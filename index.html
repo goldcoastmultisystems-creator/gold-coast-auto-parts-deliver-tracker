@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Gold Coast Auto Parts — Delivery Status Board</title>
+<link rel="icon" type="image/png" href="./favicon.png">
+<link rel="apple-touch-icon" href="./favicon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <style>
 :root {
@@ -136,6 +138,15 @@ body.reordering { user-select: none; }
 .photo-thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; border: 1px solid var(--glass-border); cursor: pointer; }
 .photo-placeholder { width: 64px; height: 64px; border-radius: 8px; border: 1.5px dashed var(--glass-border); display: flex; align-items: center; justify-content: center; color: var(--text-soft); font-size: 10px; text-align: center; background: rgba(255,255,255,0.03); cursor: pointer; }
 .photo-note { font-size: 10.5px; color: var(--text-soft); }
+.video-thumb-wrap { position: relative; width: 96px; height: 64px; border-radius: 8px; overflow: hidden; border: 1px solid var(--glass-border); cursor: pointer; background: #000; }
+.video-thumb-wrap video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.video-play-badge { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 20px; background: rgba(0,0,0,0.25); text-shadow: 0 0 6px rgba(0,0,0,0.6); }
+.video-remove-badge { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.65); color: #fca5a5; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; }
+.video-uploading { width: 96px; height: 64px; border-radius: 8px; border: 1.5px dashed var(--glass-border-gold); display: flex; align-items: center; justify-content: center; color: var(--gold-2); font-size: 10px; text-align: center; background: rgba(212,164,65,0.08); }
+.video-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 300; display: none; align-items: center; justify-content: center; padding: 24px; }
+.video-modal-backdrop.open { display: flex; }
+.video-modal-backdrop video { max-width: 100%; max-height: 85vh; border-radius: 10px; }
+.video-modal-close { position: fixed; top: 18px; right: 22px; color: #fff; font-size: 28px; cursor: pointer; z-index: 301; }
 .status-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .status-btn { flex: 1 1 0%; min-width: 90px; border-radius: 8px; padding: 8px 10px; font-size: 12px; font-weight: 700; border: 1.5px solid var(--glass-border); background: rgba(255,255,255,0.04); color: var(--text-soft); cursor: pointer; transition: all 0.15s; }
 .status-btn:hover { border-color: rgba(255,255,255,0.25); color: var(--text); }
@@ -204,6 +215,7 @@ body.reordering { user-select: none; }
 .role-badge { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; padding: 3px 8px; border-radius: 6px; }
 .role-badge.driver { background: rgba(96,165,250,0.15); color: var(--blue); border: 1px solid rgba(96,165,250,0.3); }
 .role-badge.dispatcher { background: rgba(167,139,250,0.15); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+.role-badge.admin { background: rgba(212,164,65,0.16); color: var(--gold-2); border: 1px solid var(--glass-border-gold); }
 .pin-tag { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; letter-spacing: 2px; color: var(--gold-2); background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 6px; padding: 3px 8px; }
 .team-row-actions { display: flex; gap: 6px; margin-left: auto; }
 footer { max-width: 1000px; margin: 30px auto 0px; padding: 20px 16px 24px; color: var(--text-soft); font-size: 12px; text-align: center; border-top: 1px solid var(--glass-border); }
@@ -283,10 +295,21 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
     <div id="guestPane" style="display:none;">
       <div class="field">
         <label>You Are</label>
-        <select id="guestNameSelect" onchange="document.getElementById('guestPin').focus()"></select>
+        <select id="guestNameSelect" onchange="onGuestSelectChange()"></select>
+      </div>
+      <div class="field" id="guestOtherNameField" style="display:none;">
+        <label>Your Name</label>
+        <input id="guestOtherName" type="text" placeholder="e.g. Anthony">
+      </div>
+      <div class="field" id="guestOtherRoleField" style="display:none;">
+        <label>Role</label>
+        <select id="guestOtherRole">
+          <option value="Driver">Driver</option>
+          <option value="Dispatcher">Dispatcher</option>
+        </select>
       </div>
       <div class="field">
-        <label>Your Password</label>
+        <label id="guestPinLabel">Your Password</label>
         <input id="guestPin" type="password" placeholder="Your password" onkeydown="if(event.key==='Enter')guestLogin()">
       </div>
       <button class="auth-btn" onclick="guestLogin()">Enter</button>
@@ -357,6 +380,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <button class="hdr-btn" onclick="shareList()">Share</button>
       <button class="hdr-btn" onclick="printReport()">End of Day Report</button>
       <button class="hdr-btn" onclick="openPartsList()">Parts to Pull</button>
+      <button class="hdr-btn" onclick="openPartsToPurchase()">Parts to Purchase</button>
       <button class="hdr-btn" id="manageTeamBtn" onclick="openTeamModal()" style="display:none;">👥 Manage Team</button>
       <button class="hdr-btn" onclick="doLogout()">Log Out</button>
     </div>
@@ -456,6 +480,10 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
           <div><label class="edit-label">Email (optional)</label><input class="edit-input" id="teamNewEmail" placeholder="e.g. name@gmail.com"></div>
           <div><label class="edit-label">Password</label><input class="edit-input" id="teamNewPin" placeholder="e.g. Limelight"></div>
         </div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-soft); cursor:pointer; margin-top:2px;">
+          <input type="checkbox" id="teamNewAdmin" style="width:auto;">
+          Admin access — can manage the team and freely switch their own Driver/Dispatcher role (controls their own location tracking)
+        </label>
         <div class="edit-actions"><button class="btn btn-gold btn-sm" onclick="addTeamMember()">+ Add</button></div>
       </div>
       <div id="teamModalMsg" style="font-size:12.5px; margin-top:8px;"></div>
@@ -497,12 +525,19 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
   </div>
 </div>
 
+<div class="video-modal-backdrop" id="videoModal">
+  <span class="video-modal-close" onclick="closeVideoModal()">✕</span>
+  <video id="videoModalPlayer" controls autoplay></video>
+</div>
+
 <input type="file" id="photoFileInput" accept="image/*" capture="environment" style="display:none;">
+<input type="file" id="videoFileInput" accept="video/*" capture="environment" style="display:none;">
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
 /* ---------- FIREBASE (fill in with your project's config from Firebase Console > Project settings) ---------- */
@@ -521,9 +556,9 @@ var FIREBASE_ENABLED = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.index
 /* ---------- EMAIL NOTIFICATIONS (EmailJS — sends real email from the browser, no backend needed) ---------- */
 /* Sign up free at emailjs.com, add an Email Service (connect your Gmail), create a template, then fill these in. */
 var EMAILJS_CONFIG = {
-  publicKey: "YOUR_PUBLIC_KEY",
-  serviceId: "YOUR_SERVICE_ID",
-  templateId: "YOUR_TEMPLATE_ID"
+  publicKey: "nZQzXeztAmkfMPwzS",
+  serviceId: "service_3tu8gjm",
+  templateId: "template_ikrxgrj"
 };
 var EMAILJS_ENABLED = !!(EMAILJS_CONFIG.publicKey && EMAILJS_CONFIG.publicKey.indexOf('YOUR_') !== 0);
 var NOTIFY_EMAIL = "goldcoastmultisystems@gmail.com";
@@ -561,7 +596,7 @@ function checkAutoArrival(lat, lng, driverName) {
     sendArrivalEmail(next, driverName);
   }
 }
-var fbApp = null, fbAuth = null, fbDb = null, fbReady = false;
+var fbApp = null, fbAuth = null, fbDb = null, fbStorage = null, fbReady = false;
 var driverPositions = {};
 
 function initFirebase() {
@@ -570,6 +605,7 @@ function initFirebase() {
     fbApp = firebase.initializeApp(FIREBASE_CONFIG);
     fbAuth = firebase.auth();
     fbDb = firebase.database();
+    fbStorage = firebase.storage();
   } catch (e) { console.error('Firebase init failed', e); setSyncStatus('error'); return; }
   setSyncStatus('connecting');
   fbAuth.onAuthStateChanged(function(user) {
@@ -589,6 +625,8 @@ function attachFirebaseListeners() {
   fbDb.ref('gcap/days').on('value', function(snap) {
     days = normalizeDays(snap.val() || {});
     currentDay = getDay(todayKey());
+    knownStopIds = {};
+    currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
     renderAll();
   });
   fbDb.ref('gcap/drivers').on('value', function(snap) {
@@ -604,27 +642,31 @@ function setSyncStatus(state) {
   dot.className = 'sync-dot' + (state === 'live' ? ' live' : (state === 'error' ? ' err' : ''));
   label.textContent = state === 'live' ? 'Live sync' : (state === 'connecting' ? 'Connecting…' : (state === 'error' ? 'Sync error' : 'Local only'));
 }
+function canManageTeam() {
+  return !!(session && (session.type === 'owner' || session.isAdmin));
+}
 function refreshSettingsUI() {
   document.getElementById('driverName').value = settings.driverName || '';
   document.getElementById('driverRole').value = settings.driverRole || 'Driver';
   document.getElementById('companyName').value = settings.companyName || 'Gold Coast Auto Parts';
-  document.getElementById('manageTeamBtn').style.display = (session && session.type === 'owner') ? '' : 'none';
+  document.getElementById('manageTeamBtn').style.display = canManageTeam() ? '' : 'none';
   syncRoleUI();
 }
 function syncRoleUI() {
   var sel = document.getElementById('driverRole');
   var stat = document.getElementById('driverRoleStatic');
   var nameInput = document.getElementById('driverName');
-  if (session && session.type === 'guest') {
+  var locked = session && session.type === 'guest' && !session.isAdmin;
+  if (locked) {
     sel.style.display = 'none';
     stat.style.display = '';
     stat.textContent = session.role || 'Driver';
-    nameInput.disabled = true;
   } else {
     sel.style.display = '';
     stat.style.display = 'none';
-    nameInput.disabled = false;
+    if (session && session.type === 'guest') sel.value = session.role || 'Driver';
   }
+  nameInput.disabled = !!(session && session.type === 'guest');
 }
 
 /* ---------- LIVE LOCATION TRACKING (drivers push position; everyone can view the map) ---------- */
@@ -756,16 +798,50 @@ function loadSettings() {
 }
 function saveSettings(s) { localStorage.setItem('kgps_settings', JSON.stringify(s)); if (FIREBASE_ENABLED && fbDb) fbDb.ref('gcap/settings').set(s); }
 function loadSession() {
-  try { return JSON.parse(sessionStorage.getItem('kgps_session')) || null; } catch(e) { return null; }
+  try { return JSON.parse(localStorage.getItem('kgps_session')) || null; } catch(e) { return null; }
 }
 function saveSession(s) {
-  if (s) sessionStorage.setItem('kgps_session', JSON.stringify(s));
-  else sessionStorage.removeItem('kgps_session');
+  if (s) localStorage.setItem('kgps_session', JSON.stringify(s));
+  else localStorage.removeItem('kgps_session');
 }
 function loadDays() {
   try { return JSON.parse(localStorage.getItem('kgps_days')) || {}; } catch(e) { return {}; }
 }
-function saveDays(d) { localStorage.setItem('kgps_days', JSON.stringify(d)); if (FIREBASE_ENABLED && fbDb) fbDb.ref('gcap/days').set(d); }
+var knownStopIds = {};
+function mergeStopsForSave(serverStops, localStops, knownIds) {
+  serverStops = serverStops || [];
+  localStops = localStops || [];
+  knownIds = knownIds || {};
+  var localIds = {};
+  var merged = localStops.map(function(s) { localIds[s.id] = true; return s; });
+  serverStops.forEach(function(s) {
+    if (localIds[s.id]) return;
+    if (knownIds[s.id]) return;
+    merged.push(s);
+  });
+  return merged;
+}
+var saveDaysChain = Promise.resolve();
+function saveDays(d) {
+  localStorage.setItem('kgps_days', JSON.stringify(d));
+  if (!FIREBASE_ENABLED || !fbDb) return;
+  var key = todayKey();
+  if (!d[key]) { saveDaysChain = saveDaysChain.then(function() { return fbDb.ref('gcap/days').set(d); }).catch(function(e){ console.error('saveDays failed', e); }); return; }
+  saveDaysChain = saveDaysChain.then(function() {
+    return fbDb.ref('gcap/days/' + key).once('value').then(function(snap) {
+      var serverDay = snap.val() || {};
+      var localDay = days[key] || d[key];
+      var mergedStops = mergeStopsForSave(serverDay.stops, localDay.stops, knownStopIds);
+      var toWrite = { stops: mergedStops, activity: localDay.activity || [], archived: localDay.archived || [] };
+      if (days[key]) days[key].stops = mergedStops;
+      knownStopIds = {};
+      mergedStops.forEach(function(s) { knownStopIds[s.id] = true; });
+      return fbDb.ref('gcap/days/' + key).set(toWrite);
+    });
+  }).catch(function(e) {
+    console.error('saveDays merge-read failed', e);
+  });
+}
 
 function pad2(n) { return n < 10 ? '0'+n : ''+n; }
 function todayKey() { var d = new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
@@ -794,12 +870,42 @@ function applyGeocodeResult(stopId, lat, lng) {
   saveDays(days);
   if (leafletMap) renderLiveMapMarkers();
 }
+var RUN_TOGETHER_CITY_FIXES = [
+  [/\bPEMBROKEPINES\b/gi, 'PEMBROKE PINES'],
+  [/\bPOMPANOBEACH\b/gi, 'POMPANO BEACH'],
+  [/\bOAKLANDPARK\b/gi, 'OAKLAND PARK'],
+  [/\bFORTLAUDERDALE\b/gi, 'FORT LAUDERDALE'],
+  [/\bDEERFIELDBEACH\b/gi, 'DEERFIELD BEACH'],
+  [/\bMIAMIBEACH\b/gi, 'MIAMI BEACH'],
+  [/\bBOCARATON\b/gi, 'BOCA RATON'],
+  [/\bCORALSPRINGS\b/gi, 'CORAL SPRINGS'],
+  [/\bLAUDERDALELAKES\b/gi, 'LAUDERDALE LAKES'],
+  [/\bNORTHMIAMI\b/gi, 'NORTH MIAMI'],
+  [/\bWESTPALMBEACH\b/gi, 'WEST PALM BEACH']
+];
 function cleanAddressForGeocode(addr) {
-  return (addr || '')
+  var s = (addr || '')
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/gu, '')
     .replace(/^[^\w\d]+/, '')
+    .replace(/\bU\.?S\.?A\.?\b/gi, 'USA')
+    .replace(/,?\s*\bUSA\b\s*,?/gi, ', ')
+    .replace(/\s*-\s*(\d{5})\b/g, ', $1')
     .replace(/\s+/g, ' ')
+    .replace(/,\s*,/g, ',')
     .trim();
+  RUN_TOGETHER_CITY_FIXES.forEach(function(pair) { s = s.replace(pair[0], pair[1]); });
+  var stateZip = s.match(/(?:\bFL\b|\bFlorida\b)[^\d]{0,12}(\d{5})/i);
+  if (stateZip) {
+    var idx = s.indexOf(stateZip[1], stateZip.index);
+    s = s.slice(0, idx + 5);
+  } else {
+    var zipMatches = s.match(/\b\d{5}\b/g);
+    if (zipMatches && zipMatches.length) {
+      var lastZip = zipMatches[zipMatches.length - 1];
+      s = s.slice(0, s.lastIndexOf(lastZip) + 5);
+    }
+  }
+  return s.replace(/,\s*$/, '').trim();
 }
 function geocodeStop(stop) {
   if (!stop.addr || (typeof stop.lat === 'number' && typeof stop.lng === 'number')) return;
@@ -845,7 +951,7 @@ function normalizeDayEntry(d) {
   if (!d.activity) d.activity = [];
   if (!d.archived) d.archived = [];
   d.archived.forEach(function(a) { if (!a.stops) a.stops = []; if (!a.activity) a.activity = []; });
-  d.stops.forEach(function(s) { if (!s.photos) s.photos = []; if (!s.chat) s.chat = []; });
+  d.stops.forEach(function(s) { if (!s.photos) s.photos = []; if (!s.videos) s.videos = []; if (!s.chat) s.chat = []; });
   return d;
 }
 function normalizeDays(obj) {
@@ -863,6 +969,7 @@ function init() {
   settings = loadSettings();
   session = loadSession();
   currentDay = getDay(todayKey());
+  currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
   if (!settings.team) { settings.team = []; saveSettings(settings); }
 
   document.getElementById('todayPill').textContent = fmtDateDisplay(todayKey());
@@ -874,7 +981,7 @@ function init() {
 
   if (session) {
     document.getElementById('authGate').classList.add('hidden');
-    document.getElementById('manageTeamBtn').style.display = session.type === 'owner' ? '' : 'none';
+    document.getElementById('manageTeamBtn').style.display = canManageTeam() ? '' : 'none';
     if (session.name && !settings.driverName) {
       document.getElementById('driverName').value = session.name;
       settings.driverName = session.name; saveSettings(settings);
@@ -892,8 +999,13 @@ function init() {
 }
 
 function onSettingsChange() {
+  var roleVal = document.getElementById('driverRole').value;
+  if (session && session.type === 'guest' && session.isAdmin) {
+    session.role = roleVal;
+    saveSession(session);
+  }
   settings.driverName = document.getElementById('driverName').value;
-  settings.driverRole = document.getElementById('driverRole').value;
+  settings.driverRole = roleVal;
   settings.companyName = document.getElementById('companyName').value;
   saveSettings(settings);
   renderStops();
@@ -909,12 +1021,21 @@ function switchAuthTab(which) {
   document.getElementById('authMsg').textContent = '';
   if (which === 'guest') populateGuestNameSelect();
 }
+var GENERIC_GUEST_CODE = '1234';
 function populateGuestNameSelect() {
   var sel = document.getElementById('guestNameSelect');
   if (!sel) return;
   var team = (settings && settings.team || []).filter(function(m) { return m.active !== false; });
-  if (!team.length) { sel.innerHTML = '<option value="">No team members yet — ask the owner</option>'; return; }
-  sel.innerHTML = team.map(function(m) { return '<option value="' + m.id + '">' + escapeHtml(m.name) + ' (' + m.role + ')</option>'; }).join('');
+  sel.innerHTML = team.map(function(m) { return '<option value="' + m.id + '">' + escapeHtml(m.name) + ' (' + m.role + ')</option>'; }).join('')
+    + '<option value="__other__">Someone else (type your name)</option>';
+  onGuestSelectChange();
+}
+function onGuestSelectChange() {
+  var isOther = document.getElementById('guestNameSelect').value === '__other__';
+  document.getElementById('guestOtherNameField').style.display = isOther ? '' : 'none';
+  document.getElementById('guestOtherRoleField').style.display = isOther ? '' : 'none';
+  document.getElementById('guestPinLabel').textContent = isOther ? '4-Digit Code' : 'Your Password';
+  document.getElementById('guestPin').focus();
 }
 function setAuthMsg(msg, cls) {
   var el = document.getElementById('authMsg');
@@ -944,18 +1065,27 @@ function guestLogin() {
   var sel = document.getElementById('guestNameSelect');
   var memberId = sel.value;
   var pin = document.getElementById('guestPin').value.trim();
-  var team = settings.team || [];
-  if (!team.length) { setAuthMsg('No team members yet. Ask the owner to add you in Manage Team.', 'err'); return; }
-  var member = team.find(function(m) { return m.id === memberId; });
-  if (!member) { setAuthMsg('Pick your name from the list.', 'err'); return; }
-  if (pin !== member.pin) { setAuthMsg('Incorrect PIN.', 'err'); return; }
-  session = { type: 'guest', name: member.name, role: member.role, memberId: member.id };
+  var name, role, memberObj;
+  if (memberId === '__other__') {
+    name = document.getElementById('guestOtherName').value.trim();
+    role = document.getElementById('guestOtherRole').value;
+    if (!name) { setAuthMsg('Enter your name.', 'err'); return; }
+    if (pin !== GENERIC_GUEST_CODE) { setAuthMsg('Incorrect code.', 'err'); return; }
+    memberObj = { name: name, role: role, memberId: null, isAdmin: false };
+  } else {
+    var team = settings.team || [];
+    var member = team.find(function(m) { return m.id === memberId; });
+    if (!member) { setAuthMsg('Pick your name from the list.', 'err'); return; }
+    if (pin !== member.pin) { setAuthMsg('Incorrect password.', 'err'); return; }
+    memberObj = { name: member.name, role: member.role, memberId: member.id, isAdmin: !!member.isAdmin };
+  }
+  session = { type: 'guest', name: memberObj.name, role: memberObj.role, memberId: memberObj.memberId, isAdmin: memberObj.isAdmin };
   saveSession(session);
-  document.getElementById('driverName').value = member.name;
-  document.getElementById('driverRole').value = member.role;
-  settings.driverName = member.name; settings.driverRole = member.role; saveSettings(settings);
+  document.getElementById('driverName').value = memberObj.name;
+  document.getElementById('driverRole').value = memberObj.role;
+  settings.driverName = memberObj.name; settings.driverRole = memberObj.role; saveSettings(settings);
   document.getElementById('authGate').classList.add('hidden');
-  document.getElementById('manageTeamBtn').style.display = 'none';
+  document.getElementById('manageTeamBtn').style.display = canManageTeam() ? '' : 'none';
   setAuthMsg('');
   renderAll();
   syncRoleUI();
@@ -1058,7 +1188,7 @@ function renderNextBanner() {
   banner.className = 'next-banner';
   banner.innerHTML =
     '<div><div class="lbl">Up Next</div><div class="loc">'+escapeHtml(next.loc || 'Unnamed stop')+'</div><div class="addr">'+escapeHtml(next.addr||'')+'</div></div>'+
-    (next.addr ? '<a href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(next.addr)+'" target="_blank" rel="noopener">Directions →</a>' : '');
+    (next.addr ? '<a href="https://maps.apple.com/?q='+encodeURIComponent(next.addr)+'" target="_blank" rel="noopener">Directions →</a>' : '');
 }
 function currentStopId() {
   var next = currentDay.stops.find(function(s) { return s.status !== 'completed'; });
@@ -1084,6 +1214,13 @@ function renderStopCard(s, i, curId) {
   var photosHtml = (s.photos||[]).map(function(p, pi) {
     return '<img class="photo-thumb" src="'+p+'" onclick="removePhoto(\''+s.id+'\','+pi+')" title="Tap to remove">';
   }).join('');
+  var videosHtml = (s.videos||[]).map(function(v, vi) {
+    return '<div class="video-thumb-wrap" onclick="openVideoModal(\''+escapeHtml(v)+'\')">' +
+      '<video src="'+v+'" preload="metadata" muted></video>' +
+      '<span class="video-play-badge">▶</span>' +
+      '<span class="video-remove-badge" onclick="event.stopPropagation(); removeVideo(\''+s.id+'\','+vi+')" title="Remove">✕</span>' +
+    '</div>';
+  }).join('') + (s.videoUploading ? '<div class="video-uploading">Uploading…</div>' : '');
   var statusBtns = STATUS_ORDER.map(function(st) {
     var active = s.status === st ? ' active-'+st : '';
     return '<button class="status-btn'+active+'" onclick="setStatus(\''+s.id+'\',\''+st+'\')">'+STATUS_LABELS[st]+'</button>';
@@ -1120,11 +1257,12 @@ function renderStopCard(s, i, curId) {
         (s.so ? '<div><b>SO#:</b> '+escapeHtml(s.so)+'</div>' : '') +
         (s.mop ? '<div><b>Payment:</b> '+escapeHtml(s.mop)+'</div>' : '') +
         (s.part ? '<div class="full"><b>Part:</b> '+escapeHtml(s.part)+'</div>' : '') +
-        (s.addr ? '<div class="full"><a class="maps-link" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a></div>' : '') +
+        (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a></div>' : '') +
       '</div>' +
       (noteText ? '<div class="note-flag">📝 '+escapeHtml(noteText)+'</div>' : '') +
-      '<div class="photo-row" style="margin-top:10px;">' + photosHtml +
+      '<div class="photo-row" style="margin-top:10px;">' + photosHtml + videosHtml +
         '<div class="photo-placeholder" onclick="addPhoto(\''+s.id+'\')">+ Photo</div>' +
+        (s.videoUploading ? '' : '<div class="photo-placeholder" onclick="addVideo(\''+s.id+'\')">+ Video</div>') +
       '</div>' +
       '<div class="status-row" style="margin-top:2px;">' + statusBtns + '</div>' +
       updatedByHtml +
@@ -1367,6 +1505,70 @@ function removePhoto(stopId, idx) {
   renderStops();
 }
 
+/* ---------- VIDEOS (uploaded to Firebase Storage — too large to embed like photos) ---------- */
+var videoTargetStopId = null;
+var VIDEO_MAX_BYTES = 300 * 1024 * 1024;
+function addVideo(stopId) {
+  if (!FIREBASE_ENABLED || !fbStorage) { showToast('Video needs Firebase connected — see setup notes.', 'red'); return; }
+  videoTargetStopId = stopId;
+  document.getElementById('videoFileInput').click();
+}
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('videoFileInput').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    e.target.value = '';
+    if (!file || !videoTargetStopId) return;
+    if (file.size > VIDEO_MAX_BYTES) { showToast('That video is too large (max 300MB).', 'red'); return; }
+    var stopId = videoTargetStopId;
+    var s = currentDay.stops.find(function(x) { return x.id === stopId; });
+    if (!s) return;
+    s.videoUploading = true;
+    renderStops();
+    var path = 'gcap/videos/' + stopId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    var task = fbStorage.ref(path).put(file);
+    task.then(function(snapshot) {
+      return snapshot.ref.getDownloadURL();
+    }).then(function(url) {
+      var live = currentDay.stops.find(function(x) { return x.id === stopId; });
+      if (live) {
+        live.videos = live.videos || [];
+        live.videos.push(url);
+        live.videoUploading = false;
+        saveDays(days);
+      }
+      renderStops();
+      showToast('Video uploaded.', 'green');
+    }).catch(function(err) {
+      console.error('video upload failed', err);
+      var live = currentDay.stops.find(function(x) { return x.id === stopId; });
+      if (live) live.videoUploading = false;
+      renderStops();
+      showToast('Video upload failed — check your connection.', 'red');
+    });
+  });
+});
+function removeVideo(stopId, idx) {
+  if (!confirm('Remove this video?')) return;
+  var s = currentDay.stops.find(function(x) { return x.id === stopId; });
+  if (!s || !s.videos) return;
+  var url = s.videos[idx];
+  s.videos.splice(idx, 1);
+  saveDays(days);
+  renderStops();
+  if (fbStorage && url) { fbStorage.refFromURL(url).delete().catch(function() {}); }
+}
+function openVideoModal(url) {
+  var player = document.getElementById('videoModalPlayer');
+  player.src = url;
+  document.getElementById('videoModal').classList.add('open');
+}
+function closeVideoModal() {
+  var player = document.getElementById('videoModalPlayer');
+  player.pause();
+  player.src = '';
+  document.getElementById('videoModal').classList.remove('open');
+}
+
 /* ---------- DRAG REORDER ---------- */
 function setupDragAndDrop() {
   var list = document.getElementById('stopsList');
@@ -1536,6 +1738,12 @@ function viewHistoryDay(key) {
 
 function openTeamModal() {
   document.getElementById('teamModal').classList.add('open');
+  if (session && session.type === 'guest' && session.isAdmin) {
+    document.getElementById('teamPasswordGate').style.display = 'none';
+    document.getElementById('teamManageSection').style.display = '';
+    renderTeamList();
+    return;
+  }
   document.getElementById('teamPasswordGate').style.display = '';
   document.getElementById('teamManageSection').style.display = 'none';
   document.getElementById('teamGatePassword').value = '';
@@ -1560,6 +1768,7 @@ function renderTeamList() {
     return '<div class="team-row' + (m.active === false ? ' inactive' : '') + '">' +
       '<span class="tname">' + escapeHtml(m.name) + (m.email ? '<br><span style="font-weight:400;font-size:11px;color:var(--text-soft);">' + escapeHtml(m.email) + '</span>' : '') + '</span>' +
       '<span class="role-badge ' + m.role.toLowerCase() + '">' + m.role + '</span>' +
+      (m.isAdmin ? '<span class="role-badge admin">Admin</span>' : '') +
       '<span class="pin-tag">' + escapeHtml(m.pin) + '</span>' +
       '<div class="team-row-actions">' +
         '<button class="btn btn-ghost btn-sm" onclick="toggleTeamMemberActive(\'' + m.id + '\')">' + (m.active === false ? 'Reactivate' : 'Deactivate') + '</button>' +
@@ -1572,15 +1781,17 @@ function addTeamMember() {
   var role = document.getElementById('teamNewRole').value;
   var email = document.getElementById('teamNewEmail').value.trim();
   var pin = document.getElementById('teamNewPin').value.trim();
+  var isAdmin = document.getElementById('teamNewAdmin').checked;
   var msg = document.getElementById('teamModalMsg');
   if (!name) { msg.textContent = 'Enter a name.'; msg.style.color = 'var(--red)'; return; }
   if (pin.length < 3) { msg.textContent = 'Password must be at least 3 characters.'; msg.style.color = 'var(--red)'; return; }
   settings.team = settings.team || [];
-  settings.team.push({ id: uid(), name: name, role: role, email: email, pin: pin, active: true });
+  settings.team.push({ id: uid(), name: name, role: role, email: email, pin: pin, isAdmin: isAdmin, active: true });
   saveSettings(settings);
   document.getElementById('teamNewName').value = '';
   document.getElementById('teamNewEmail').value = '';
   document.getElementById('teamNewPin').value = '';
+  document.getElementById('teamNewAdmin').checked = false;
   msg.textContent = name + ' added.'; msg.style.color = 'var(--green)';
   renderTeamList();
   populateGuestNameSelect();
@@ -1641,14 +1852,24 @@ function printReport() {
   openPageOverlay('End of Day Report', reportDocShell('End of Day Report', body));
 }
 function openPartsList() {
-  var withParts = currentDay.stops.filter(function(s) { return s.part && s.part.trim(); });
+  var withParts = currentDay.stops.filter(function(s) { return s.part && s.part.trim() && s.type !== 'pickup'; });
   var rows = withParts.map(function(s) {
     return '<tr><td>'+escapeHtml(s.loc)+'</td><td>'+escapeHtml(s.part)+'</td><td>'+(s.so?escapeHtml(s.so):'—')+'</td><td>'+STATUS_LABELS[s.status]+'</td></tr>';
   }).join('');
-  var body = '<h1>Parts to Pull</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+'</h2>' +
+  var body = '<h1>Parts to Pull</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • already in stock, pull from Davie</h2>' +
     (withParts.length ? '<table><tr><th>Stop</th><th>Part # / Description</th><th>SO#</th><th>Status</th></tr>'+rows+'</table>'
       : '<p style="color:#5b6a85;">No stops have a part number or description yet.</p>');
   openPageOverlay('Parts to Pull', reportDocShell('Parts to Pull', body));
+}
+function openPartsToPurchase() {
+  var toBuy = currentDay.stops.filter(function(s) { return s.part && s.part.trim() && s.type === 'pickup'; });
+  var rows = toBuy.map(function(s) {
+    return '<tr><td>'+escapeHtml(s.loc)+'</td><td>'+escapeHtml(s.part)+'</td><td>'+(s.so?escapeHtml(s.so):'—')+'</td><td>'+STATUS_LABELS[s.status]+'</td></tr>';
+  }).join('');
+  var body = '<h1>Parts to Purchase</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • pickups from suppliers, not yet in stock</h2>' +
+    (toBuy.length ? '<table><tr><th>Stop</th><th>Part # / Description</th><th>SO#</th><th>Status</th></tr>'+rows+'</table>'
+      : '<p style="color:#5b6a85;">No pickup stops with a part number or description yet.</p>');
+  openPageOverlay('Parts to Purchase', reportDocShell('Parts to Purchase', body));
 }
 function shareStop(id) {
   var s = currentDay.stops.find(function(x) { return x.id === id; });
