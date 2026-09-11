@@ -623,8 +623,16 @@ function attachFirebaseListeners() {
     populateGuestNameSelect();
   });
   fbDb.ref('gcap/days').on('value', function(snap) {
-    days = normalizeDays(snap.val() || {});
-    currentDay = getDay(todayKey());
+    var incoming = normalizeDays(snap.val() || {});
+    var key = todayKey();
+    var localToday = days && days[key];
+    if (localToday) {
+      if (!incoming[key]) incoming[key] = { stops: [], activity: [], archived: [] };
+      incoming[key].stops = mergeStopsForSave(incoming[key].stops, localToday.stops, knownStopIds);
+      incoming[key].activity = localToday.activity && localToday.activity.length > (incoming[key].activity||[]).length ? localToday.activity : incoming[key].activity;
+    }
+    days = incoming;
+    currentDay = getDay(key);
     knownStopIds = {};
     currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
     renderAll();
