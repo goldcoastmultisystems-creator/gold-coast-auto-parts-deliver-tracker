@@ -376,7 +376,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <input id="companyName" placeholder="e.g. Gold Coast Auto Parts" style="width:170px;" oninput="onSettingsChange()">
     </div>
     <div class="header-actions">
-      <button class="hdr-btn" onclick="location.href='sales-routes.html'">🧾 Sales Rep Routes →</button>
+      <button class="hdr-btn" id="salesNavBtn" onclick="location.href='sales-routes.html'">🧾 Sales Rep Routes →</button>
       <button class="hdr-btn" onclick="startNewList()">+ New List</button>
       <button class="hdr-btn" onclick="openLiveMap()">📍 Live Map</button>
       <button class="hdr-btn" onclick="openHistory()">History</button>
@@ -679,6 +679,11 @@ function syncRoleUI() {
     if (session && session.type === 'guest') sel.value = session.role || 'Driver';
   }
   nameInput.disabled = !!(session && session.type === 'guest');
+  var salesBtn = document.getElementById('salesNavBtn');
+  if (salesBtn) {
+    var hideSales = !!(session && session.type === 'guest' && !session.isAdmin && session.role === 'Driver');
+    salesBtn.style.display = hideSales ? 'none' : '';
+  }
 }
 
 /* ---------- LIVE LOCATION TRACKING (drivers push position; everyone can view the map) ---------- */
@@ -976,7 +981,7 @@ function getDay(key) {
   return days[key];
 }
 
-function maybeRedirectForRole() {
+function enforcePageAccess() {
   if (session && session.type === 'guest' && !session.isAdmin && session.role === 'Sales Rep') {
     window.location.href = 'sales-routes.html';
     return true;
@@ -988,7 +993,7 @@ function init() {
   days = normalizeDays(loadDays());
   settings = loadSettings();
   session = loadSession();
-  if (maybeRedirectForRole()) return;
+  if (enforcePageAccess()) return;
   currentDay = getDay(todayKey());
   currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
   if (!settings.team) { settings.team = []; saveSettings(settings); }
@@ -1102,10 +1107,14 @@ function guestLogin() {
   }
   session = { type: 'guest', name: memberObj.name, role: memberObj.role, memberId: memberObj.memberId, isAdmin: memberObj.isAdmin };
   saveSession(session);
-  if (maybeRedirectForRole()) return;
+  settings.driverName = memberObj.name; settings.driverRole = memberObj.role; saveSettings(settings);
+  if (enforcePageAccess()) return;
+  if (session.type === 'guest' && !session.isAdmin && session.role === 'Dispatcher') {
+    window.location.href = 'choose-dashboard.html';
+    return;
+  }
   document.getElementById('driverName').value = memberObj.name;
   document.getElementById('driverRole').value = memberObj.role;
-  settings.driverName = memberObj.name; settings.driverRole = memberObj.role; saveSettings(settings);
   document.getElementById('authGate').classList.add('hidden');
   document.getElementById('manageTeamBtn').style.display = canManageTeam() ? '' : 'none';
   setAuthMsg('');
