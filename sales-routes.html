@@ -103,11 +103,52 @@ main { max-width: 1000px; margin: 0px auto; padding: 18px 16px 0px; }
 .column.drag-over { background: rgba(212,164,65,0.08); border-color: var(--glass-border-gold); }
 .pcard-placeholder { border: 1.5px dashed var(--glass-border-gold); border-radius: 16px; background: rgba(212,164,65,0.05); }
 .pcard-head { cursor: pointer; }
+.pcard.current .pcard-head { padding-top: 24px; }
+.pcard-badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
 .pcard-actions { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 10px; }
 .media-badge { font-size: 10px; font-weight: 700; color: var(--gold-2); background: rgba(212,164,65,0.12); border: 1px solid var(--glass-border-gold); border-radius: 6px; padding: 3px 7px; white-space: nowrap; align-self: flex-start; }
 .expand-caret { color: var(--text-soft); font-size: 9px; margin-top: 6px; flex-shrink: 0; }
 .pcard.dragging { box-shadow: 0 20px 52px rgba(0,0,0,0.6); }
 @media (max-width: 700px) { .board { scroll-snap-type: x mandatory; } }
+.tier-badge { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+.tier-badge.tier-A { background: linear-gradient(135deg, var(--gold), var(--gold-2)); color: var(--gold-ink); }
+.tier-badge.tier-B { background: rgba(96,165,250,0.2); color: var(--blue); border: 1px solid rgba(96,165,250,0.4); }
+.tier-badge.tier-C { background: rgba(251,191,36,0.2); color: var(--amber); border: 1px solid rgba(251,191,36,0.4); }
+.tier-badge.tier-D { background: rgba(255,255,255,0.08); color: var(--text-soft); border: 1px solid var(--glass-border); }
+.report-badge { font-size: 10.5px; color: var(--green); font-weight: 700; white-space: nowrap; align-self: center; }
+.stop-report-btn { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; border: 1.5px solid var(--glass-border-gold); background: rgba(212,164,65,0.12); color: var(--gold-2); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.stop-report-btn:hover { background: rgba(212,164,65,0.22); }
+.report-section { border: 1px solid var(--glass-border); border-radius: 12px; margin-bottom: 10px; overflow: hidden; background: rgba(255,255,255,0.02); }
+.report-section summary { padding: 10px 14px; cursor: pointer; font-weight: 700; font-size: 12px; color: var(--gold-2); text-transform: uppercase; letter-spacing: 0.4px; list-style: none; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); }
+.report-section summary::-webkit-details-marker { display: none; }
+.report-section summary::after { content: '▾'; transition: transform 0.15s; color: var(--text-soft); }
+.report-section[open] summary::after { transform: rotate(180deg); }
+.report-section .report-section-body { padding: 12px 14px 4px; }
+.chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.chip-btn { border: 1.5px solid var(--glass-border); background: rgba(255,255,255,0.04); color: var(--text-soft); border-radius: 20px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.chip-btn.active { border-color: var(--glass-border-gold); background: rgba(212,164,65,0.16); color: var(--gold-2); }
+.tier-chip { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--glass-border); background: rgba(255,255,255,0.04); color: var(--text-soft); font-weight: 800; font-size: 15px; cursor: pointer; font-family: inherit; }
+.tier-chip.active[data-tier="A"] { background: linear-gradient(135deg, var(--gold), var(--gold-2)); color: var(--gold-ink); border-color: transparent; }
+.tier-chip.active[data-tier="B"] { background: rgba(96,165,250,0.25); color: var(--blue); border-color: var(--blue); }
+.tier-chip.active[data-tier="C"] { background: rgba(251,191,36,0.25); color: var(--amber); border-color: var(--amber); }
+.tier-chip.active[data-tier="D"] { background: rgba(255,255,255,0.14); color: var(--text); border-color: var(--text-soft); }
+.checklist-progress { height: 8px; background: rgba(255,255,255,0.06); border-radius: 6px; overflow: hidden; margin-bottom: 6px; }
+.checklist-progress-bar { height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-2)); transition: width 0.3s; }
+.checklist-progress-label { font-size: 11.5px; color: var(--text-soft); margin-bottom: 20px; }
+.checklist-section { background: var(--glass); backdrop-filter: var(--blur); border: 1px solid var(--glass-border); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+.checklist-section h3 { margin: 0 0 10px; font-size: 13px; color: var(--gold-2); text-transform: uppercase; letter-spacing: 0.4px; }
+.checklist-item { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 13px; cursor: pointer; }
+.checklist-item input { width: 18px; height: 18px; flex-shrink: 0; }
+.during-visit-list { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--text-soft); line-height: 1.8; }
+.kpi-table { display: flex; flex-direction: column; gap: 2px; }
+.kpi-row { display: grid; grid-template-columns: 1fr 70px 70px; gap: 10px; align-items: center; padding: 6px 0; font-size: 12.5px; }
+.kpi-row.kpi-head { color: var(--text-soft); font-weight: 700; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.4px; border-bottom: 1px dashed var(--glass-border); padding-bottom: 8px; margin-bottom: 4px; }
+.kpi-input { width: 100%; border: 1px solid var(--glass-border); border-radius: 6px; padding: 6px; background: rgba(255,255,255,0.06); color: var(--text); text-align: center; font-family: inherit; }
+.kpi-actual { text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+.kpi-good { color: var(--green); }
+.kpi-warn { color: var(--amber); }
+.kpi-bad { color: var(--red); }
+#checklistBody textarea { width: 100%; border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; background: rgba(255,255,255,0.06); color: var(--text); font-family: inherit; font-size: 13px; box-sizing: border-box; }
 .stop-card { background: var(--glass); backdrop-filter: var(--blur); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.35); position: relative; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
 .stop-card:hover { border-color: rgba(255,255,255,0.18); }
 .stop-card.current { border: 1px solid var(--glass-border-gold); box-shadow: 0 0 0 1px rgba(212,164,65,0.3), 0 0 34px rgba(212,164,65,0.25), 0 10px 30px rgba(0,0,0,0.4); }
@@ -389,6 +430,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <button class="hdr-btn" onclick="openHistory()">History</button>
       <button class="hdr-btn" onclick="shareList()">Share</button>
       <button class="hdr-btn" onclick="printReport()">End of Day Report</button>
+      <button class="hdr-btn" onclick="openChecklist()">✅ Daily Checklist</button>
       <button class="hdr-btn" id="manageTeamBtn" onclick="openTeamModal()" style="display:none;">👥 Manage Team</button>
       <button class="hdr-btn" onclick="doLogout()">Log Out</button>
     </div>
@@ -501,6 +543,26 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
     <div id="historyBody"></div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeHistory()">Close</button></div>
   </div>
+</div>
+
+<div class="modal-backdrop" id="reportModal">
+  <div class="modal wide">
+    <h3>Visit Report</h3>
+    <p class="modal-sub" id="reportSub"></p>
+    <div id="reportBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeReportModal()">Close</button>
+      <button class="btn btn-gold" onclick="saveReportModal()">Save Report</button>
+    </div>
+  </div>
+</div>
+
+<div class="page-overlay" id="checklistOverlay">
+  <div class="page-overlay-toolbar">
+    <button onclick="closeChecklist()">← Back</button>
+    <span class="page-overlay-title">Daily Checklist — <span id="checklistDateLabel"></span></span>
+  </div>
+  <div id="checklistBody" style="flex:1; overflow-y:auto; padding:20px 16px 50px; max-width:720px; margin:0 auto; width:100%; box-sizing:border-box;"></div>
 </div>
 
 <div class="page-overlay" id="pageOverlay">
@@ -802,6 +864,28 @@ function renderDriverListPanel() {
 var STATUS_LABELS = { pending:'Pending', onway:'En Route', arrived:'At Location', completed:'Completed', postponed:'Postponed', returned:'Not Interested' };
 var STATUS_ORDER = ['pending','onway','arrived','completed','postponed','returned'];
 var TYPE_LABELS = { prospect:'New Prospect', customer:'Existing Customer', followup:'Follow-Up', other:'Other' };
+var PAIN_POINTS = [
+  { key:'fitment', label:'Fitment' }, { key:'delivery', label:'Delivery' }, { key:'communication', label:'Communication' },
+  { key:'availability', label:'Availability' }, { key:'price', label:'Price' }
+];
+var LEAD_TIERS = ['A','B','C','D'];
+function ensureReport(s) {
+  if (!s.report) {
+    s.report = {
+      bays: '', jobsPerWeek: '', contactTitle: '', preferredContact: '',
+      vehicleMakes: '', drpAffiliations: '', currentSuppliers: '', estimatingSoftware: '',
+      painPoints: { fitment:false, delivery:false, communication:false, availability:false, price:false },
+      quotes: [ { ymm:'', notes:'' }, { ymm:'', notes:'' } ],
+      visitOutcome: '', leadTier: '',
+      nextAction: { what:'', when:'', channel:'', stage:'' },
+      crmConfirmed: false
+    };
+  }
+  if (!s.report.painPoints) s.report.painPoints = { fitment:false, delivery:false, communication:false, availability:false, price:false };
+  if (!s.report.quotes) s.report.quotes = [ { ymm:'', notes:'' }, { ymm:'', notes:'' } ];
+  if (!s.report.nextAction) s.report.nextAction = { what:'', when:'', channel:'', stage:'' };
+  return s.report;
+}
 
 function loadSettings() {
   try { return JSON.parse(localStorage.getItem('kgps_settings')) || {}; } catch(e) { return {}; }
@@ -961,7 +1045,7 @@ function normalizeDayEntry(d) {
   if (!d.activity) d.activity = [];
   if (!d.archived) d.archived = [];
   d.archived.forEach(function(a) { if (!a.stops) a.stops = []; if (!a.activity) a.activity = []; });
-  d.stops.forEach(function(s) { if (!s.photos) s.photos = []; if (!s.videos) s.videos = []; if (!s.chat) s.chat = []; });
+  d.stops.forEach(function(s) { if (!s.photos) s.photos = []; if (!s.videos) s.videos = []; if (!s.chat) s.chat = []; ensureReport(s); });
   return d;
 }
 function normalizeDays(obj) {
@@ -1248,6 +1332,9 @@ function renderStopCard(s, curId) {
   var hasPriority = /priority/i.test(s.notes || '');
   var noteText = s.notes || '';
   var mediaCount = (s.photos || []).length + (s.videos || []).length;
+  var rpt = ensureReport(s);
+  var tierBadge = rpt.leadTier ? '<span class="tier-badge tier-' + rpt.leadTier + '" title="Lead Tier ' + rpt.leadTier + '">' + rpt.leadTier + '</span>' : '';
+  var reportBadge = rpt.crmConfirmed ? '<span class="report-badge" title="Visit report submitted">📋✓</span>' : '';
 
   if (s.editing) {
     return '<div class="' + cls + '" data-id="' + s.id + '">' +
@@ -1262,9 +1349,12 @@ function renderStopCard(s, curId) {
         '<span class="loc">' + escapeHtml(s.loc || 'Unnamed visit') + '</span>' +
         (hasPriority ? '<span class="priority-flag">PRIORITY</span>' : '') +
         '<div class="addr">' + (s.contact ? escapeHtml(s.contact) : escapeHtml(s.addr || 'No contact yet')) + '</div>' +
+        '<div class="pcard-badges">' +
+          '<span class="type-badge type-' + s.type + '">' + TYPE_LABELS[s.type] + '</span>' +
+          tierBadge + reportBadge +
+          (mediaCount ? '<span class="media-badge">📎 ' + mediaCount + '</span>' : '') +
+        '</div>' +
       '</div>' +
-      '<span class="type-badge type-' + s.type + '">' + TYPE_LABELS[s.type] + '</span>' +
-      (mediaCount ? '<span class="media-badge">📎 ' + mediaCount + '</span>' : '') +
       '<span class="expand-caret">' + (s.expanded ? '&#9650;' : '&#9660;') + '</span>' +
     '</div>';
 
@@ -1294,6 +1384,7 @@ function renderStopCard(s, curId) {
   var body =
     '<div class="stop-body" onclick="event.stopPropagation()">' +
       '<div class="pcard-actions">' +
+        '<button class="stop-report-btn" onclick="openReportModal(\''+s.id+'\')" title="Visit Report">📋</button>' +
         '<button class="stop-share-btn" onclick="shareStop(\''+s.id+'\')" title="Share">↗</button>' +
         '<button class="stop-edit-btn" onclick="editStop(\''+s.id+'\')" title="Edit">✎</button>' +
         '<button class="stop-delete-btn" onclick="deleteStop(\''+s.id+'\')" title="Delete">🗑</button>' +
@@ -1389,6 +1480,275 @@ function renderEndReport() {
       ? '<ul>' + flagged.map(function(s) { return '<li><b>'+escapeHtml(s.loc||'Stop')+':</b> '+escapeHtml(s.notes)+'</li>'; }).join('') + '</ul>'
       : '<div class="empty-note">No flagged notes yet today.</div>') +
     '<div style="margin-top:12px; font-size:12px; color:rgba(255,255,255,0.65);">' + statusLine + '</div>';
+}
+
+/* ---------- VISIT REPORT (Page 1) ---------- */
+function val(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+function reportField(label, id, value, placeholder) {
+  return '<div class="field"><label>'+label+'</label><input id="'+id+'" value="'+escapeHtml(value||'')+'" placeholder="'+(placeholder||'')+'"></div>';
+}
+function reportTextarea(label, id, value, placeholder, rows) {
+  return '<div class="field"><label>'+label+'</label><textarea id="'+id+'" rows="'+(rows||2)+'" placeholder="'+(placeholder||'')+'">'+escapeHtml(value||'')+'</textarea></div>';
+}
+function reportSelect(label, id, options, value) {
+  return '<div class="field"><label>'+label+'</label><select id="'+id+'">'+options.map(function(o) {
+    return '<option value="'+o.v+'"'+(value===o.v?' selected':'')+'>'+o.l+'</option>';
+  }).join('')+'</select></div>';
+}
+function reportSection(title, body) {
+  return '<details class="report-section" open><summary>'+title+'</summary><div class="report-section-body">'+body+'</div></details>';
+}
+function toggleChip(el) { el.classList.toggle('active'); }
+function selectTier(el, stopId) {
+  var container = document.getElementById('rf_tier_'+stopId);
+  if (!container) return;
+  container.querySelectorAll('.tier-chip').forEach(function(c) { c.classList.remove('active'); });
+  el.classList.add('active');
+  container.dataset.selected = el.getAttribute('data-tier');
+}
+function renderReportForm(s) {
+  var r = ensureReport(s);
+  var id = s.id;
+  var painChips = PAIN_POINTS.map(function(p) {
+    return '<button type="button" class="chip-btn'+(r.painPoints[p.key]?' active':'')+'" id="rf_pain_'+p.key+'_'+id+'" onclick="toggleChip(this)">'+p.label+'</button>';
+  }).join('');
+  var tierChips = LEAD_TIERS.map(function(t) {
+    return '<button type="button" class="tier-chip'+(r.leadTier===t?' active':'')+'" data-tier="'+t+'" onclick="selectTier(this,\''+id+'\')">'+t+'</button>';
+  }).join('');
+  var stageOptions = STATUS_ORDER.map(function(st) { return { v: st, l: STATUS_LABELS[st] }; });
+
+  var html = '';
+  html += reportSection('Shop Information',
+    reportField('Number of Bays', 'rf_bays_'+id, r.bays, 'e.g. 6') +
+    reportField('Jobs per Week', 'rf_jobs_'+id, r.jobsPerWeek, 'e.g. 25')
+  );
+  html += reportSection('Contact Details',
+    reportField('Title', 'rf_ctitle_'+id, r.contactTitle, 'e.g. Shop Manager') +
+    reportSelect('Preferred Contact Method', 'rf_pref_'+id, ['', 'Call', 'Text', 'Email'].map(function(v) { return { v: v, l: v || '—' }; }), r.preferredContact)
+  );
+  html += reportSection('Shop Profile',
+    reportField('Vehicle Makes Serviced', 'rf_makes_'+id, r.vehicleMakes, 'e.g. Domestic, Import, Luxury') +
+    reportField('DRP Affiliations', 'rf_drp_'+id, r.drpAffiliations, 'e.g. State Farm, Geico') +
+    reportField('Current Suppliers', 'rf_suppliers_'+id, r.currentSuppliers, 'e.g. LKQ, Keystone') +
+    reportField('Estimating Software', 'rf_software_'+id, r.estimatingSoftware, 'e.g. CCC ONE, Mitchell')
+  );
+  html += reportSection('Pain Points', '<div class="chip-row">'+painChips+'</div>');
+  html += reportSection('Quote Opportunities',
+    '<div class="edit-label" style="margin-top:0;">Quote 1</div>' +
+    reportField('Year / Make / Model', 'rf_q0_ymm_'+id, r.quotes[0].ymm, 'e.g. 2021 Honda Accord') +
+    reportTextarea('Fitment Notes', 'rf_q0_notes_'+id, r.quotes[0].notes, '', 2) +
+    '<div class="edit-label">Quote 2</div>' +
+    reportField('Year / Make / Model', 'rf_q1_ymm_'+id, r.quotes[1].ymm, 'e.g. 2019 Toyota Camry') +
+    reportTextarea('Fitment Notes', 'rf_q1_notes_'+id, r.quotes[1].notes, '', 2)
+  );
+  html += reportSection('Visit Outcome',
+    reportTextarea('What was accomplished', 'rf_outcome_'+id, r.visitOutcome, '', 3) +
+    '<div class="edit-label">Lead Tier</div>' +
+    '<div class="chip-row" id="rf_tier_'+id+'" data-selected="'+(r.leadTier||'')+'">'+tierChips+'</div>'
+  );
+  html += reportSection('Next Action',
+    reportField('What', 'rf_na_what_'+id, r.nextAction.what, 'e.g. Send pricing sheet') +
+    '<div class="edit-row-2">' +
+      '<div><label class="edit-label">When</label><input type="date" class="edit-input" id="rf_na_when_'+id+'" value="'+(r.nextAction.when||'')+'"></div>' +
+      '<div><label class="edit-label">Channel</label><select class="edit-input" id="rf_na_channel_'+id+'">' +
+        ['', 'Call', 'Text', 'Email', 'Visit'].map(function(v) { return '<option value="'+v+'"'+(r.nextAction.channel===v?' selected':'')+'>'+(v||'—')+'</option>'; }).join('') +
+      '</select></div>' +
+    '</div>' +
+    reportSelect('Pipeline Stage', 'rf_na_stage_'+id, stageOptions, r.nextAction.stage)
+  );
+  html += reportSection('CRM Confirmation',
+    '<label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:13px;">' +
+      '<input type="checkbox" id="rf_crm_'+id+'" style="width:18px; height:18px;" '+(r.crmConfirmed?'checked':'')+'> ' +
+      'This visit has been fully logged in the CRM' +
+    '</label>'
+  );
+  return html;
+}
+function openReportModal(stopId) {
+  var s = currentDay.stops.find(function(x) { return x.id === stopId; });
+  if (!s) return;
+  ensureReport(s);
+  document.getElementById('reportSub').textContent = s.loc + (s.addr ? ' — ' + s.addr : '');
+  document.getElementById('reportBody').innerHTML = renderReportForm(s);
+  document.getElementById('reportModal').dataset.stopId = stopId;
+  document.getElementById('reportModal').classList.add('open');
+}
+function closeReportModal() { document.getElementById('reportModal').classList.remove('open'); }
+function saveReportModal() {
+  var stopId = document.getElementById('reportModal').dataset.stopId;
+  var s = currentDay.stops.find(function(x) { return x.id === stopId; });
+  if (!s) return;
+  var r = ensureReport(s);
+  r.bays = val('rf_bays_'+stopId);
+  r.jobsPerWeek = val('rf_jobs_'+stopId);
+  r.contactTitle = val('rf_ctitle_'+stopId);
+  r.preferredContact = val('rf_pref_'+stopId);
+  r.vehicleMakes = val('rf_makes_'+stopId);
+  r.drpAffiliations = val('rf_drp_'+stopId);
+  r.currentSuppliers = val('rf_suppliers_'+stopId);
+  r.estimatingSoftware = val('rf_software_'+stopId);
+  PAIN_POINTS.forEach(function(p) {
+    var chip = document.getElementById('rf_pain_'+p.key+'_'+stopId);
+    r.painPoints[p.key] = !!(chip && chip.classList.contains('active'));
+  });
+  r.quotes = [0, 1].map(function(i) { return { ymm: val('rf_q'+i+'_ymm_'+stopId), notes: val('rf_q'+i+'_notes_'+stopId) }; });
+  r.visitOutcome = val('rf_outcome_'+stopId);
+  var tierContainer = document.getElementById('rf_tier_'+stopId);
+  r.leadTier = tierContainer ? (tierContainer.dataset.selected || '') : '';
+  r.nextAction.what = val('rf_na_what_'+stopId);
+  r.nextAction.when = val('rf_na_when_'+stopId);
+  r.nextAction.channel = val('rf_na_channel_'+stopId);
+  var newStage = val('rf_na_stage_'+stopId);
+  r.nextAction.stage = newStage;
+  r.crmConfirmed = !!document.getElementById('rf_crm_'+stopId).checked;
+  saveDays(days);
+  closeReportModal();
+  addActivity('Visit Report', s.loc + ' report saved' + (r.leadTier ? ' — Lead Tier ' + r.leadTier : ''));
+  if (newStage && s.status !== newStage) setStatus(stopId, newStage); else renderAll();
+}
+
+/* ---------- DAILY CHECKLIST (Page 2) ---------- */
+var checklistData = null;
+var CHECKLIST_SECTIONS = [
+  { key: 'morningPrep', title: 'Morning Prep (Before First Visit)', items: [
+    { key: 'route', label: "Reviewed today's route and shop list" },
+    { key: 'samples', label: 'Samples/catalogs loaded in vehicle' },
+    { key: 'cards', label: 'Business cards stocked' },
+    { key: 'vehicle', label: 'Vehicle inspected (fuel, cleanliness)' },
+    { key: 'firstContact', label: 'Confirmed first appointment/contact' }
+  ]},
+  { key: 'postVisit', title: 'Post-Visit (Within 30 Minutes)', items: [
+    { key: 'logReport', label: 'Logged the Visit Report in the app' },
+    { key: 'nextAction', label: 'Set next action & pipeline stage' },
+    { key: 'sendMaterials', label: 'Sent any promised follow-up materials' },
+    { key: 'updateTier', label: 'Updated lead tier' }
+  ]},
+  { key: 'followUps', title: 'Follow-Up Actions for the Day', items: [
+    { key: 'callFollow', label: 'Called/emailed scheduled follow-ups' },
+    { key: 'quoteFollow', label: 'Sent quote follow-ups' },
+    { key: 'crmUpdates', label: "Confirmed CRM entries for the day" }
+  ]},
+  { key: 'endOfDay', title: 'End of Day', items: [
+    { key: 'reviewVisits', label: "Reviewed today's completed visits" },
+    { key: 'updateKpi', label: 'Reviewed KPI actuals below' },
+    { key: 'eodNotes', label: 'Wrote EOD summary notes' },
+    { key: 'planTomorrow', label: "Planned tomorrow's priority shops" }
+  ]}
+];
+var DURING_VISIT_ITEMS = [
+  'Introduce yourself and Gold Coast Auto Parts',
+  'Ask about current pain points (fitment, delivery, communication, availability, price)',
+  'Note vehicle makes serviced & DRP affiliations',
+  'Offer a quote if the opportunity comes up',
+  'Get a business card or direct contact info',
+  'Take a photo of the shop for the record'
+];
+var KPI_METRICS = [
+  { key: 'visitsCompleted', label: 'Visits Completed', defaultTarget: 8 },
+  { key: 'newProspects', label: 'New Prospects Added', defaultTarget: 2 },
+  { key: 'quotesGiven', label: 'Quotes Given', defaultTarget: 3 },
+  { key: 'followUpsScheduled', label: 'Follow-Ups Scheduled', defaultTarget: 4 }
+];
+function checklistRepId() { return getDriverSessionId(); }
+function checklistPath() { return 'gcap/salesChecklist/' + checklistRepId() + '/' + todayKey(); }
+function defaultChecklistData() {
+  var d = { eodNotes: '', kpi: {} };
+  CHECKLIST_SECTIONS.forEach(function(sec) { d[sec.key] = {}; });
+  KPI_METRICS.forEach(function(m) { d.kpi[m.key] = { target: m.defaultTarget }; });
+  return d;
+}
+function loadLocalChecklist() {
+  try { return JSON.parse(localStorage.getItem('kgps_sales_checklist_' + todayKey())) || defaultChecklistData(); } catch (e) { return defaultChecklistData(); }
+}
+function openChecklist() {
+  document.getElementById('checklistOverlay').classList.add('open');
+  document.getElementById('checklistDateLabel').textContent = fmtDateDisplay(todayKey());
+  checklistData = loadLocalChecklist();
+  renderChecklist();
+  if (FIREBASE_ENABLED && fbDb) {
+    fbDb.ref(checklistPath()).once('value').then(function(snap) {
+      checklistData = snap.val() || checklistData || defaultChecklistData();
+      renderChecklist();
+    }).catch(function() {});
+  }
+}
+function closeChecklist() { document.getElementById('checklistOverlay').classList.remove('open'); }
+function saveChecklist() {
+  try { localStorage.setItem('kgps_sales_checklist_' + todayKey(), JSON.stringify(checklistData)); } catch (e) {}
+  if (FIREBASE_ENABLED && fbDb) fbDb.ref(checklistPath()).set(checklistData);
+}
+function computeKpiActual(key) {
+  var stops = currentDay.stops || [];
+  if (key === 'visitsCompleted') return stops.filter(function(s) { return s.status === 'completed'; }).length;
+  if (key === 'newProspects') return stops.filter(function(s) { return s.type === 'prospect'; }).length;
+  if (key === 'quotesGiven') {
+    var n = 0;
+    stops.forEach(function(s) { ((s.report && s.report.quotes) || []).forEach(function(q) { if (q.ymm && q.ymm.trim()) n++; }); });
+    return n;
+  }
+  if (key === 'followUpsScheduled') return stops.filter(function(s) { return s.report && s.report.nextAction && s.report.nextAction.when; }).length;
+  return 0;
+}
+function renderChecklist() {
+  var el = document.getElementById('checklistBody');
+  if (!checklistData) checklistData = defaultChecklistData();
+  var totalItems = 0, doneItems = 0;
+  CHECKLIST_SECTIONS.forEach(function(sec) { sec.items.forEach(function(it) { totalItems++; if (checklistData[sec.key] && checklistData[sec.key][it.key]) doneItems++; }); });
+  var pct = totalItems ? Math.round(doneItems / totalItems * 100) : 0;
+
+  var html = '<div class="checklist-progress"><div class="checklist-progress-bar" style="width:'+pct+'%;"></div></div>' +
+    '<div class="checklist-progress-label">'+doneItems+' / '+totalItems+' checklist items complete ('+pct+'%)</div>';
+
+  CHECKLIST_SECTIONS.forEach(function(sec) {
+    html += '<div class="checklist-section"><h3>'+sec.title+'</h3>' +
+      sec.items.map(function(it) {
+        var checked = !!(checklistData[sec.key] && checklistData[sec.key][it.key]);
+        return '<label class="checklist-item"><input type="checkbox" '+(checked?'checked':'')+' onchange="setChecklistItem(\''+sec.key+'\',\''+it.key+'\',this.checked)"><span'+(checked?' style="text-decoration:line-through;color:var(--text-soft);"':'')+'>'+it.label+'</span></label>';
+      }).join('') +
+    '</div>';
+  });
+
+  html += '<div class="checklist-section"><h3>During-Visit Reference</h3>' +
+    '<p class="modal-sub" style="margin-bottom:8px;">Keep this in mind at every stop — a reminder, not tracked.</p>' +
+    '<ul class="during-visit-list">' + DURING_VISIT_ITEMS.map(function(t) { return '<li>'+t+'</li>'; }).join('') + '</ul>' +
+  '</div>';
+
+  html += '<div class="checklist-section"><h3>Daily KPIs</h3><div class="kpi-table">' +
+    '<div class="kpi-row kpi-head"><span>Metric</span><span>Target</span><span>Actual</span></div>' +
+    KPI_METRICS.map(function(m) {
+      var target = (checklistData.kpi[m.key] && checklistData.kpi[m.key].target) || 0;
+      var actual = computeKpiActual(m.key);
+      var delta = actual - target;
+      var deltaCls = target === 0 ? '' : (delta >= 0 ? 'kpi-good' : (delta >= -1 ? 'kpi-warn' : 'kpi-bad'));
+      return '<div class="kpi-row">' +
+        '<span>'+m.label+'</span>' +
+        '<span><input type="number" min="0" class="kpi-input" value="'+target+'" onchange="setKpiTarget(\''+m.key+'\',this.value)"></span>' +
+        '<span class="kpi-actual '+deltaCls+'">'+actual+'</span>' +
+      '</div>';
+    }).join('') +
+  '</div></div>';
+
+  html += '<div class="checklist-section"><h3>EOD Summary Notes</h3>' +
+    '<textarea id="checklistNotes" rows="4" placeholder="What happened today, blockers, wins..." onchange="setChecklistNotes(this.value)">'+escapeHtml(checklistData.eodNotes||'')+'</textarea>' +
+  '</div>';
+
+  el.innerHTML = html;
+}
+function setChecklistItem(sectionKey, itemKey, checked) {
+  if (!checklistData[sectionKey]) checklistData[sectionKey] = {};
+  checklistData[sectionKey][itemKey] = checked;
+  saveChecklist();
+  renderChecklist();
+}
+function setKpiTarget(metricKey, value) {
+  if (!checklistData.kpi[metricKey]) checklistData.kpi[metricKey] = {};
+  checklistData.kpi[metricKey].target = parseInt(value, 10) || 0;
+  saveChecklist();
+  renderChecklist();
+}
+function setChecklistNotes(value) {
+  checklistData.eodNotes = value;
+  saveChecklist();
 }
 
 /* ---------- STOP CRUD ---------- */
