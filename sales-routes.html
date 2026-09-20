@@ -1054,12 +1054,7 @@ function ownerLogin() {
   }
   session = { type: 'owner', name: settings.driverName || 'Owner' };
   saveSession(session);
-  document.getElementById('authGate').classList.add('hidden');
-  document.getElementById('manageTeamBtn').style.display = '';
-  setAuthMsg('');
-  renderAll();
-  syncRoleUI();
-  updateTrackingForRole();
+  window.location.href = 'choose-dashboard.html';
 }
 function guestLogin() {
   var sel = document.getElementById('guestNameSelect');
