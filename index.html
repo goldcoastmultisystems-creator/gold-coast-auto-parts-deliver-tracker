@@ -159,6 +159,8 @@ body.reordering { user-select: none; }
 .chat { border-top: 1px solid var(--glass-border); padding-top: 10px; }
 .chat-log { max-height: 110px; overflow-y: auto; margin-bottom: 8px; }
 .chat-msg { font-size: 12.5px; padding: 4px 0px; display: flex; gap: 6px; }
+.chat-msg.ai { background: rgba(212,164,65,0.08); border: 1px solid rgba(212,164,65,0.2); border-radius: 7px; padding: 5px 8px; margin: 2px 0; }
+.chat-msg.ai span:not(.who):not(.t):not(.chat-msg-actions) { font-style: italic; color: var(--text); }
 .chat-msg .who { font-weight: 700; color: var(--gold-2); white-space: nowrap; }
 .chat-msg .t { color: var(--text-soft); font-size: 10.5px; margin-left: auto; white-space: nowrap; }
 .chat-empty { font-size: 12px; color: var(--text-soft); font-style: italic; }
@@ -1308,11 +1310,11 @@ function renderChatMsg(stopId, c, idx) {
       '<button class="chat-msg-btn" onclick="saveChatEdit(\''+stopId+'\','+idx+')">✓</button>' +
       '<button class="chat-msg-btn" onclick="cancelChatEdit(\''+stopId+'\','+idx+')">✕</button></div>';
   }
-  return '<div class="chat-msg"><span class="who">'+escapeHtml(c.who)+':</span><span>'+escapeHtml(c.text)+'</span>' +
+  return '<div class="chat-msg'+(c.isAI ? ' ai' : '')+'"><span class="who">'+escapeHtml(c.who)+':</span><span>'+escapeHtml(c.text)+'</span>' +
     (c.edited ? '<span class="edited-tag">(edited)</span>' : '') +
     '<span class="t">'+c.time+'</span>' +
     '<span class="chat-msg-actions">' +
-      '<button class="chat-msg-btn" onclick="startChatEdit(\''+stopId+'\','+idx+')" title="Edit">✎</button>' +
+      (c.isAI ? '' : '<button class="chat-msg-btn" onclick="startChatEdit(\''+stopId+'\','+idx+')" title="Edit">✎</button>') +
       '<button class="chat-msg-btn" onclick="deleteChatMsg(\''+stopId+'\','+idx+')" title="Delete">🗑</button>' +
     '</span></div>';
 }
@@ -1492,6 +1494,50 @@ function deleteChatMsg(stopId, idx) {
   renderStops();
 }
 
+/* ---------- AI DESCRIPTION (Claude vision, via a Netlify function so the API key stays server-side) ---------- */
+var AI_DESCRIBE_ENDPOINT = '/.netlify/functions/describe-media';
+function describeMedia(stopId, base64DataUrl, mediaType, kindLabel) {
+  fetch(AI_DESCRIBE_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: base64DataUrl, mediaType: mediaType })
+  }).then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+    .then(function(res) {
+      if (!res.ok || !res.data || !res.data.description) { console.error('AI describe failed', res.data && res.data.error); return; }
+      var s = currentDay.stops.find(function(x) { return x.id === stopId; });
+      if (!s) return;
+      s.chat = s.chat || [];
+      s.chat.push({ who: '🤖 AI', text: res.data.description, time: nowTimeStr(), isAI: true });
+      saveDays(days);
+      addActivity('AI Description', s.loc + ' — ' + res.data.description);
+      renderAll();
+    })
+    .catch(function(e) { console.error('AI describe request failed', e); });
+}
+function extractVideoFrame(file, callback) {
+  var video = document.createElement('video');
+  video.preload = 'metadata'; video.muted = true; video.playsInline = true;
+  var url = URL.createObjectURL(file);
+  var done = false;
+  function finish(dataUrl) { if (done) return; done = true; URL.revokeObjectURL(url); callback(dataUrl); }
+  video.addEventListener('loadedmetadata', function() {
+    video.currentTime = Math.min(1, (video.duration || 2) / 2);
+  });
+  video.addEventListener('seeked', function() {
+    try {
+      var maxW = 480;
+      var scale = Math.min(1, maxW / video.videoWidth);
+      var canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth * scale; canvas.height = video.videoHeight * scale;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      finish(canvas.toDataURL('image/jpeg', 0.7));
+    } catch (e) { finish(null); }
+  });
+  video.addEventListener('error', function() { finish(null); });
+  video.src = url;
+}
+
 /* ---------- PHOTOS ---------- */
 var photoTargetStopId = null;
 function addPhoto(stopId) {
@@ -1514,7 +1560,7 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         var dataUrl = canvas.toDataURL('image/jpeg', 0.7);
         var s = currentDay.stops.find(function(x) { return x.id === photoTargetStopId; });
-        if (s) { s.photos = s.photos || []; s.photos.push(dataUrl); saveDays(days); renderStops(); }
+        if (s) { s.photos = s.photos || []; s.photos.push(dataUrl); saveDays(days); renderStops(); describeMedia(photoTargetStopId, dataUrl, 'image/jpeg', 'photo'); }
       };
       img.src = ev.target.result;
     };
@@ -1550,6 +1596,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!s) return;
     s.videoUploading = true;
     renderStops();
+    extractVideoFrame(file, function(frameDataUrl) {
+      if (frameDataUrl) describeMedia(stopId, frameDataUrl, 'image/jpeg', 'video');
+    });
     var path = 'gcap/videos/' + stopId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
     var task = fbStorage.ref(path).put(file);
     task.then(function(snapshot) {
