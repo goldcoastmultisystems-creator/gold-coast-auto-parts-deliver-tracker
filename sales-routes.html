@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Gold Coast Auto Parts — Delivery Status Board</title>
+<title>Gold Coast Auto Parts — Sales Rep Routes</title>
 <link rel="icon" type="image/png" href="./favicon.png">
 <link rel="apple-touch-icon" href="./favicon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
@@ -110,10 +110,10 @@ body.reordering { user-select: none; }
 .stop-title .loc { font-weight: 800; font-size: 15px; color: var(--text); }
 .stop-title .addr { font-size: 12.5px; color: var(--text-soft); margin-top: 2px; }
 .type-badge { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; padding: 4px 8px; border-radius: 6px; white-space: nowrap; border: 1px solid transparent; }
-.type-pickup { background: rgba(96,165,250,0.15); color: var(--blue); border-color: rgba(96,165,250,0.3); }
-.type-delivery { background: rgba(52,211,153,0.15); color: var(--green); border-color: rgba(52,211,153,0.3); }
-.type-deposit { background: rgba(251,191,36,0.15); color: var(--amber); border-color: rgba(251,191,36,0.3); }
-.type-stop { background: rgba(255,255,255,0.08); color: var(--text-soft); border-color: var(--glass-border); }
+.type-prospect { background: rgba(96,165,250,0.15); color: var(--blue); border-color: rgba(96,165,250,0.3); }
+.type-customer { background: rgba(52,211,153,0.15); color: var(--green); border-color: rgba(52,211,153,0.3); }
+.type-followup { background: rgba(251,191,36,0.15); color: var(--amber); border-color: rgba(251,191,36,0.3); }
+.type-other { background: rgba(255,255,255,0.08); color: var(--text-soft); border-color: var(--glass-border); }
 .stop-body { padding: 0px 16px 14px; }
 .details { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; font-size: 12.5px; color: var(--text); margin-bottom: 10px; }
 .details .full { grid-column: 1 / -1; }
@@ -276,10 +276,10 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 <div class="auth-gate" id="authGate">
   <div class="auth-card">
     <div class="auth-logo"><img src="gca-logo.png" alt="Gold Coast Auto Parts"></div>
-    <div class="auth-sub">Sign in to view the team status board.</div>
+    <div class="auth-sub">Sign in to view the sales route board.</div>
     <div class="auth-tabs" id="authTabs">
       <div class="auth-tab active" id="tabOwner" onclick="switchAuthTab('owner')">Log In</div>
-      <div class="auth-tab" id="tabGuest" onclick="switchAuthTab('guest')">Associate / Guest</div>
+      <div class="auth-tab" id="tabGuest" onclick="switchAuthTab('guest')">Sales Rep / Guest</div>
     </div>
     <div id="ownerPane">
       <div class="field">
@@ -301,14 +301,6 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <div class="field" id="guestOtherNameField" style="display:none;">
         <label>Your Name</label>
         <input id="guestOtherName" type="text" placeholder="e.g. Anthony">
-      </div>
-      <div class="field" id="guestOtherRoleField" style="display:none;">
-        <label>Role</label>
-        <select id="guestOtherRole">
-          <option value="Driver">Driver</option>
-          <option value="Dispatcher">Dispatcher</option>
-          <option value="Sales Rep">Sales Rep</option>
-        </select>
       </div>
       <div class="field">
         <label id="guestPinLabel">Your Password</label>
@@ -350,7 +342,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <img class="brand-logo" src="gca-logo.png" alt="Gold Coast Auto Parts">
       <div>
         <h1>GOLD COAST AUTO PARTS</h1>
-        <div class="sub">DELIVERY STATUS BOARD</div>
+        <div class="sub">SALES REP ROUTES</div>
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
@@ -366,8 +358,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
     <div>
       <label>Role</label>
       <select id="driverRole" onchange="onSettingsChange()">
-        <option value="Driver">Driver</option>
-        <option value="Dispatcher">Dispatcher</option>
+        <option value="Sales Rep">Sales Rep</option>
       </select>
       <span id="driverRoleStatic" class="date-pill" style="display:none; padding:9px 12px;"></span>
     </div>
@@ -376,14 +367,12 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <input id="companyName" placeholder="e.g. Gold Coast Auto Parts" style="width:170px;" oninput="onSettingsChange()">
     </div>
     <div class="header-actions">
-      <button class="hdr-btn" onclick="location.href='sales-routes.html'">🧾 Sales Rep Routes →</button>
-      <button class="hdr-btn" onclick="startNewList()">+ New List</button>
+      <button class="hdr-btn" onclick="location.href='index.html'">← Delivery Tracker</button>
+      <button class="hdr-btn" onclick="startNewList()">+ New Route</button>
       <button class="hdr-btn" onclick="openLiveMap()">📍 Live Map</button>
       <button class="hdr-btn" onclick="openHistory()">History</button>
       <button class="hdr-btn" onclick="shareList()">Share</button>
       <button class="hdr-btn" onclick="printReport()">End of Day Report</button>
-      <button class="hdr-btn" onclick="openPartsList()">Parts to Pull</button>
-      <button class="hdr-btn" onclick="openPartsToPurchase()">Parts to Purchase</button>
       <button class="hdr-btn" id="manageTeamBtn" onclick="openTeamModal()" style="display:none;">👥 Manage Team</button>
       <button class="hdr-btn" onclick="doLogout()">Log Out</button>
     </div>
@@ -391,9 +380,9 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 </header>
 
 <div class="smart-bar-wrap">
-  <div class="smart-bar-label">💬 Paste your dispatcher's list, or type a stop — I'll organize it for you</div>
+  <div class="smart-bar-label">💬 Paste your route list, or type a stop — I'll organize it for you</div>
   <div class="smart-bar-row">
-    <textarea id="smartInput" class="smart-input" rows="1" placeholder="Paste a list here, or describe a stop... (Enter to process, Shift+Enter for a new line)" oninput="autoGrowSmartInput(this)" onkeydown="handleSmartInputKey(event)"></textarea>
+    <textarea id="smartInput" class="smart-input" rows="1" placeholder="Paste a list here, or describe a visit... (Enter to process, Shift+Enter for a new line)" oninput="autoGrowSmartInput(this)" onkeydown="handleSmartInputKey(event)"></textarea>
     <button class="smart-send-btn" onclick="submitSmartInput()" aria-label="Process">➤</button>
   </div>
   <div id="smartResult"></div>
@@ -407,8 +396,8 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
   <div class="feed" id="activityFeed"></div>
 
   <div class="section-title">
-    <h2>Today's Stops</h2>
-    <div class="actions"><button class="btn btn-gold" onclick="openAddStop()">+ Add Stop</button></div>
+    <h2>Today's Sales Route</h2>
+    <div class="actions"><button class="btn btn-gold" onclick="openAddStop()">+ Add Visit</button></div>
   </div>
   <div class="stops" id="stopsList"></div>
 
@@ -416,39 +405,30 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 </main>
 
 <footer>
-  <div class="footer-brand">Gold Coast Auto Parts — Internal Delivery Tool</div>
+  <div class="footer-brand">Gold Coast Auto Parts — Internal Sales Tool</div>
   <div class="footer-copy">© <span id="footerYear"></span> Gold Coast Auto Parts. All rights reserved.</div>
 </footer>
 
 <div class="modal-backdrop" id="addModal">
   <div class="modal">
-    <h3 id="addModalTitle">Add a Stop</h3>
-    <div class="field"><label>Location / Business Name</label><input id="f_loc" placeholder="e.g. Maaco Lauderdale"></div>
+    <h3 id="addModalTitle">Add a Visit</h3>
+    <div class="field"><label>Customer / Business Name</label><input id="f_loc" placeholder="e.g. Maaco Lauderdale"></div>
     <div class="field"><label>Address</label><input id="f_addr" placeholder="Street, City, State, ZIP"></div>
     <div class="field">
       <label>Type</label>
       <select id="f_type">
-        <option value="pickup">Pickup</option>
-        <option value="delivery">Delivery</option>
-        <option value="deposit">Deposit</option>
-        <option value="stop">Other / Stop</option>
+        <option value="prospect">New Prospect</option>
+        <option value="customer">Existing Customer</option>
+        <option value="followup">Follow-Up</option>
+        <option value="other">Other / Stop</option>
       </select>
     </div>
-    <div class="field"><label>Sales Order #</label><input id="f_so" placeholder="SO-XXXXX (optional)"></div>
-    <div class="field"><label>Part # / Description</label><input id="f_part" placeholder="Part number and description"></div>
-    <div class="field">
-      <label>Method of Payment</label>
-      <select id="f_mop">
-        <option value="">—</option>
-        <option value="Cash">Cash</option>
-        <option value="Check">Check</option>
-        <option value="Charge Account">Charge Account</option>
-      </select>
-    </div>
-    <div class="field"><label>Notes</label><textarea id="f_notes" rows="2" placeholder="Priority, discount requested, not yet paid, etc."></textarea></div>
+    <div class="field"><label>Contact Name</label><input id="f_contact" placeholder="Who you're meeting with (optional)"></div>
+    <div class="field"><label>Phone</label><input id="f_phone" placeholder="(optional)"></div>
+    <div class="field"><label>Notes</label><textarea id="f_notes" rows="2" placeholder="Priority, what they need, last conversation, etc."></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeAddStop()">Cancel</button>
-      <button class="btn btn-navy" onclick="submitAddStop()">Add Stop</button>
+      <button class="btn btn-navy" onclick="submitAddStop()">Add Visit</button>
     </div>
   </div>
 </div>
@@ -466,7 +446,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       </div>
     </div>
     <div id="teamManageSection" style="display:none;">
-      <p class="modal-sub">Each person gets their own name and password to log in with — no more sharing one code. Assign a role so location tracking only turns on for actual drivers.</p>
+      <p class="modal-sub">Each person gets their own name and password to log in with. Assign a role so location tracking and page access line up correctly.</p>
       <div id="teamList"></div>
       <div class="stop-edit-form" style="margin-top:14px;">
         <div class="edit-label">Add a Person</div>
@@ -486,7 +466,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
         </div>
         <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-soft); cursor:pointer; margin-top:2px;">
           <input type="checkbox" id="teamNewAdmin" style="width:auto;">
-          Admin access — can manage the team and freely switch their own Driver/Dispatcher role (controls their own location tracking)
+          Admin access — can manage the team and freely switch their own role (controls their own location tracking)
         </label>
         <div class="edit-actions"><button class="btn btn-gold btn-sm" onclick="addTeamMember()">+ Add</button></div>
       </div>
@@ -501,7 +481,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 <div class="modal-backdrop" id="historyModal">
   <div class="modal wide">
     <h3>History</h3>
-    <p class="modal-sub" id="historySub">Past days' delivery lists. Photos stay on this device.</p>
+    <p class="modal-sub" id="historySub">Past days' sales routes. Photos stay on this device.</p>
     <div id="historyBody"></div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeHistory()">Close</button></div>
   </div>
@@ -518,12 +498,12 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 <div class="page-overlay" id="mapOverlay">
   <div class="page-overlay-toolbar">
     <button onclick="closeLiveMap()">← Back</button>
-    <span class="page-overlay-title">Live Driver Map</span>
+    <span class="page-overlay-title">Live Sales Rep Map</span>
   </div>
   <div style="flex:1; display:flex; min-height:0;">
     <div id="liveMapEl" style="flex:1;"></div>
     <div id="driverListWrap" class="driver-list-wrap">
-      <div class="section-title" style="margin:0 0 8px;"><h2 style="font-size:12.5px;">Drivers</h2></div>
+      <div class="section-title" style="margin:0 0 8px;"><h2 style="font-size:12.5px;">Sales Reps</h2></div>
       <div id="driverListPanel"></div>
     </div>
   </div>
@@ -544,7 +524,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>
-/* ---------- FIREBASE (fill in with your project's config from Firebase Console > Project settings) ---------- */
+/* ---------- FIREBASE (same project as the delivery tracker — shared team/settings, separate route data) ---------- */
 var FIREBASE_CONFIG = {
   apiKey: "AIzaSyBQiE4TlMIcO6iyCob2G1js3eEVcmmjNmI",
   authDomain: "gold-coast-auto-parts.firebaseapp.com",
@@ -558,7 +538,6 @@ var FIREBASE_CONFIG = {
 var FIREBASE_ENABLED = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf('YOUR_') !== 0);
 
 /* ---------- EMAIL NOTIFICATIONS (EmailJS — sends real email from the browser, no backend needed) ---------- */
-/* Sign up free at emailjs.com, add an Email Service (connect your Gmail), create a template, then fill these in. */
 var EMAILJS_CONFIG = {
   publicKey: "nZQzXeztAmkfMPwzS",
   serviceId: "service_3tu8gjm",
@@ -626,7 +605,7 @@ function attachFirebaseListeners() {
     refreshSettingsUI();
     populateGuestNameSelect();
   });
-  fbDb.ref('gcap/days').on('value', function(snap) {
+  fbDb.ref('gcap/salesRoutes').on('value', function(snap) {
     var incoming = normalizeDays(snap.val() || {});
     var key = todayKey();
     var localToday = days && days[key];
@@ -641,7 +620,7 @@ function attachFirebaseListeners() {
     currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
     renderAll();
   });
-  fbDb.ref('gcap/drivers').on('value', function(snap) {
+  fbDb.ref('gcap/salesReps').on('value', function(snap) {
     driverPositions = snap.val() || {};
     renderLiveMapMarkers();
     renderDriverListPanel();
@@ -659,7 +638,6 @@ function canManageTeam() {
 }
 function refreshSettingsUI() {
   document.getElementById('driverName').value = settings.driverName || '';
-  document.getElementById('driverRole').value = settings.driverRole || 'Driver';
   document.getElementById('companyName').value = settings.companyName || 'Gold Coast Auto Parts';
   document.getElementById('manageTeamBtn').style.display = canManageTeam() ? '' : 'none';
   syncRoleUI();
@@ -672,25 +650,24 @@ function syncRoleUI() {
   if (locked) {
     sel.style.display = 'none';
     stat.style.display = '';
-    stat.textContent = session.role || 'Driver';
+    stat.textContent = session.role || 'Sales Rep';
   } else {
     sel.style.display = '';
     stat.style.display = 'none';
-    if (session && session.type === 'guest') sel.value = session.role || 'Driver';
   }
   nameInput.disabled = !!(session && session.type === 'guest');
 }
 
-/* ---------- LIVE LOCATION TRACKING (drivers push position; everyone can view the map) ---------- */
+/* ---------- LIVE LOCATION TRACKING (sales reps push position; everyone can view the map) ---------- */
 var geoWatchId = null, leafletMap = null, driverMarkers = {};
 function getDriverSessionId() {
   if (session && session.memberId) return 'm_' + session.memberId;
-  var name = (session && session.name) || settings.driverName || 'driver';
+  var name = (session && session.name) || settings.driverName || 'rep';
   return 'owner_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
 }
 function updateTrackingForRole() {
   var role = (session && session.type === 'guest') ? session.role : document.getElementById('driverRole').value;
-  if (session && role === 'Driver' && FIREBASE_ENABLED) startLocationTracking();
+  if (session && role === 'Sales Rep' && FIREBASE_ENABLED) startLocationTracking();
   else stopLocationTracking();
 }
 function startLocationTracking() {
@@ -698,13 +675,13 @@ function startLocationTracking() {
   if (!navigator.geolocation) { showToast('Location is not supported on this device.', 'red'); return; }
   var id = getDriverSessionId();
   geoWatchId = navigator.geolocation.watchPosition(function(pos) {
-    fbDb.ref('gcap/drivers/' + id).set({
-      name: settings.driverName || (session && session.name) || 'Driver',
+    fbDb.ref('gcap/salesReps/' + id).set({
+      name: settings.driverName || (session && session.name) || 'Sales Rep',
       lat: pos.coords.latitude, lng: pos.coords.longitude,
       heading: pos.coords.heading || null, speed: pos.coords.speed || null,
       accuracy: pos.coords.accuracy || null, updatedAt: Date.now()
     });
-    checkAutoArrival(pos.coords.latitude, pos.coords.longitude, settings.driverName || (session && session.name) || 'Driver');
+    checkAutoArrival(pos.coords.latitude, pos.coords.longitude, settings.driverName || (session && session.name) || 'Sales Rep');
   }, function(err) {
     console.error('geo error', err);
     showToast('Location access denied — live tracking is off.', 'red');
@@ -712,7 +689,7 @@ function startLocationTracking() {
 }
 function stopLocationTracking() {
   if (geoWatchId !== null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; }
-  if (fbDb && session) fbDb.ref('gcap/drivers/' + getDriverSessionId()).remove();
+  if (fbDb && session) fbDb.ref('gcap/salesReps/' + getDriverSessionId()).remove();
 }
 function timeAgo(ts) {
   var s = Math.floor((Date.now() - ts) / 1000);
@@ -737,7 +714,7 @@ function renderLiveMapMarkers() {
   if (!leafletMap) return;
   var bounds = [];
 
-  /* today's planned stops, in route order, colored by status */
+  /* today's planned visits, in route order, colored by status */
   var stopIds = [];
   var routePts = [];
   (currentDay.stops || []).forEach(function(s, i) {
@@ -764,13 +741,13 @@ function renderLiveMapMarkers() {
     routeLine = L.polyline(routePts, { color: '#d4a441', weight: 2, opacity: 0.55, dashArray: '6,8' }).addTo(leafletMap);
   }
 
-  /* live driver positions */
+  /* live sales rep positions */
   var ids = Object.keys(driverPositions || {});
   ids.forEach(function(id) {
     var d = driverPositions[id];
     if (typeof d.lat !== 'number' || typeof d.lng !== 'number') return;
     var stale = (Date.now() - (d.updatedAt || 0)) > 5 * 60 * 1000;
-    var initial = (d.name || 'D').charAt(0).toUpperCase();
+    var initial = (d.name || 'R').charAt(0).toUpperCase();
     var html = '<div class="driver-pin' + (stale ? ' stale' : '') + '">' + initial + '</div>';
     if (!driverMarkers[id]) {
       driverMarkers[id] = L.marker([d.lat, d.lng], { icon: L.divIcon({ className: 'driver-pin-wrap', html: html, iconSize: [34,34], iconAnchor: [17,17] }) }).addTo(leafletMap);
@@ -778,32 +755,32 @@ function renderLiveMapMarkers() {
       driverMarkers[id].setLatLng([d.lat, d.lng]);
       driverMarkers[id].setIcon(L.divIcon({ className: 'driver-pin-wrap', html: html, iconSize: [34,34], iconAnchor: [17,17] }));
     }
-    driverMarkers[id].bindPopup('<b>' + escapeHtml(d.name || 'Driver') + '</b><br>Updated ' + timeAgo(d.updatedAt || 0) + (d.speed ? '<br>' + Math.round(d.speed * 2.237) + ' mph' : ''));
+    driverMarkers[id].bindPopup('<b>' + escapeHtml(d.name || 'Sales Rep') + '</b><br>Updated ' + timeAgo(d.updatedAt || 0) + (d.speed ? '<br>' + Math.round(d.speed * 2.237) + ' mph' : ''));
     bounds.push([d.lat, d.lng]);
   });
   Object.keys(driverMarkers).forEach(function(id) {
     if (ids.indexOf(id) === -1) { leafletMap.removeLayer(driverMarkers[id]); delete driverMarkers[id]; }
   });
 
-  if (bounds.length) leafletMap.fitBounds(bounds, { maxZoom: 14, padding: [40,40] });
+  if (bounds.length) leafletMap.fitBounds(bounds, { padding: [40,40], maxZoom: 14 });
 }
 function renderDriverListPanel() {
   var el = document.getElementById('driverListPanel');
   if (!el) return;
   var ids = Object.keys(driverPositions || {});
-  if (!ids.length) { el.innerHTML = '<div class="hist-empty">No drivers currently sharing their location.</div>'; return; }
+  if (!ids.length) { el.innerHTML = '<div class="hist-empty">No sales reps currently sharing their location.</div>'; return; }
   el.innerHTML = ids.map(function(id) {
     var d = driverPositions[id];
     var stale = (Date.now() - (d.updatedAt || 0)) > 5 * 60 * 1000;
     return '<div class="hist-date-row" onclick="leafletMap && leafletMap.setView([' + d.lat + ',' + d.lng + '], 15)">' +
-      '<span class="d">' + (stale ? '⚪' : '🟢') + ' ' + escapeHtml(d.name || 'Driver') + '</span>' +
+      '<span class="d">' + (stale ? '⚪' : '🟢') + ' ' + escapeHtml(d.name || 'Sales Rep') + '</span>' +
       '<span class="c">' + timeAgo(d.updatedAt || 0) + '</span></div>';
   }).join('');
 }
 
-var STATUS_LABELS = { pending:'Pending', onway:'En Route', arrived:'At Location', completed:'Completed', postponed:'Postponed', returned:'Returned Part' };
+var STATUS_LABELS = { pending:'Pending', onway:'En Route', arrived:'At Location', completed:'Completed', postponed:'Postponed', returned:'Not Interested' };
 var STATUS_ORDER = ['pending','onway','arrived','completed','postponed','returned'];
-var TYPE_LABELS = { pickup:'Pickup', delivery:'Delivery', deposit:'Deposit', stop:'Stop' };
+var TYPE_LABELS = { prospect:'New Prospect', customer:'Existing Customer', followup:'Follow-Up', other:'Other' };
 
 function loadSettings() {
   try { return JSON.parse(localStorage.getItem('kgps_settings')) || {}; } catch(e) { return {}; }
@@ -817,7 +794,7 @@ function saveSession(s) {
   else localStorage.removeItem('kgps_session');
 }
 function loadDays() {
-  try { return JSON.parse(localStorage.getItem('kgps_days')) || {}; } catch(e) { return {}; }
+  try { return JSON.parse(localStorage.getItem('kgps_sales_days')) || {}; } catch(e) { return {}; }
 }
 var knownStopIds = {};
 function mergeStopsForSave(serverStops, localStops, knownIds) {
@@ -835,12 +812,12 @@ function mergeStopsForSave(serverStops, localStops, knownIds) {
 }
 var saveDaysChain = Promise.resolve();
 function saveDays(d) {
-  localStorage.setItem('kgps_days', JSON.stringify(d));
+  localStorage.setItem('kgps_sales_days', JSON.stringify(d));
   if (!FIREBASE_ENABLED || !fbDb) return;
   var key = todayKey();
-  if (!d[key]) { saveDaysChain = saveDaysChain.then(function() { return fbDb.ref('gcap/days').set(d); }).catch(function(e){ console.error('saveDays failed', e); }); return; }
+  if (!d[key]) { saveDaysChain = saveDaysChain.then(function() { return fbDb.ref('gcap/salesRoutes').set(d); }).catch(function(e){ console.error('saveDays failed', e); }); return; }
   saveDaysChain = saveDaysChain.then(function() {
-    return fbDb.ref('gcap/days/' + key).once('value').then(function(snap) {
+    return fbDb.ref('gcap/salesRoutes/' + key).once('value').then(function(snap) {
       var serverDay = snap.val() || {};
       var localDay = days[key] || d[key];
       var mergedStops = mergeStopsForSave(serverDay.stops, localDay.stops, knownStopIds);
@@ -848,7 +825,7 @@ function saveDays(d) {
       if (days[key]) days[key].stops = mergedStops;
       knownStopIds = {};
       mergedStops.forEach(function(s) { knownStopIds[s.id] = true; });
-      return fbDb.ref('gcap/days/' + key).set(toWrite);
+      return fbDb.ref('gcap/salesRoutes/' + key).set(toWrite);
     });
   }).catch(function(e) {
     console.error('saveDays merge-read failed', e);
@@ -977,8 +954,8 @@ function getDay(key) {
 }
 
 function maybeRedirectForRole() {
-  if (session && session.type === 'guest' && !session.isAdmin && session.role === 'Sales Rep') {
-    window.location.href = 'sales-routes.html';
+  if (session && session.type === 'guest' && !session.isAdmin && session.role && session.role !== 'Sales Rep') {
+    window.location.href = 'index.html';
     return true;
   }
   return false;
@@ -996,7 +973,6 @@ function init() {
   document.getElementById('todayPill').textContent = fmtDateDisplay(todayKey());
   document.getElementById('footerYear').textContent = new Date().getFullYear();
   document.getElementById('driverName').value = settings.driverName || '';
-  document.getElementById('driverRole').value = settings.driverRole || 'Driver';
   document.getElementById('companyName').value = settings.companyName || 'Gold Coast Auto Parts';
   populateGuestNameSelect();
 
@@ -1026,7 +1002,6 @@ function onSettingsChange() {
     saveSession(session);
   }
   settings.driverName = document.getElementById('driverName').value;
-  settings.driverRole = roleVal;
   settings.companyName = document.getElementById('companyName').value;
   saveSettings(settings);
   renderStops();
@@ -1054,7 +1029,6 @@ function populateGuestNameSelect() {
 function onGuestSelectChange() {
   var isOther = document.getElementById('guestNameSelect').value === '__other__';
   document.getElementById('guestOtherNameField').style.display = isOther ? '' : 'none';
-  document.getElementById('guestOtherRoleField').style.display = isOther ? '' : 'none';
   document.getElementById('guestPinLabel').textContent = isOther ? '4-Digit Code' : 'Your Password';
   document.getElementById('guestPin').focus();
 }
@@ -1089,7 +1063,7 @@ function guestLogin() {
   var name, role, memberObj;
   if (memberId === '__other__') {
     name = document.getElementById('guestOtherName').value.trim();
-    role = document.getElementById('guestOtherRole').value;
+    role = 'Sales Rep';
     if (!name) { setAuthMsg('Enter your name.', 'err'); return; }
     if (pin !== GENERIC_GUEST_CODE) { setAuthMsg('Incorrect code.', 'err'); return; }
     memberObj = { name: name, role: role, memberId: null, isAdmin: false };
@@ -1104,8 +1078,7 @@ function guestLogin() {
   saveSession(session);
   if (maybeRedirectForRole()) return;
   document.getElementById('driverName').value = memberObj.name;
-  document.getElementById('driverRole').value = memberObj.role;
-  settings.driverName = memberObj.name; settings.driverRole = memberObj.role; saveSettings(settings);
+  settings.driverName = memberObj.name; saveSettings(settings);
   document.getElementById('authGate').classList.add('hidden');
   document.getElementById('manageTeamBtn').style.display = canManageTeam() ? '' : 'none';
   setAuthMsg('');
@@ -1181,12 +1154,12 @@ function renderSummary() {
   stops.forEach(function(s) { counts[s.status] = (counts[s.status]||0) + 1; });
   var strip = document.getElementById('summaryStrip');
   strip.innerHTML =
-    '<div class="stat"><div class="num">'+counts.total+'</div><div class="lbl">Total Stops</div></div>'+
+    '<div class="stat"><div class="num">'+counts.total+'</div><div class="lbl">Total Visits</div></div>'+
     '<div class="stat completed"><div class="num">'+counts.completed+'</div><div class="lbl">Completed</div></div>'+
     '<div class="stat onway"><div class="num">'+counts.onway+'</div><div class="lbl">En Route</div></div>'+
     '<div class="stat arrived"><div class="num">'+counts.arrived+'</div><div class="lbl">At Location</div></div>'+
     '<div class="stat postponed"><div class="num">'+counts.postponed+'</div><div class="lbl">Postponed</div></div>'+
-    '<div class="stat returned"><div class="num">'+counts.returned+'</div><div class="lbl">Returned Part</div></div>'+
+    '<div class="stat returned"><div class="num">'+counts.returned+'</div><div class="lbl">Not Interested</div></div>'+
     '<div class="stat"><div class="num">'+counts.pending+'</div><div class="lbl">Pending</div></div>';
 }
 function renderFeed() {
@@ -1204,7 +1177,7 @@ function renderNextBanner() {
   banner.style.display = 'flex';
   if (!next) {
     banner.className = 'next-banner done';
-    banner.innerHTML = '<div><div class="lbl">All Done</div><div class="loc">Every stop complete — great work!</div></div>';
+    banner.innerHTML = '<div><div class="lbl">All Done</div><div class="loc">Every visit complete — great work!</div></div>';
     return;
   }
   banner.className = 'next-banner';
@@ -1220,7 +1193,7 @@ function renderStops() {
   var el = document.getElementById('stopsList');
   var stops = currentDay.stops;
   if (!stops.length) {
-    el.innerHTML = '<div class="empty-state"><div class="big">No stops yet</div><div class="sm">Paste your dispatcher\'s list up top, or tap <b>+ Add Stop</b> to get started.</div></div>';
+    el.innerHTML = '<div class="empty-state"><div class="big">No visits yet</div><div class="sm">Paste your route list up top, or tap <b>+ Add Visit</b> to get started.</div></div>';
     return;
   }
   var curId = currentStopId();
@@ -1276,9 +1249,8 @@ function renderStopCard(s, i, curId) {
     '</div>' +
     '<div class="stop-body">' +
       '<div class="details">' +
-        (s.so ? '<div><b>SO#:</b> '+escapeHtml(s.so)+'</div>' : '') +
-        (s.mop ? '<div><b>Payment:</b> '+escapeHtml(s.mop)+'</div>' : '') +
-        (s.part ? '<div class="full"><b>Part:</b> '+escapeHtml(s.part)+'</div>' : '') +
+        (s.contact ? '<div><b>Contact:</b> '+escapeHtml(s.contact)+'</div>' : '') +
+        (s.phone ? '<div><b>Phone:</b> '+escapeHtml(s.phone)+'</div>' : '') +
         (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a></div>' : '') +
       '</div>' +
       (noteText ? '<div class="note-flag">📝 '+escapeHtml(noteText)+'</div>' : '') +
@@ -1314,19 +1286,17 @@ function renderChatMsg(stopId, c, idx) {
 }
 function renderEditForm(s) {
   return '<div class="stop-edit-form">' +
-    '<input class="edit-title-input" id="e_loc_'+s.id+'" value="'+escapeHtml(s.loc||'')+'" placeholder="Location / Business Name">' +
+    '<input class="edit-title-input" id="e_loc_'+s.id+'" value="'+escapeHtml(s.loc||'')+'" placeholder="Customer / Business Name">' +
     '<div><label class="edit-label">Address</label><input class="edit-input" id="e_addr_'+s.id+'" value="'+escapeHtml(s.addr||'')+'"></div>' +
     '<div class="edit-row-2">' +
       '<div><label class="edit-label">Type</label><select class="edit-input" id="e_type_'+s.id+'">' +
         Object.keys(TYPE_LABELS).map(function(k) { return '<option value="'+k+'"'+(s.type===k?' selected':'')+'>'+TYPE_LABELS[k]+'</option>'; }).join('') +
       '</select></div>' +
-      '<div><label class="edit-label">Sales Order #</label><input class="edit-input" id="e_so_'+s.id+'" value="'+escapeHtml(s.so||'')+'"></div>' +
+      '<div><label class="edit-label">Contact Name</label><input class="edit-input" id="e_contact_'+s.id+'" value="'+escapeHtml(s.contact||'')+'"></div>' +
     '</div>' +
     '<div class="edit-row-2">' +
-      '<div><label class="edit-label">Part # / Description</label><input class="edit-input" id="e_part_'+s.id+'" value="'+escapeHtml(s.part||'')+'"></div>' +
-      '<div><label class="edit-label">Payment</label><select class="edit-input" id="e_mop_'+s.id+'">' +
-        ['','Cash','Check','Charge Account'].map(function(v) { return '<option value="'+v+'"'+(s.mop===v?' selected':'')+'>'+(v||'—')+'</option>'; }).join('') +
-      '</select></div>' +
+      '<div><label class="edit-label">Phone</label><input class="edit-input" id="e_phone_'+s.id+'" value="'+escapeHtml(s.phone||'')+'"></div>' +
+      '<div></div>' +
     '</div>' +
     '<div><label class="edit-label">Notes</label><input class="edit-input" id="e_notes_'+s.id+'" value="'+escapeHtml(s.notes||'')+'"></div>' +
     '<div class="edit-actions">' +
@@ -1340,29 +1310,29 @@ function renderEndReport() {
   var stops = currentDay.stops;
   var total = stops.length;
   var completed = stops.filter(function(s) { return s.status === 'completed'; });
-  var deliveries = completed.filter(function(s) { return s.type === 'delivery'; }).length;
-  var pickups = completed.filter(function(s) { return s.type === 'pickup'; }).length;
-  var deposits = completed.filter(function(s) { return s.type === 'deposit'; }).length;
+  var prospects = completed.filter(function(s) { return s.type === 'prospect'; }).length;
+  var customers = completed.filter(function(s) { return s.type === 'customer'; }).length;
+  var followups = completed.filter(function(s) { return s.type === 'followup'; }).length;
   var postponed = stops.filter(function(s) { return s.status === 'postponed'; }).length;
   var returned = stops.filter(function(s) { return s.status === 'returned'; }).length;
   var flagged = stops.filter(function(s) { return s.notes && s.notes.trim(); });
 
   var allPending = stops.every(function(s) { return s.status === 'pending'; });
   var statusLine;
-  if (!total) statusLine = 'No stops added yet today.';
-  else if (completed.length === total) statusLine = 'All stops complete — great work!';
-  else if (allPending) statusLine = 'Route not started yet — all stops pending.';
-  else statusLine = 'Route in progress — ' + completed.length + ' of ' + total + ' stops complete.';
+  if (!total) statusLine = 'No visits added yet today.';
+  else if (completed.length === total) statusLine = 'All visits complete — great work!';
+  else if (allPending) statusLine = 'Route not started yet — all visits pending.';
+  else statusLine = 'Route in progress — ' + completed.length + ' of ' + total + ' visits complete.';
 
   el.innerHTML =
     '<h2>End-of-Day Summary — '+fmtDateDisplay(todayKey())+'</h2>' +
     '<div class="grid">' +
-      '<div class="cell"><div class="n">'+completed.length+'/'+total+'</div><div class="l">Stops Completed</div></div>' +
-      '<div class="cell"><div class="n">'+deliveries+'</div><div class="l">Deliveries</div></div>' +
-      '<div class="cell"><div class="n">'+pickups+'</div><div class="l">Pickups</div></div>' +
-      '<div class="cell"><div class="n">'+deposits+'</div><div class="l">Deposits</div></div>' +
+      '<div class="cell"><div class="n">'+completed.length+'/'+total+'</div><div class="l">Visits Completed</div></div>' +
+      '<div class="cell"><div class="n">'+prospects+'</div><div class="l">New Prospects</div></div>' +
+      '<div class="cell"><div class="n">'+customers+'</div><div class="l">Existing Customers</div></div>' +
+      '<div class="cell"><div class="n">'+followups+'</div><div class="l">Follow-Ups</div></div>' +
       '<div class="cell"><div class="n">'+postponed+'</div><div class="l">Postponed</div></div>' +
-      '<div class="cell"><div class="n">'+returned+'</div><div class="l">Returned Part</div></div>' +
+      '<div class="cell"><div class="n">'+returned+'</div><div class="l">Not Interested</div></div>' +
     '</div>' +
     (flagged.length
       ? '<ul>' + flagged.map(function(s) { return '<li><b>'+escapeHtml(s.loc||'Stop')+':</b> '+escapeHtml(s.notes)+'</li>'; }).join('') + '</ul>'
@@ -1372,34 +1342,32 @@ function renderEndReport() {
 
 /* ---------- STOP CRUD ---------- */
 function openAddStop() {
-  ['f_loc','f_addr','f_so','f_part','f_notes'].forEach(function(id) { document.getElementById(id).value = ''; });
-  document.getElementById('f_type').value = 'pickup';
-  document.getElementById('f_mop').value = '';
+  ['f_loc','f_addr','f_contact','f_phone','f_notes'].forEach(function(id) { document.getElementById(id).value = ''; });
+  document.getElementById('f_type').value = 'prospect';
   document.getElementById('addModal').classList.add('open');
 }
 function closeAddStop() { document.getElementById('addModal').classList.remove('open'); }
 function submitAddStop() {
   var loc = document.getElementById('f_loc').value.trim();
-  if (!loc) { alert('Please enter a location or business name.'); return; }
+  if (!loc) { alert('Please enter a customer or business name.'); return; }
   var stop = {
     id: uid(), loc: loc,
     addr: document.getElementById('f_addr').value.trim(),
     type: document.getElementById('f_type').value,
-    so: document.getElementById('f_so').value.trim(),
-    part: document.getElementById('f_part').value.trim(),
-    mop: document.getElementById('f_mop').value,
+    contact: document.getElementById('f_contact').value.trim(),
+    phone: document.getElementById('f_phone').value.trim(),
     notes: document.getElementById('f_notes').value.trim(),
-    status: 'pending', photos: [], chat: [], createdAt: nowTimeStr()
+    status: 'pending', photos: [], videos: [], chat: [], createdAt: nowTimeStr()
   };
   currentDay.stops.push(stop);
   saveDays(days);
   geocodeStop(stop);
-  addActivity('New Stop', loc + ' added to the list');
+  addActivity('New Visit', loc + ' added to the route');
   closeAddStop();
   renderAll();
 }
 function deleteStop(id) {
-  if (!confirm('Delete this stop?')) return;
+  if (!confirm('Delete this visit?')) return;
   var s = currentDay.stops.find(function(x) { return x.id === id; });
   currentDay.stops = currentDay.stops.filter(function(x) { return x.id !== id; });
   saveDays(days);
@@ -1423,9 +1391,8 @@ function saveEditStop(id) {
   if (newAddr !== s.addr) { s.lat = null; s.lng = null; }
   s.addr = newAddr;
   s.type = document.getElementById('e_type_'+id).value;
-  s.so = document.getElementById('e_so_'+id).value.trim();
-  s.part = document.getElementById('e_part_'+id).value.trim();
-  s.mop = document.getElementById('e_mop_'+id).value;
+  s.contact = document.getElementById('e_contact_'+id).value.trim();
+  s.phone = document.getElementById('e_phone_'+id).value.trim();
   s.notes = document.getElementById('e_notes_'+id).value.trim();
   s.editing = false;
   saveDays(days);
@@ -1660,38 +1627,37 @@ function parseDispatchText(text) {
   return blocks.map(function(block) {
     var lines = block.split(/\n/).map(function(l) { return l.replace(/^\d+[\.\)]\s*/, '').trim(); }).filter(Boolean);
     var loc = lines[0] || 'Stop';
-    var addr = '', so = '', part = '', mop = '', notes = [];
-    var type = 'stop';
+    var addr = '', contact = '', phone = '', notes = [];
+    var type = 'other';
     lines.slice(1).forEach(function(line) {
-      if (/^(pick\s*up|delivery|deliver|deposit|stop)$/i.test(line.trim())) return;
+      if (/^(prospect|customer|follow\s*-?up|stop)$/i.test(line.trim())) return;
       var clean = line.replace(/^[-••]\s*/, '').trim();
       var hasPin = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(line);
-      var looksLikePart = /\b(19|20)\d{2}\s*-\s*(19|20)\d{2}\b/.test(clean) || /\b[A-Z]{2}\d{5,8}\b/.test(clean);
-      var looksLikeAddress = !looksLikePart && (hasPin || (/,/.test(clean) && /\d{1,6}\s+\w+/.test(clean)));
+      var looksLikePhone = /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/.test(clean);
+      var looksLikeAddress = !looksLikePhone && (hasPin || (/,/.test(clean) && /\d{1,6}\s+\w+/.test(clean)));
       if (looksLikeAddress) { addr = clean; return; }
-      if (looksLikePart) { part = clean; return; }
-      if (/^(s\/?o\.?\s*#?\s*:?|po#)/i.test(clean) || /\bso[-\s]?\d/i.test(clean)) { so = clean.replace(/^(s\/?o\.?\s*#?\s*:?|po#)\s*-?\s*/i, '').trim(); return; }
-      if (/^(mop\s*:?\s*)?(cash|check|charge)/i.test(clean)) { mop = clean; return; }
+      if (looksLikePhone) { phone = clean.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)[0]; return; }
+      if (/^(contact|attn)\s*:?/i.test(clean)) { contact = clean.replace(/^(contact|attn)\s*:?\s*/i, '').trim(); return; }
       notes.push(clean);
     });
-    if (/pick\s*up/i.test(block)) type = 'pickup';
-    else if (/deliver/i.test(block)) type = 'delivery';
-    else if (/deposit/i.test(block)) type = 'deposit';
-    return { loc: loc, addr: addr, type: type, so: so, part: part, mop: mop, notes: notes.join(' ') };
+    if (/prospect|new\s*lead/i.test(block)) type = 'prospect';
+    else if (/existing|customer/i.test(block)) type = 'customer';
+    else if (/follow\s*-?up/i.test(block)) type = 'followup';
+    return { loc: loc, addr: addr, type: type, contact: contact, phone: phone, notes: notes.join(' ') };
   });
 }
 function renderSmartPreview() {
   var el = document.getElementById('smartResult');
   if (!pendingParsed.length) { el.innerHTML = ''; return; }
   el.innerHTML = '<div class="smart-bubble">' +
-    '<div style="font-weight:700; color:var(--navy); margin-bottom:6px;">Found ' + pendingParsed.length + ' stop' + (pendingParsed.length === 1 ? '' : 's') + ':</div>' +
+    '<div style="font-weight:700; color:var(--navy); margin-bottom:6px;">Found ' + pendingParsed.length + ' visit' + (pendingParsed.length === 1 ? '' : 's') + ':</div>' +
     '<div class="parse-preview">' + pendingParsed.map(function(p) {
       return '<div class="parse-row"><b>'+escapeHtml(p.loc)+'</b>' + (p.addr ? ' — '+escapeHtml(p.addr) : '') +
-        '<div class="p-meta">'+TYPE_LABELS[p.type]+(p.so ? ' • SO '+escapeHtml(p.so) : '')+(p.part ? ' • '+escapeHtml(p.part) : '')+'</div></div>';
+        '<div class="p-meta">'+TYPE_LABELS[p.type]+(p.phone ? ' • '+escapeHtml(p.phone) : '')+'</div></div>';
     }).join('') + '</div>' +
     '<div class="modal-actions" style="margin-top:10px;">' +
       '<button class="btn btn-ghost btn-sm" onclick="cancelSmartPreview()">Cancel</button>' +
-      '<button class="btn btn-navy btn-sm" onclick="confirmSmartPreview()">Add ' + pendingParsed.length + ' Stop' + (pendingParsed.length === 1 ? '' : 's') + '</button>' +
+      '<button class="btn btn-navy btn-sm" onclick="confirmSmartPreview()">Add ' + pendingParsed.length + ' Visit' + (pendingParsed.length === 1 ? '' : 's') + '</button>' +
     '</div></div>';
 }
 function cancelSmartPreview() { pendingParsed = []; document.getElementById('smartResult').innerHTML = ''; }
@@ -1699,13 +1665,13 @@ function confirmSmartPreview() {
   var added = [];
   pendingParsed.forEach(function(p) {
     var stop = {
-      id: uid(), loc: p.loc, addr: p.addr, type: p.type, so: p.so, part: p.part, mop: p.mop, notes: p.notes,
-      status: 'pending', photos: [], chat: [], createdAt: nowTimeStr()
+      id: uid(), loc: p.loc, addr: p.addr, type: p.type, contact: p.contact, phone: p.phone, notes: p.notes,
+      status: 'pending', photos: [], videos: [], chat: [], createdAt: nowTimeStr()
     };
     currentDay.stops.push(stop);
     added.push(stop);
   });
-  addActivity('Smart Add', pendingParsed.length + ' stop(s) added from pasted list');
+  addActivity('Smart Add', pendingParsed.length + ' visit(s) added from pasted list');
   saveDays(days);
   added.forEach(geocodeStop);
   var input = document.getElementById('smartInput');
@@ -1716,14 +1682,14 @@ function confirmSmartPreview() {
 
 /* ---------- HEADER ACTIONS ---------- */
 function startNewList() {
-  if (!currentDay.stops.length) { showToast('List is already empty.', ''); return; }
-  if (!confirm('Start a new list? Today\'s current stops will be archived to History.')) return;
+  if (!currentDay.stops.length) { showToast('Route is already empty.', ''); return; }
+  if (!confirm('Start a new route? Today\'s current visits will be archived to History.')) return;
   currentDay.archived.push({ stops: currentDay.stops, activity: currentDay.activity, archivedAt: nowTimeStr() });
   currentDay.stops = [];
   currentDay.activity = [];
   saveDays(days);
   renderAll();
-  showToast('New list started — previous list saved to History.', 'green');
+  showToast('New route started — previous route saved to History.', 'green');
 }
 function openHistory() {
   document.getElementById('historyModal').classList.add('open');
@@ -1733,18 +1699,18 @@ function closeHistory() { document.getElementById('historyModal').classList.remo
 function renderHistoryDateList() {
   var keys = Object.keys(days).filter(function(k) { return (days[k].stops.length || (days[k].archived||[]).length); }).sort().reverse();
   var body = document.getElementById('historyBody');
-  document.getElementById('historySub').textContent = "Past days' delivery lists. Photos stay on this device.";
+  document.getElementById('historySub').textContent = "Past days' sales routes. Photos stay on this device.";
   if (!keys.length) { body.innerHTML = '<div class="hist-empty">No history yet.</div>'; return; }
   body.innerHTML = keys.map(function(k) {
     var day = days[k];
     var count = day.stops.length + day.archived.reduce(function(a, l) { return a + l.stops.length; }, 0);
-    return '<div class="hist-date-row" onclick="viewHistoryDay(\''+k+'\')"><span class="d">'+fmtDateDisplay(k)+(k===todayKey() ? ' (Today)' : '')+'</span><span class="c">'+count+' stop'+(count===1?'':'s')+'</span></div>';
+    return '<div class="hist-date-row" onclick="viewHistoryDay(\''+k+'\')"><span class="d">'+fmtDateDisplay(k)+(k===todayKey() ? ' (Today)' : '')+'</span><span class="c">'+count+' visit'+(count===1?'':'s')+'</span></div>';
   }).join('');
 }
 function viewHistoryDay(key) {
   var day = days[key];
-  var lists = day.archived.map(function(l, i) { return { label: 'List ' + (i+1) + ' (archived ' + l.archivedAt + ')', stops: l.stops }; });
-  lists.push({ label: key === todayKey() ? 'Current List' : 'List', stops: day.stops });
+  var lists = day.archived.map(function(l, i) { return { label: 'Route ' + (i+1) + ' (archived ' + l.archivedAt + ')', stops: l.stops }; });
+  lists.push({ label: key === todayKey() ? 'Current Route' : 'Route', stops: day.stops });
   var body = document.getElementById('historyBody');
   body.innerHTML = '<span class="hist-back" onclick="renderHistoryDateList()">← Back to dates</span>' +
     '<div style="font-weight:700; color:var(--navy); margin-bottom:8px;">'+fmtDateDisplay(key)+'</div>' +
@@ -1755,7 +1721,7 @@ function viewHistoryDay(key) {
           return '<div class="hist-stop-row"><span class="hloc">'+escapeHtml(s.loc)+'</span> — '+TYPE_LABELS[s.type]+' — '+STATUS_LABELS[s.status] +
             (s.addr ? '<br><span style="color:var(--text-soft);">'+escapeHtml(s.addr)+'</span>' : '') + '</div>';
         }).join('');
-    }).join('') || '<div class="hist-empty">No stops recorded.</div>';
+    }).join('') || '<div class="hist-empty">No visits recorded.</div>';
 }
 
 function openTeamModal() {
@@ -1849,12 +1815,8 @@ function reportDocShell(title, bodyHtml) {
     'table{width:100%;border-collapse:collapse;margin-top:16px;}td,th{border:1px solid #e3e8f2;padding:8px 10px;font-size:13px;text-align:left;}' +
     'th{background:#f4f6fb;} .stat-grid{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;}' +
     '.stat-cell{background:#f4f6fb;border-radius:10px;padding:10px 16px;} .stat-cell .n{font-size:20px;font-weight:800;color:#0b1f42;}' +
-    '.stat-cell .l{font-size:11px;color:#5b6a85;text-transform:uppercase;font-weight:700;}' +
-    '.printbar{margin-top:20px;} button{background:#0b1f42;color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}' +
-    '@media print{.printbar{display:none;}}' +
-    '</style></head><body>' + bodyHtml +
-    '<div class="printbar"><button onclick="window.print()">Print / Save as PDF</button></div>' +
-    '</body></html>';
+    '.stat-cell .l{font-size:11px;color:#5b6a85;font-weight:700;text-transform:uppercase;margin-top:2px;}' +
+    '</style></head><body>'+bodyHtml+'</body></html>';
 }
 function printReport() {
   var stops = currentDay.stops;
@@ -1862,48 +1824,28 @@ function printReport() {
   var rows = stops.map(function(s) {
     return '<tr><td>'+escapeHtml(s.loc)+'</td><td>'+TYPE_LABELS[s.type]+'</td><td>'+STATUS_LABELS[s.status]+'</td><td>'+escapeHtml(s.addr||'')+'</td><td>'+escapeHtml(s.notes||'')+'</td></tr>';
   }).join('');
-  var body = '<h1>Gold Coast Auto Parts — End of Day Report</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+'</h2>' +
+  var body = '<h1>Gold Coast Auto Parts — End of Day Sales Report</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+'</h2>' +
     '<div class="stat-grid">' +
       '<div class="stat-cell"><div class="n">'+completed.length+'/'+stops.length+'</div><div class="l">Completed</div></div>' +
-      '<div class="stat-cell"><div class="n">'+stops.filter(function(s){return s.type==='delivery';}).length+'</div><div class="l">Deliveries</div></div>' +
-      '<div class="stat-cell"><div class="n">'+stops.filter(function(s){return s.type==='pickup';}).length+'</div><div class="l">Pickups</div></div>' +
-      '<div class="stat-cell"><div class="n">'+stops.filter(function(s){return s.type==='deposit';}).length+'</div><div class="l">Deposits</div></div>' +
+      '<div class="stat-cell"><div class="n">'+stops.filter(function(s){return s.type==='prospect';}).length+'</div><div class="l">New Prospects</div></div>' +
+      '<div class="stat-cell"><div class="n">'+stops.filter(function(s){return s.type==='customer';}).length+'</div><div class="l">Existing Customers</div></div>' +
+      '<div class="stat-cell"><div class="n">'+stops.filter(function(s){return s.type==='followup';}).length+'</div><div class="l">Follow-Ups</div></div>' +
       '<div class="stat-cell"><div class="n">'+stops.filter(function(s){return s.status==='postponed';}).length+'</div><div class="l">Postponed</div></div>' +
-      '<div class="stat-cell"><div class="n">'+stops.filter(function(s){return s.status==='returned';}).length+'</div><div class="l">Returned</div></div>' +
+      '<div class="stat-cell"><div class="n">'+stops.filter(function(s){return s.status==='returned';}).length+'</div><div class="l">Not Interested</div></div>' +
     '</div>' +
-    '<table><tr><th>Location</th><th>Type</th><th>Status</th><th>Address</th><th>Notes</th></tr>'+rows+'</table>';
+    '<table><tr><th>Stop</th><th>Type</th><th>Status</th><th>Address</th><th>Notes</th></tr>'+rows+'</table>';
   openPageOverlay('End of Day Report', reportDocShell('End of Day Report', body));
-}
-function openPartsList() {
-  var withParts = currentDay.stops.filter(function(s) { return s.part && s.part.trim() && s.type !== 'pickup'; });
-  var rows = withParts.map(function(s) {
-    return '<tr><td>'+escapeHtml(s.loc)+'</td><td>'+escapeHtml(s.part)+'</td><td>'+(s.so?escapeHtml(s.so):'—')+'</td><td>'+STATUS_LABELS[s.status]+'</td></tr>';
-  }).join('');
-  var body = '<h1>Parts to Pull</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • already in stock, pull from Davie</h2>' +
-    (withParts.length ? '<table><tr><th>Stop</th><th>Part # / Description</th><th>SO#</th><th>Status</th></tr>'+rows+'</table>'
-      : '<p style="color:#5b6a85;">No stops have a part number or description yet.</p>');
-  openPageOverlay('Parts to Pull', reportDocShell('Parts to Pull', body));
-}
-function openPartsToPurchase() {
-  var toBuy = currentDay.stops.filter(function(s) { return s.part && s.part.trim() && s.type === 'pickup'; });
-  var rows = toBuy.map(function(s) {
-    return '<tr><td>'+escapeHtml(s.loc)+'</td><td>'+escapeHtml(s.part)+'</td><td>'+(s.so?escapeHtml(s.so):'—')+'</td><td>'+STATUS_LABELS[s.status]+'</td></tr>';
-  }).join('');
-  var body = '<h1>Parts to Purchase</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • pickups from suppliers, not yet in stock</h2>' +
-    (toBuy.length ? '<table><tr><th>Stop</th><th>Part # / Description</th><th>SO#</th><th>Status</th></tr>'+rows+'</table>'
-      : '<p style="color:#5b6a85;">No pickup stops with a part number or description yet.</p>');
-  openPageOverlay('Parts to Purchase', reportDocShell('Parts to Purchase', body));
 }
 function shareStop(id) {
   var s = currentDay.stops.find(function(x) { return x.id === id; });
   if (!s) return;
   var text = s.loc + (s.addr ? ' — ' + s.addr : '') + '\\n' + TYPE_LABELS[s.type] + ' • ' + STATUS_LABELS[s.status] +
-    (s.so ? '\\nSO# ' + s.so : '') + (s.part ? '\\nPart: ' + s.part : '') + (s.notes ? '\\nNotes: ' + s.notes : '');
-  shareText('Gold Coast Auto Parts Stop', text);
+    (s.contact ? '\\nContact: ' + s.contact : '') + (s.phone ? '\\nPhone: ' + s.phone : '') + (s.notes ? '\\nNotes: ' + s.notes : '');
+  shareText('Gold Coast Auto Parts Visit', text);
 }
 function shareList() {
   var stops = currentDay.stops;
-  if (!stops.length) { showToast('No stops to share yet.', ''); return; }
+  if (!stops.length) { showToast('No visits to share yet.', ''); return; }
   var lines = stops.map(function(s, i) { return (i+1)+'. '+s.loc+(s.addr?' — '+s.addr:'')+' ['+STATUS_LABELS[s.status]+']'; });
   var text = (settings.companyName || 'Gold Coast Auto Parts') + ' — ' + fmtDateDisplay(todayKey()) + '\\n' + lines.join('\\n');
   shareText('Gold Coast Auto Parts — ' + fmtDateDisplay(todayKey()), text);
