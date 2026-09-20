@@ -92,6 +92,22 @@ main { max-width: 1000px; margin: 0px auto; padding: 18px 16px 0px; }
 .update-toast.green { background: linear-gradient(135deg, var(--green), #10b981); box-shadow: 0 10px 32px rgba(52,211,153,0.4); }
 .update-toast.red { background: linear-gradient(135deg, var(--red), #ef4444); box-shadow: 0 10px 32px rgba(248,113,113,0.4); }
 .stops { display: flex; flex-direction: column; gap: 14px; }
+.board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px; scroll-snap-type: x proximity; align-items: flex-start; }
+.column { background: rgba(255,255,255,0.025); border: 1px solid var(--glass-border); border-radius: 14px; padding: 10px; width: min(86vw, 280px); flex: 0 0 auto; scroll-snap-align: start; transition: background 0.15s, border-color 0.15s; }
+.column-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 10px; border-bottom: 1px dashed var(--glass-border); margin-bottom: 10px; }
+.column-head h3 { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; color: var(--text-soft); display: flex; align-items: center; }
+.column-head .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; display: inline-block; flex-shrink: 0; }
+.column-head .count { font-size: 11px; color: var(--text-soft); background: rgba(255,255,255,0.06); padding: 2px 9px; border-radius: 20px; }
+.column-body { display: flex; flex-direction: column; gap: 10px; min-height: 70px; }
+.drop-hint { border: 1.5px dashed var(--glass-border); border-radius: 11px; padding: 20px 10px; text-align: center; font-size: 11px; color: var(--text-soft); }
+.column.drag-over { background: rgba(212,164,65,0.08); border-color: var(--glass-border-gold); }
+.pcard-placeholder { border: 1.5px dashed var(--glass-border-gold); border-radius: 16px; background: rgba(212,164,65,0.05); }
+.pcard-head { cursor: pointer; }
+.pcard-actions { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 10px; }
+.media-badge { font-size: 10px; font-weight: 700; color: var(--gold-2); background: rgba(212,164,65,0.12); border: 1px solid var(--glass-border-gold); border-radius: 6px; padding: 3px 7px; white-space: nowrap; align-self: flex-start; }
+.expand-caret { color: var(--text-soft); font-size: 9px; margin-top: 6px; flex-shrink: 0; }
+.pcard.dragging { box-shadow: 0 20px 52px rgba(0,0,0,0.6); }
+@media (max-width: 700px) { .board { scroll-snap-type: x mandatory; } }
 .stop-card { background: var(--glass); backdrop-filter: var(--blur); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.35); position: relative; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
 .stop-card:hover { border-color: rgba(255,255,255,0.18); }
 .stop-card.current { border: 1px solid var(--glass-border-gold); box-shadow: 0 0 0 1px rgba(212,164,65,0.3), 0 0 34px rgba(212,164,65,0.25), 0 10px 30px rgba(0,0,0,0.4); }
@@ -396,10 +412,10 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
   <div class="feed" id="activityFeed"></div>
 
   <div class="section-title">
-    <h2>Today's Sales Route</h2>
+    <h2>Sales Pipeline</h2>
     <div class="actions"><button class="btn btn-gold" onclick="openAddStop()">+ Add Visit</button></div>
   </div>
-  <div class="stops" id="stopsList"></div>
+  <div class="board" id="stopsList"></div>
 
   <div class="end-report" id="endReport"></div>
 </main>
@@ -1193,6 +1209,20 @@ function currentStopId() {
   var next = currentDay.stops.find(function(s) { return s.status !== 'completed'; });
   return next ? next.id : null;
 }
+var BOARD_COLUMNS = [
+  { key: 'pending', label: 'Pending', dot: 'var(--gray)' },
+  { key: 'onway', label: 'En Route', dot: 'var(--blue)' },
+  { key: 'arrived', label: 'At Location', dot: 'var(--purple)' },
+  { key: 'completed', label: 'Completed', dot: 'var(--green)' },
+  { key: 'followup', label: 'Needs Follow-Up', dot: 'var(--amber)' }
+];
+function boardColumnKey(status) { return (status === 'postponed' || status === 'returned') ? 'followup' : status; }
+function toggleExpand(id) {
+  var s = currentDay.stops.find(function(x) { return x.id === id; });
+  if (!s) return;
+  s.expanded = !s.expanded;
+  renderStops();
+}
 function renderStops() {
   var el = document.getElementById('stopsList');
   var stops = currentDay.stops;
@@ -1201,20 +1231,52 @@ function renderStops() {
     return;
   }
   var curId = currentStopId();
-  el.innerHTML = stops.map(function(s, i) { return renderStopCard(s, i, curId); }).join('');
+  el.innerHTML = BOARD_COLUMNS.map(function(col) {
+    var items = stops.filter(function(s) { return boardColumnKey(s.status) === col.key; });
+    return '<div class="column" data-col="' + col.key + '">' +
+      '<div class="column-head"><h3><span class="dot" style="background:' + col.dot + ';"></span>' + col.label + '</h3><span class="count">' + items.length + '</span></div>' +
+      '<div class="column-body">' +
+        (items.length ? items.map(function(s) { return renderStopCard(s, curId); }).join('') : '<div class="drop-hint">Drop a visit here</div>') +
+      '</div>' +
+    '</div>';
+  }).join('');
 }
-function renderStopCard(s, i, curId) {
+function renderStopCard(s, curId) {
   var isCurrent = s.id === curId;
   var isDone = s.status === 'completed';
-  var cls = 'stop-card' + (isCurrent ? ' current' : '') + (isDone ? ' completed-card' : '');
-  var numCls = 'stop-num' + (isDone ? ' done' : (isCurrent ? ' current-num' : ''));
+  var cls = 'stop-card pcard' + (isCurrent ? ' current' : '') + (isDone ? ' completed-card' : '');
   var hasPriority = /priority/i.test(s.notes || '');
   var noteText = s.notes || '';
+  var mediaCount = (s.photos || []).length + (s.videos || []).length;
+
+  if (s.editing) {
+    return '<div class="' + cls + '" data-id="' + s.id + '">' +
+      (isCurrent ? '<div class="current-ribbon">CURRENT</div>' : '') +
+      '<div class="stop-head"><div class="stop-title" style="width:100%;">' + renderEditForm(s) + '</div></div></div>';
+  }
+
+  var head =
+    '<div class="stop-head pcard-head" onclick="toggleExpand(\'' + s.id + '\')">' +
+      '<div class="drag-handle" data-id="' + s.id + '" onclick="event.stopPropagation()">⠿</div>' +
+      '<div class="stop-title">' +
+        '<span class="loc">' + escapeHtml(s.loc || 'Unnamed visit') + '</span>' +
+        (hasPriority ? '<span class="priority-flag">PRIORITY</span>' : '') +
+        '<div class="addr">' + (s.contact ? escapeHtml(s.contact) : escapeHtml(s.addr || 'No contact yet')) + '</div>' +
+      '</div>' +
+      '<span class="type-badge type-' + s.type + '">' + TYPE_LABELS[s.type] + '</span>' +
+      (mediaCount ? '<span class="media-badge">📎 ' + mediaCount + '</span>' : '') +
+      '<span class="expand-caret">' + (s.expanded ? '&#9650;' : '&#9660;') + '</span>' +
+    '</div>';
+
+  if (!s.expanded) {
+    return '<div class="' + cls + '" data-id="' + s.id + '">' + (isCurrent ? '<div class="current-ribbon">CURRENT</div>' : '') + head + '</div>';
+  }
+
   var photosHtml = (s.photos||[]).map(function(p, pi) {
-    return '<img class="photo-thumb" src="'+p+'" onclick="removePhoto(\''+s.id+'\','+pi+')" title="Tap to remove">';
+    return '<img class="photo-thumb" src="'+p+'" onclick="event.stopPropagation(); removePhoto(\''+s.id+'\','+pi+')" title="Tap to remove">';
   }).join('');
   var videosHtml = (s.videos||[]).map(function(v, vi) {
-    return '<div class="video-thumb-wrap" onclick="openVideoModal(\''+escapeHtml(v)+'\')">' +
+    return '<div class="video-thumb-wrap" onclick="event.stopPropagation(); openVideoModal(\''+escapeHtml(v)+'\')">' +
       '<video src="'+v+'" preload="metadata" muted></video>' +
       '<span class="video-play-badge">▶</span>' +
       '<span class="video-remove-badge" onclick="event.stopPropagation(); removeVideo(\''+s.id+'\','+vi+')" title="Remove">✕</span>' +
@@ -1222,36 +1284,20 @@ function renderStopCard(s, i, curId) {
   }).join('') + (s.videoUploading ? '<div class="video-uploading">Uploading…</div>' : '');
   var statusBtns = STATUS_ORDER.map(function(st) {
     var active = s.status === st ? ' active-'+st : '';
-    return '<button class="status-btn'+active+'" onclick="setStatus(\''+s.id+'\',\''+st+'\')">'+STATUS_LABELS[st]+'</button>';
+    return '<button class="status-btn'+active+'" onclick="event.stopPropagation(); setStatus(\''+s.id+'\',\''+st+'\')">'+STATUS_LABELS[st]+'</button>';
   }).join('');
   var chatLog = (s.chat||[]).length
     ? s.chat.map(function(c, ci) { return renderChatMsg(s.id, c, ci); }).join('')
     : '<div class="chat-empty">No messages yet.</div>';
   var updatedByHtml = s.updatedBy ? '<div class="updated-by">Updated by '+escapeHtml(s.updatedBy)+' • '+s.updatedAt+'</div>' : '';
 
-  if (s.editing) {
-    return '<div class="'+cls+'" data-id="'+s.id+'">' +
-      (isCurrent ? '<div class="current-ribbon">CURRENT STOP</div>' : '') +
-      '<div class="stop-head"><div class="'+numCls+'">'+(i+1)+'</div>' +
-      '<div class="stop-title" style="width:100%;">' + renderEditForm(s) + '</div></div></div>';
-  }
-
-  return '<div class="'+cls+'" data-id="'+s.id+'">' +
-    (isCurrent ? '<div class="current-ribbon">CURRENT STOP</div>' : '') +
-    '<div class="stop-head">' +
-      '<div class="drag-handle" data-id="'+s.id+'">⠿</div>' +
-      '<div class="'+numCls+'">'+(i+1)+'</div>' +
-      '<div class="stop-title">' +
-        '<span class="loc">'+escapeHtml(s.loc||'Unnamed stop')+'</span>' +
-        (hasPriority ? '<span class="priority-flag">PRIORITY</span>' : '') +
-        '<div class="addr">'+escapeHtml(s.addr||'')+'</div>' +
+  var body =
+    '<div class="stop-body" onclick="event.stopPropagation()">' +
+      '<div class="pcard-actions">' +
+        '<button class="stop-share-btn" onclick="shareStop(\''+s.id+'\')" title="Share">↗</button>' +
+        '<button class="stop-edit-btn" onclick="editStop(\''+s.id+'\')" title="Edit">✎</button>' +
+        '<button class="stop-delete-btn" onclick="deleteStop(\''+s.id+'\')" title="Delete">🗑</button>' +
       '</div>' +
-      '<span class="type-badge type-'+s.type+'">'+TYPE_LABELS[s.type]+'</span>' +
-      '<button class="stop-share-btn" onclick="shareStop(\''+s.id+'\')" title="Share">↗</button>' +
-      '<button class="stop-edit-btn" onclick="editStop(\''+s.id+'\')" title="Edit">✎</button>' +
-      '<button class="stop-delete-btn" onclick="deleteStop(\''+s.id+'\')" title="Delete">🗑</button>' +
-    '</div>' +
-    '<div class="stop-body">' +
       '<div class="details">' +
         (s.contact ? '<div><b>Contact:</b> '+escapeHtml(s.contact)+'</div>' : '') +
         (s.phone ? '<div><b>Phone:</b> '+escapeHtml(s.phone)+'</div>' : '') +
@@ -1271,8 +1317,9 @@ function renderStopCard(s, i, curId) {
           '<button class="btn btn-sm btn-navy" onclick="sendChat(\''+s.id+'\')">Send</button>' +
         '</div>' +
       '</div>' +
-    '</div>' +
-  '</div>';
+    '</div>';
+
+  return '<div class="' + cls + '" data-id="' + s.id + '">' + (isCurrent ? '<div class="current-ribbon">CURRENT</div>' : '') + head + body + '</div>';
 }
 function renderChatMsg(stopId, c, idx) {
   if (c.editing) {
@@ -1564,40 +1611,57 @@ function closeVideoModal() {
 
 /* ---------- DRAG REORDER ---------- */
 function setupDragAndDrop() {
-  var list = document.getElementById('stopsList');
-  var dragEl = null, dragId = null;
-  list.addEventListener('pointerdown', function(e) {
+  var board = document.getElementById('stopsList');
+  var dragCard = null, dragId = null, offsetX = 0, offsetY = 0, placeholder = null;
+  board.addEventListener('pointerdown', function(e) {
     var handle = e.target.closest('.drag-handle');
     if (!handle) return;
-    var card = handle.closest('.stop-card');
+    var card = handle.closest('.pcard');
     if (!card) return;
     dragId = card.getAttribute('data-id');
-    dragEl = card;
+    dragCard = card;
+    var rect = card.getBoundingClientRect();
+    offsetX = e.clientX - rect.left; offsetY = e.clientY - rect.top;
+    placeholder = document.createElement('div');
+    placeholder.className = 'pcard-placeholder';
+    placeholder.style.height = rect.height + 'px';
+    card.parentNode.insertBefore(placeholder, card);
+    card.style.position = 'fixed';
+    card.style.left = rect.left + 'px';
+    card.style.top = rect.top + 'px';
+    card.style.width = rect.width + 'px';
+    card.style.zIndex = 999;
+    card.style.pointerEvents = 'none';
     card.classList.add('dragging');
     document.body.classList.add('reordering');
     e.preventDefault();
   });
   document.addEventListener('pointermove', function(e) {
-    if (!dragEl) return;
-    var cards = Array.prototype.slice.call(list.querySelectorAll('.stop-card'));
-    var y = e.clientY;
-    for (var i = 0; i < cards.length; i++) {
-      var c = cards[i];
-      if (c === dragEl) continue;
-      var r = c.getBoundingClientRect();
-      var mid = r.top + r.height / 2;
-      if (y < mid) { list.insertBefore(dragEl, c); return; }
-    }
-    list.appendChild(dragEl);
+    if (!dragCard) return;
+    dragCard.style.left = (e.clientX - offsetX) + 'px';
+    dragCard.style.top = (e.clientY - offsetY) + 'px';
+    document.querySelectorAll('.column').forEach(function(c) { c.classList.remove('drag-over'); });
+    var elUnder = document.elementFromPoint(e.clientX, e.clientY);
+    var col = elUnder && elUnder.closest('.column');
+    if (col) col.classList.add('drag-over');
   });
-  document.addEventListener('pointerup', function() {
-    if (!dragEl) return;
-    dragEl.classList.remove('dragging');
+  document.addEventListener('pointerup', function(e) {
+    if (!dragCard) return;
+    var elUnder = document.elementFromPoint(e.clientX, e.clientY);
+    var col = elUnder && elUnder.closest('.column');
+    var idToMove = dragId;
+    document.querySelectorAll('.column').forEach(function(c) { c.classList.remove('drag-over'); });
+    dragCard.classList.remove('dragging');
+    dragCard.style.position = ''; dragCard.style.left = ''; dragCard.style.top = ''; dragCard.style.width = ''; dragCard.style.zIndex = ''; dragCard.style.pointerEvents = '';
     document.body.classList.remove('reordering');
-    var order = Array.prototype.slice.call(list.querySelectorAll('.stop-card')).map(function(c) { return c.getAttribute('data-id'); });
-    currentDay.stops.sort(function(a, b) { return order.indexOf(a.id) - order.indexOf(b.id); });
-    saveDays(days);
-    dragEl = null; dragId = null;
+    if (placeholder && placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+    placeholder = null; dragCard = null; dragId = null;
+    if (col) {
+      var newColKey = col.getAttribute('data-col');
+      var s = currentDay.stops.find(function(x) { return x.id === idToMove; });
+      var newStatus = newColKey === 'followup' ? 'postponed' : newColKey;
+      if (s && newStatus && s.status !== newStatus) { setStatus(idToMove, newStatus); return; }
+    }
     renderAll();
   });
 }
