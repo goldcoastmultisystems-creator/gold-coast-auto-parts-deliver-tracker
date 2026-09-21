@@ -1979,16 +1979,43 @@ function currentUserLabel() {
   var role = session ? (session.type === 'owner' ? 'Owner' : (session.role || '')) : (settings.driverRole || '');
   return who + (role ? ' (' + role + ')' : '');
 }
+function dataUrlToFile(dataUrl, filename) {
+  var arr = dataUrl.split(',');
+  var mimeMatch = arr[0].match(/:(.*?);/);
+  var mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  var bstr = atob(arr[1]);
+  var n = bstr.length;
+  var u8arr = new Uint8Array(n);
+  while (n--) { u8arr[n] = bstr.charCodeAt(n); }
+  return new File([u8arr], filename, { type: mime });
+}
 function shareStop(id) {
   var s = currentDay.stops.find(function(x) { return x.id === id; });
   if (!s) return;
   var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Delivery Status Board — ' + fmtDateDisplay(todayKey());
+  var videoLinks = (s.videos || []).map(function(v, i) { return 'Video ' + (i + 1) + ': ' + v; }).join('\n');
+  var photoCount = (s.photos || []).length;
   var text = header + '\nShared by: ' + currentUserLabel() + '\n\n' +
     s.loc + (s.addr ? ' — ' + s.addr : '') + '\n' +
     TYPE_LABELS[s.type] + ' • Status: ' + STATUS_LABELS[s.status] +
     (s.updatedBy ? ' (updated by ' + s.updatedBy + ', ' + s.updatedAt + ')' : '') +
-    (s.so ? '\nSO# ' + s.so : '') + (s.part ? '\nPart: ' + s.part : '') + (s.mop ? '\nPayment: ' + s.mop : '') + (s.notes ? '\nNotes: ' + s.notes : '');
-  shareText('Gold Coast Auto Parts Stop', text);
+    (s.so ? '\nSO# ' + s.so : '') + (s.part ? '\nPart: ' + s.part : '') + (s.mop ? '\nPayment: ' + s.mop : '') + (s.notes ? '\nNotes: ' + s.notes : '') +
+    (photoCount ? '\n' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + ' attached' : '') +
+    (videoLinks ? '\n\n' + videoLinks : '');
+
+  var photoFiles = (s.photos || []).map(function(p, i) {
+    try { return dataUrlToFile(p, (s.loc || 'stop').replace(/[^a-z0-9]+/gi, '_') + '-photo-' + (i + 1) + '.jpg'); }
+    catch (e) { return null; }
+  }).filter(Boolean);
+
+  if (navigator.canShare && photoFiles.length && navigator.canShare({ files: photoFiles })) {
+    navigator.share({ title: 'Gold Coast Auto Parts Stop', text: text, files: photoFiles }).catch(function(e) {
+      console.error('share with photos failed, falling back to text-only', e);
+      shareText('Gold Coast Auto Parts Stop', text);
+    });
+  } else {
+    shareText('Gold Coast Auto Parts Stop', text);
+  }
 }
 function shareList() {
   var stops = currentDay.stops;
