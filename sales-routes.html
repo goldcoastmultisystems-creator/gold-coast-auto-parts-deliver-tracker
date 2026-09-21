@@ -2309,19 +2309,40 @@ function printReport() {
     '<table><tr><th>Stop</th><th>Type</th><th>Status</th><th>Address</th><th>Notes</th></tr>'+rows+'</table>';
   openPageOverlay('End of Day Report', reportDocShell('End of Day Report', body));
 }
+function currentUserLabel() {
+  var who = (session && session.name) || settings.driverName || 'Someone';
+  var role = session ? (session.type === 'owner' ? 'Owner' : (session.role || '')) : 'Sales Rep';
+  return who + (role ? ' (' + role + ')' : '');
+}
 function shareStop(id) {
   var s = currentDay.stops.find(function(x) { return x.id === id; });
   if (!s) return;
-  var text = s.loc + (s.addr ? ' — ' + s.addr : '') + '\\n' + TYPE_LABELS[s.type] + ' • ' + STATUS_LABELS[s.status] +
-    (s.contact ? '\\nContact: ' + s.contact : '') + (s.phone ? '\\nPhone: ' + s.phone : '') + (s.notes ? '\\nNotes: ' + s.notes : '');
+  var rpt = ensureReport(s);
+  var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Sales Representative Routes — ' + fmtDateDisplay(todayKey());
+  var text = header + '\nShared by: ' + currentUserLabel() + '\n\n' +
+    s.loc + (s.addr ? ' — ' + s.addr : '') + '\n' +
+    TYPE_LABELS[s.type] + ' • Status: ' + STATUS_LABELS[s.status] +
+    (s.updatedBy ? ' (updated by ' + s.updatedBy + ', ' + s.updatedAt + ')' : '') +
+    (s.contact ? '\nContact: ' + s.contact : '') + (s.phone ? '\nPhone: ' + s.phone : '') +
+    (rpt.leadTier ? '\nLead Tier: ' + rpt.leadTier : '') +
+    (rpt.crmConfirmed ? '\nCRM Confirmed: Yes' : '') +
+    (rpt.nextAction && rpt.nextAction.what ? '\nNext Action: ' + rpt.nextAction.what + (rpt.nextAction.when ? ' (by ' + rpt.nextAction.when + ')' : '') : '') +
+    (s.notes ? '\nNotes: ' + s.notes : '');
   shareText('Gold Coast Auto Parts Visit', text);
 }
 function shareList() {
   var stops = currentDay.stops;
   if (!stops.length) { showToast('No visits to share yet.', ''); return; }
-  var lines = stops.map(function(s, i) { return (i+1)+'. '+s.loc+(s.addr?' — '+s.addr:'')+' ['+STATUS_LABELS[s.status]+']'; });
-  var text = (settings.companyName || 'Gold Coast Auto Parts') + ' — ' + fmtDateDisplay(todayKey()) + '\\n' + lines.join('\\n');
-  shareText('Gold Coast Auto Parts — ' + fmtDateDisplay(todayKey()), text);
+  var counts = { completed:0, onway:0, arrived:0, postponed:0, returned:0, pending:0 };
+  stops.forEach(function(s) { counts[s.status] = (counts[s.status]||0) + 1; });
+  var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Sales Representative Routes — ' + fmtDateDisplay(todayKey());
+  var summary = 'Summary: ' + counts.completed + ' Completed, ' + counts.onway + ' En Route, ' + counts.arrived + ' At Location, ' +
+    counts.postponed + ' Postponed, ' + counts.returned + ' Not Interested, ' + counts.pending + ' Pending';
+  var lines = stops.map(function(s, i) {
+    return (i+1)+'. '+s.loc+(s.addr?' — '+s.addr:'')+' — '+STATUS_LABELS[s.status] + (s.updatedBy ? ' (by '+s.updatedBy+', '+s.updatedAt+')' : '');
+  });
+  var text = header + '\nShared by: ' + currentUserLabel() + '\n' + summary + '\n\n' + lines.join('\n');
+  shareText(header, text);
 }
 function shareText(title, text) {
   if (navigator.share) {

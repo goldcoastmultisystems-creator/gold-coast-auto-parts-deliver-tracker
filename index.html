@@ -1947,19 +1947,35 @@ function openPartsToPurchase() {
       : '<p style="color:#5b6a85;">No pickup stops with a part number or description yet.</p>');
   openPageOverlay('Parts to Purchase', reportDocShell('Parts to Purchase', body));
 }
+function currentUserLabel() {
+  var who = (session && session.name) || settings.driverName || 'Someone';
+  var role = session ? (session.type === 'owner' ? 'Owner' : (session.role || '')) : (settings.driverRole || '');
+  return who + (role ? ' (' + role + ')' : '');
+}
 function shareStop(id) {
   var s = currentDay.stops.find(function(x) { return x.id === id; });
   if (!s) return;
-  var text = s.loc + (s.addr ? ' — ' + s.addr : '') + '\\n' + TYPE_LABELS[s.type] + ' • ' + STATUS_LABELS[s.status] +
-    (s.so ? '\\nSO# ' + s.so : '') + (s.part ? '\\nPart: ' + s.part : '') + (s.notes ? '\\nNotes: ' + s.notes : '');
+  var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Delivery Status Board — ' + fmtDateDisplay(todayKey());
+  var text = header + '\nShared by: ' + currentUserLabel() + '\n\n' +
+    s.loc + (s.addr ? ' — ' + s.addr : '') + '\n' +
+    TYPE_LABELS[s.type] + ' • Status: ' + STATUS_LABELS[s.status] +
+    (s.updatedBy ? ' (updated by ' + s.updatedBy + ', ' + s.updatedAt + ')' : '') +
+    (s.so ? '\nSO# ' + s.so : '') + (s.part ? '\nPart: ' + s.part : '') + (s.mop ? '\nPayment: ' + s.mop : '') + (s.notes ? '\nNotes: ' + s.notes : '');
   shareText('Gold Coast Auto Parts Stop', text);
 }
 function shareList() {
   var stops = currentDay.stops;
   if (!stops.length) { showToast('No stops to share yet.', ''); return; }
-  var lines = stops.map(function(s, i) { return (i+1)+'. '+s.loc+(s.addr?' — '+s.addr:'')+' ['+STATUS_LABELS[s.status]+']'; });
-  var text = (settings.companyName || 'Gold Coast Auto Parts') + ' — ' + fmtDateDisplay(todayKey()) + '\\n' + lines.join('\\n');
-  shareText('Gold Coast Auto Parts — ' + fmtDateDisplay(todayKey()), text);
+  var counts = { completed:0, onway:0, arrived:0, postponed:0, returned:0, pending:0 };
+  stops.forEach(function(s) { counts[s.status] = (counts[s.status]||0) + 1; });
+  var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Delivery Status Board — ' + fmtDateDisplay(todayKey());
+  var summary = 'Summary: ' + counts.completed + ' Completed, ' + counts.onway + ' En Route, ' + counts.arrived + ' At Location, ' +
+    counts.postponed + ' Postponed, ' + counts.returned + ' Returned Part, ' + counts.pending + ' Pending';
+  var lines = stops.map(function(s, i) {
+    return (i+1)+'. '+s.loc+(s.addr?' — '+s.addr:'')+' — '+STATUS_LABELS[s.status] + (s.updatedBy ? ' (by '+s.updatedBy+', '+s.updatedAt+')' : '');
+  });
+  var text = header + '\nShared by: ' + currentUserLabel() + '\n' + summary + '\n\n' + lines.join('\n');
+  shareText(header, text);
 }
 function shareText(title, text) {
   if (navigator.share) {
