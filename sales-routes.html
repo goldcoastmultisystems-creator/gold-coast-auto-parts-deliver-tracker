@@ -47,6 +47,8 @@ header::after { content: ""; position: absolute; right: -40px; top: -60px; width
 .header-actions { display: flex; gap: 8px; margin-left: auto; align-items: center; flex-wrap: wrap; }
 .hdr-btn { background: var(--glass); backdrop-filter: var(--blur); border: 1px solid var(--glass-border); color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
 .hdr-btn:hover { background: rgba(212,164,65,0.16); border-color: var(--glass-border-gold); box-shadow: 0 0 16px rgba(212,164,65,0.25); }
+.hdr-btn.tracking-off { border-color: rgba(248,113,113,0.5); background: rgba(248,113,113,0.14); color: #fca5a5; }
+.hdr-btn.tracking-off:hover { background: rgba(248,113,113,0.24); }
 .empty-state { background: var(--glass); backdrop-filter: var(--blur); border: 1.5px dashed var(--glass-border); border-radius: 16px; padding: 34px 20px; text-align: center; color: var(--text-soft); }
 .empty-state .big { font-size: 15px; font-weight: 800; color: var(--gold-2); margin-bottom: 6px; }
 .empty-state .sm { font-size: 12.5px; }
@@ -437,6 +439,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <input id="companyName" placeholder="e.g. Gold Coast Auto Parts" style="width:170px;" oninput="onSettingsChange()">
     </div>
     <div class="header-actions">
+      <button class="hdr-btn" id="trackingToggleBtn" onclick="toggleTrackingPaused()" style="display:none;">📍 Tracking: ON</button>
       <button class="hdr-btn" id="deliveryNavBtn" onclick="location.href='index.html'">← Delivery Tracker</button>
       <button class="hdr-btn" onclick="startNewList()">+ New Route</button>
       <button class="hdr-btn" onclick="openLiveMap()">📍 Live Map</button>
@@ -752,6 +755,7 @@ function syncRoleUI() {
     var hideDelivery = !!(session && session.type === 'guest' && !session.isAdmin && session.role === 'Sales Rep');
     deliveryBtn.style.display = hideDelivery ? 'none' : '';
   }
+  syncTrackingToggleUI();
 }
 
 /* ---------- LIVE LOCATION TRACKING (sales reps push position; everyone can view the map) ---------- */
@@ -761,10 +765,30 @@ function getDriverSessionId() {
   var name = (session && session.name) || settings.driverName || 'rep';
   return 'owner_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
 }
+function isTrackingPaused() { return localStorage.getItem('kgps_tracking_paused') === '1'; }
+function setTrackingPaused(paused) { localStorage.setItem('kgps_tracking_paused', paused ? '1' : '0'); }
+function toggleTrackingPaused() {
+  setTrackingPaused(!isTrackingPaused());
+  updateTrackingForRole();
+  showToast(isTrackingPaused() ? '📍 Location tracking paused.' : '📍 Location tracking resumed.', isTrackingPaused() ? 'red' : 'green');
+}
+function syncTrackingToggleUI() {
+  var btn = document.getElementById('trackingToggleBtn');
+  if (!btn) return;
+  var roleSel = document.getElementById('driverRole');
+  var role = (session && session.type === 'guest') ? session.role : (roleSel ? roleSel.value : '');
+  var applicable = !!(session && role === 'Sales Rep');
+  btn.style.display = applicable ? '' : 'none';
+  if (!applicable) return;
+  var paused = isTrackingPaused();
+  btn.textContent = paused ? '📍 Tracking: OFF' : '📍 Tracking: ON';
+  btn.classList.toggle('tracking-off', paused);
+}
 function updateTrackingForRole() {
   var role = (session && session.type === 'guest') ? session.role : document.getElementById('driverRole').value;
-  if (session && role === 'Sales Rep' && FIREBASE_ENABLED) startLocationTracking();
+  if (session && role === 'Sales Rep' && FIREBASE_ENABLED && !isTrackingPaused()) startLocationTracking();
   else stopLocationTracking();
+  syncTrackingToggleUI();
 }
 function startLocationTracking() {
   if (!fbDb || geoWatchId !== null) return;
