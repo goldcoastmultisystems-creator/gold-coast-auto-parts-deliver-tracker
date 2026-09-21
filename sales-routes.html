@@ -116,6 +116,7 @@ main { max-width: 1000px; margin: 0px auto; padding: 18px 16px 0px; }
 .tier-badge.tier-C { background: rgba(251,191,36,0.2); color: var(--amber); border: 1px solid rgba(251,191,36,0.4); }
 .tier-badge.tier-D { background: rgba(255,255,255,0.08); color: var(--text-soft); border: 1px solid var(--glass-border); }
 .report-badge { font-size: 10.5px; color: var(--green); font-weight: 700; white-space: nowrap; align-self: center; }
+.zoho-badge { font-size: 10px; font-weight: 700; color: var(--blue); background: rgba(96,165,250,0.14); border: 1px solid rgba(96,165,250,0.3); border-radius: 6px; padding: 3px 7px; white-space: nowrap; }
 .checklist-progress-badge { font-size: 10px; font-weight: 700; color: var(--text-soft); background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border); border-radius: 6px; padding: 3px 7px; white-space: nowrap; }
 .checklist-progress-badge.done { color: var(--green); background: rgba(52,211,153,0.14); border-color: rgba(52,211,153,0.3); }
 .visit-checklist-group { margin-bottom: 12px; }
@@ -1384,6 +1385,7 @@ function renderStopCard(s, curId) {
   var rpt = ensureReport(s);
   var tierBadge = rpt.leadTier ? '<span class="tier-badge tier-' + rpt.leadTier + '" title="Lead Tier ' + rpt.leadTier + '">' + rpt.leadTier + '</span>' : '';
   var reportBadge = rpt.crmConfirmed ? '<span class="report-badge" title="Visit report submitted">📋✓</span>' : '';
+  var zohoBadge = rpt.zohoSyncedAt ? '<span class="zoho-badge" title="Synced to Zoho CRM at ' + escapeHtml(rpt.zohoSyncedAt) + '">☁️ Zoho</span>' : '';
   var vcProgress = visitChecklistProgress(s);
   var checklistBadge = vcProgress.done ? '<span class="checklist-progress-badge'+(vcProgress.done===vcProgress.total?' done':'')+'">✅ '+vcProgress.done+'/'+vcProgress.total+'</span>' : '';
 
@@ -1402,7 +1404,7 @@ function renderStopCard(s, curId) {
         '<div class="addr">' + (s.contact ? escapeHtml(s.contact) : escapeHtml(s.addr || 'No contact yet')) + '</div>' +
         '<div class="pcard-badges">' +
           '<span class="type-badge type-' + s.type + '">' + TYPE_LABELS[s.type] + '</span>' +
-          tierBadge + reportBadge + checklistBadge +
+          tierBadge + reportBadge + zohoBadge + checklistBadge +
           (mediaCount ? '<span class="media-badge">📎 ' + mediaCount + '</span>' : '') +
         '</div>' +
       '</div>' +
@@ -1617,7 +1619,9 @@ function renderReportForm(s) {
     '<label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:13px;">' +
       '<input type="checkbox" id="rf_crm_'+id+'" style="width:18px; height:18px;" '+(r.crmConfirmed?'checked':'')+'> ' +
       'This visit has been fully logged in the CRM' +
-    '</label>'
+    '</label>' +
+    (r.zohoSyncedAt ? '<div class="modal-sub" style="margin:8px 0 0;">Last synced to Zoho: '+escapeHtml(r.zohoSyncedAt)+'</div>' : '') +
+    '<div class="edit-actions" style="margin-top:10px;"><button type="button" class="btn btn-navy btn-sm" onclick="syncToZoho(\''+id+'\')">🔄 Sync to Zoho Now</button></div>'
   );
   return html;
 }
@@ -1636,6 +1640,7 @@ function saveReportModal() {
   var s = currentDay.stops.find(function(x) { return x.id === stopId; });
   if (!s) return;
   var r = ensureReport(s);
+  var wasConfirmed = r.crmConfirmed;
   s.contact = val('rf_cname_'+stopId);
   s.phone = val('rf_cphone_'+stopId);
   r.bays = val('rf_bays_'+stopId);
@@ -1663,7 +1668,42 @@ function saveReportModal() {
   saveDays(days);
   closeReportModal();
   addActivity('Visit Report', s.loc + ' report saved' + (r.leadTier ? ' — Lead Tier ' + r.leadTier : ''));
+  if (r.crmConfirmed && !wasConfirmed) syncToZoho(stopId);
   if (newStage && s.status !== newStage) setStatus(stopId, newStage); else renderAll();
+}
+function syncToZoho(stopId) {
+  var s = currentDay.stops.find(function(x) { return x.id === stopId; });
+  if (!s) return;
+  var r = ensureReport(s);
+  var painPointKeys = PAIN_POINTS.filter(function(p) { return r.painPoints[p.key]; }).map(function(p) { return p.label; });
+  var payload = { visit: {
+    shopName: s.loc, address: s.addr, type: s.type,
+    contactName: s.contact, phone: s.phone, contactTitle: r.contactTitle, preferredContact: r.preferredContact,
+    vehicleMakes: r.vehicleMakes, drpAffiliations: r.drpAffiliations, currentSuppliers: r.currentSuppliers, estimatingSoftware: r.estimatingSoftware,
+    painPoints: painPointKeys, quotes: r.quotes, visitOutcome: r.visitOutcome, leadTier: r.leadTier, nextAction: r.nextAction,
+    repName: (session && session.name) || settings.driverName || ''
+  }};
+  showToast('Syncing to Zoho CRM…', '');
+  fetch('/.netlify/functions/zoho-sync', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+  }).then(function(resp) { return resp.json().then(function(data) { return { ok: resp.ok, data: data }; }); })
+    .then(function(res) {
+      if (res.ok) {
+        showToast('Synced to Zoho CRM ✓', 'green');
+        r.zohoSyncedAt = nowTimeStr();
+        saveDays(days);
+        if (document.getElementById('reportModal').classList.contains('open') && document.getElementById('reportModal').dataset.stopId === stopId) {
+          document.getElementById('reportBody').innerHTML = renderReportForm(s);
+        }
+      } else {
+        console.error('Zoho sync failed', res.data);
+        showToast('Zoho sync failed — see console for details.', 'red');
+      }
+    })
+    .catch(function(e) {
+      console.error('Zoho sync request failed', e);
+      showToast('Zoho sync failed — check your connection.', 'red');
+    });
 }
 
 /* ---------- DAILY CHECKLIST (Page 2) ---------- */
