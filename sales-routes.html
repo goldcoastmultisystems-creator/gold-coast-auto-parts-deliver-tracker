@@ -116,6 +116,13 @@ main { max-width: 1000px; margin: 0px auto; padding: 18px 16px 0px; }
 .tier-badge.tier-C { background: rgba(251,191,36,0.2); color: var(--amber); border: 1px solid rgba(251,191,36,0.4); }
 .tier-badge.tier-D { background: rgba(255,255,255,0.08); color: var(--text-soft); border: 1px solid var(--glass-border); }
 .report-badge { font-size: 10.5px; color: var(--green); font-weight: 700; white-space: nowrap; align-self: center; }
+.checklist-progress-badge { font-size: 10px; font-weight: 700; color: var(--text-soft); background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border); border-radius: 6px; padding: 3px 7px; white-space: nowrap; }
+.checklist-progress-badge.done { color: var(--green); background: rgba(52,211,153,0.14); border-color: rgba(52,211,153,0.3); }
+.visit-checklist-group { margin-bottom: 12px; }
+.visit-checklist-group:last-child { margin-bottom: 0; }
+.visit-checklist-title { font-size: 10.5px; font-weight: 700; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+.checklist-item.small { padding: 4px 0; font-size: 12px; }
+.checklist-item.small input { width: 15px; height: 15px; }
 .stop-report-btn { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; border: 1.5px solid var(--glass-border-gold); background: rgba(212,164,65,0.12); color: var(--gold-2); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .stop-report-btn:hover { background: rgba(212,164,65,0.22); }
 .report-section { border: 1px solid var(--glass-border); border-radius: 12px; margin-bottom: 10px; overflow: hidden; background: rgba(255,255,255,0.02); }
@@ -869,6 +876,20 @@ var PAIN_POINTS = [
   { key:'availability', label:'Availability' }, { key:'price', label:'Price' }
 ];
 var LEAD_TIERS = ['A','B','C','D'];
+var VISIT_DURING_ITEMS = [
+  { key:'intro', label:'Introduced yourself and Gold Coast Auto Parts' },
+  { key:'painPoints', label:'Asked about current pain points' },
+  { key:'profile', label:'Noted vehicle makes & DRP affiliations' },
+  { key:'quote', label:'Offered a quote if the opportunity came up' },
+  { key:'contact', label:'Got a business card or direct contact info' },
+  { key:'photo', label:'Took a photo of the shop' }
+];
+var VISIT_POST_ITEMS = [
+  { key:'report', label:'Logged the Visit Report in the app' },
+  { key:'nextAction', label:'Set next action & pipeline stage' },
+  { key:'materials', label:'Sent any promised follow-up materials' },
+  { key:'tier', label:'Updated lead tier' }
+];
 function ensureReport(s) {
   if (!s.report) {
     s.report = {
@@ -878,13 +899,41 @@ function ensureReport(s) {
       quotes: [ { ymm:'', notes:'' }, { ymm:'', notes:'' } ],
       visitOutcome: '', leadTier: '',
       nextAction: { what:'', when:'', channel:'', stage:'' },
-      crmConfirmed: false
+      crmConfirmed: false,
+      checklist: { duringVisit: {}, postVisit: {} }
     };
   }
   if (!s.report.painPoints) s.report.painPoints = { fitment:false, delivery:false, communication:false, availability:false, price:false };
   if (!s.report.quotes) s.report.quotes = [ { ymm:'', notes:'' }, { ymm:'', notes:'' } ];
   if (!s.report.nextAction) s.report.nextAction = { what:'', when:'', channel:'', stage:'' };
+  if (!s.report.checklist) s.report.checklist = { duringVisit: {}, postVisit: {} };
+  if (!s.report.checklist.duringVisit) s.report.checklist.duringVisit = {};
+  if (!s.report.checklist.postVisit) s.report.checklist.postVisit = {};
   return s.report;
+}
+function visitChecklistProgress(s) {
+  var checklist = (s.report && s.report.checklist) || { duringVisit:{}, postVisit:{} };
+  var total = VISIT_DURING_ITEMS.length + VISIT_POST_ITEMS.length;
+  var done = 0;
+  VISIT_DURING_ITEMS.forEach(function(it) { if (checklist.duringVisit && checklist.duringVisit[it.key]) done++; });
+  VISIT_POST_ITEMS.forEach(function(it) { if (checklist.postVisit && checklist.postVisit[it.key]) done++; });
+  return { done: done, total: total };
+}
+function setVisitChecklistItem(stopId, sectionKey, itemKey, checked) {
+  var s = currentDay.stops.find(function(x) { return x.id === stopId; });
+  if (!s) return;
+  var r = ensureReport(s);
+  r.checklist[sectionKey][itemKey] = checked;
+  saveDays(days);
+  renderStops();
+}
+function renderVisitChecklistGroup(title, items, sectionKey, s) {
+  var checklist = ensureReport(s).checklist[sectionKey] || {};
+  var rows = items.map(function(it) {
+    var checked = !!checklist[it.key];
+    return '<label class="checklist-item small"><input type="checkbox" '+(checked?'checked':'')+' onclick="event.stopPropagation()" onchange="setVisitChecklistItem(\''+s.id+'\',\''+sectionKey+'\',\''+it.key+'\',this.checked)"><span'+(checked?' style="text-decoration:line-through;color:var(--text-soft);"':'')+'>'+it.label+'</span></label>';
+  }).join('');
+  return '<div class="visit-checklist-group"><div class="visit-checklist-title">'+title+'</div>'+rows+'</div>';
 }
 
 function loadSettings() {
@@ -1335,6 +1384,8 @@ function renderStopCard(s, curId) {
   var rpt = ensureReport(s);
   var tierBadge = rpt.leadTier ? '<span class="tier-badge tier-' + rpt.leadTier + '" title="Lead Tier ' + rpt.leadTier + '">' + rpt.leadTier + '</span>' : '';
   var reportBadge = rpt.crmConfirmed ? '<span class="report-badge" title="Visit report submitted">📋✓</span>' : '';
+  var vcProgress = visitChecklistProgress(s);
+  var checklistBadge = vcProgress.done ? '<span class="checklist-progress-badge'+(vcProgress.done===vcProgress.total?' done':'')+'">✅ '+vcProgress.done+'/'+vcProgress.total+'</span>' : '';
 
   if (s.editing) {
     return '<div class="' + cls + '" data-id="' + s.id + '">' +
@@ -1351,7 +1402,7 @@ function renderStopCard(s, curId) {
         '<div class="addr">' + (s.contact ? escapeHtml(s.contact) : escapeHtml(s.addr || 'No contact yet')) + '</div>' +
         '<div class="pcard-badges">' +
           '<span class="type-badge type-' + s.type + '">' + TYPE_LABELS[s.type] + '</span>' +
-          tierBadge + reportBadge +
+          tierBadge + reportBadge + checklistBadge +
           (mediaCount ? '<span class="media-badge">📎 ' + mediaCount + '</span>' : '') +
         '</div>' +
       '</div>' +
@@ -1395,6 +1446,10 @@ function renderStopCard(s, curId) {
         (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a></div>' : '') +
       '</div>' +
       (noteText ? '<div class="note-flag">📝 '+escapeHtml(noteText)+'</div>' : '') +
+      '<details class="report-section" style="margin-top:10px;"><summary>Visit Checklist ('+vcProgress.done+'/'+vcProgress.total+')</summary><div class="report-section-body">' +
+        renderVisitChecklistGroup('During the Visit', VISIT_DURING_ITEMS, 'duringVisit', s) +
+        renderVisitChecklistGroup('Post-Visit (Within 30 Min)', VISIT_POST_ITEMS, 'postVisit', s) +
+      '</div></details>' +
       '<div class="photo-row" style="margin-top:10px;">' + photosHtml + videosHtml +
         '<div class="photo-placeholder" onclick="addPhoto(\''+s.id+'\')">+ Photo</div>' +
         (s.videoUploading ? '' : '<div class="photo-placeholder" onclick="addVideo(\''+s.id+'\')">+ Video</div>') +
@@ -1617,12 +1672,6 @@ var CHECKLIST_SECTIONS = [
     { key: 'vehicle', label: 'Vehicle inspected (fuel, cleanliness)' },
     { key: 'firstContact', label: 'Confirmed first appointment/contact' }
   ]},
-  { key: 'postVisit', title: 'Post-Visit (Within 30 Minutes)', items: [
-    { key: 'logReport', label: 'Logged the Visit Report in the app' },
-    { key: 'nextAction', label: 'Set next action & pipeline stage' },
-    { key: 'sendMaterials', label: 'Sent any promised follow-up materials' },
-    { key: 'updateTier', label: 'Updated lead tier' }
-  ]},
   { key: 'followUps', title: 'Follow-Up Actions for the Day', items: [
     { key: 'callFollow', label: 'Called/emailed scheduled follow-ups' },
     { key: 'quoteFollow', label: 'Sent quote follow-ups' },
@@ -1634,14 +1683,6 @@ var CHECKLIST_SECTIONS = [
     { key: 'eodNotes', label: 'Wrote EOD summary notes' },
     { key: 'planTomorrow', label: "Planned tomorrow's priority shops" }
   ]}
-];
-var DURING_VISIT_ITEMS = [
-  'Introduce yourself and Gold Coast Auto Parts',
-  'Ask about current pain points (fitment, delivery, communication, availability, price)',
-  'Note vehicle makes serviced & DRP affiliations',
-  'Offer a quote if the opportunity comes up',
-  'Get a business card or direct contact info',
-  'Take a photo of the shop for the record'
 ];
 var KPI_METRICS = [
   { key: 'visitsCompleted', label: 'Visits Completed', defaultTarget: 8 },
@@ -1708,9 +1749,13 @@ function renderChecklist() {
     '</div>';
   });
 
-  html += '<div class="checklist-section"><h3>During-Visit Reference</h3>' +
-    '<p class="modal-sub" style="margin-bottom:8px;">Keep this in mind at every stop — a reminder, not tracked.</p>' +
-    '<ul class="during-visit-list">' + DURING_VISIT_ITEMS.map(function(t) { return '<li>'+t+'</li>'; }).join('') + '</ul>' +
+  var visitProgressList = (currentDay.stops || []).map(function(s) { return { s: s, p: visitChecklistProgress(s) }; });
+  var visitsFullyDone = visitProgressList.filter(function(x) { return x.p.total && x.p.done === x.p.total; }).length;
+  html += '<div class="checklist-section"><h3>During-Visit &amp; Post-Visit Checklists</h3>' +
+    '<p class="modal-sub" style="margin-bottom:8px;">These now live on each shop\'s card in the Sales Pipeline — expand a visit and open "Visit Checklist" to check them off there.</p>' +
+    (visitProgressList.length
+      ? '<div class="checklist-progress-label" style="margin-bottom:0;">'+visitsFullyDone+' / '+visitProgressList.length+' of today\'s visits fully checked off</div>'
+      : '<div class="checklist-progress-label" style="margin-bottom:0;">No visits added yet today.</div>') +
   '</div>';
 
   html += '<div class="checklist-section"><h3>Daily KPIs</h3><div class="kpi-table">' +
