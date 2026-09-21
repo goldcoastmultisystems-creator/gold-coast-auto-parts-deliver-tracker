@@ -2395,24 +2395,37 @@ function dataUrlToFile(dataUrl, filename) {
   while (n--) { u8arr[n] = bstr.charCodeAt(n); }
   return new File([u8arr], filename, { type: mime });
 }
+var STATUS_NARRATIVE = {
+  pending: 'has not started yet and is still pending',
+  onway: 'is currently en route',
+  arrived: 'has arrived at the location',
+  completed: 'has been completed',
+  postponed: 'has been postponed',
+  returned: 'was marked as not interested'
+};
+function shareFooter() {
+  return '\n\n— This update was generated ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + ' from the Gold Coast Auto Parts Sales Rep Tracker (goldcoastautoparts.netlify.app).';
+}
 function shareStop(id) {
   var s = currentDay.stops.find(function(x) { return x.id === id; });
   if (!s) return;
   var rpt = ensureReport(s);
-  var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Sales Representative Routes — ' + fmtDateDisplay(todayKey());
+  var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Sales Representative Routes';
   var videoLinks = (s.videos || []).map(function(v, i) { return 'Video ' + (i + 1) + ': ' + v; }).join('\n');
   var photoCount = (s.photos || []).length;
-  var text = header + '\nShared by: ' + currentUserLabel() + '\n\n' +
-    s.loc + (s.addr ? ' — ' + s.addr : '') + '\n' +
-    TYPE_LABELS[s.type] + ' • Status: ' + STATUS_LABELS[s.status] +
-    (s.updatedBy ? ' (updated by ' + s.updatedBy + ', ' + s.updatedAt + ')' : '') +
+  var narrative = s.loc + (s.addr ? ' — ' + s.addr : '') + '\nThis ' + (TYPE_LABELS[s.type] || 'visit').toLowerCase() + ' ' +
+    (STATUS_NARRATIVE[s.status] || ('is marked ' + STATUS_LABELS[s.status])) + '.' +
+    (s.updatedBy ? ' Last updated by ' + s.updatedBy + ' at ' + s.updatedAt + '.' : '');
+  var text = header + '\nUpdate generated: ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + '\nShared by: ' + currentUserLabel() + '\n\n' +
+    narrative +
     (s.contact ? '\nContact: ' + s.contact : '') + (s.phone ? '\nPhone: ' + s.phone : '') +
     (rpt.leadTier ? '\nLead Tier: ' + rpt.leadTier : '') +
     (rpt.crmConfirmed ? '\nCRM Confirmed: Yes' : '') +
     (rpt.nextAction && rpt.nextAction.what ? '\nNext Action: ' + rpt.nextAction.what + (rpt.nextAction.when ? ' (by ' + rpt.nextAction.when + ')' : '') : '') +
     (s.notes ? '\nNotes: ' + s.notes : '') +
     (photoCount ? '\n' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + ' attached' : '') +
-    (videoLinks ? '\n\n' + videoLinks : '');
+    (videoLinks ? '\n\n' + videoLinks : '') +
+    shareFooter();
 
   var photoFiles = (s.photos || []).map(function(p, i) {
     try { return dataUrlToFile(p, (s.loc || 'visit').replace(/[^a-z0-9]+/gi, '_') + '-photo-' + (i + 1) + '.jpg'); }
@@ -2433,14 +2446,16 @@ function shareList() {
   if (!stops.length) { showToast('No visits to share yet.', ''); return; }
   var counts = { completed:0, onway:0, arrived:0, postponed:0, returned:0, pending:0 };
   stops.forEach(function(s) { counts[s.status] = (counts[s.status]||0) + 1; });
-  var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Sales Representative Routes — ' + fmtDateDisplay(todayKey());
-  var summary = 'Summary: ' + counts.completed + ' Completed, ' + counts.onway + ' En Route, ' + counts.arrived + ' At Location, ' +
-    counts.postponed + ' Postponed, ' + counts.returned + ' Not Interested, ' + counts.pending + ' Pending';
+  var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Sales Representative Routes';
+  var narrative = "Today's route has " + stops.length + ' visit' + (stops.length === 1 ? '' : 's') + ' total: ' +
+    counts.completed + ' completed, ' + counts.onway + ' en route, ' + counts.arrived + ' at location, ' +
+    counts.postponed + ' postponed, ' + counts.returned + ' not interested, and ' + counts.pending + ' still pending.';
   var lines = stops.map(function(s, i) {
     return (i+1)+'. '+s.loc+(s.addr?' — '+s.addr:'')+' — '+STATUS_LABELS[s.status] + (s.updatedBy ? ' (by '+s.updatedBy+', '+s.updatedAt+')' : '');
   });
-  var text = header + '\nShared by: ' + currentUserLabel() + '\n' + summary + '\n\n' + lines.join('\n');
-  shareText(header, text);
+  var text = header + '\nUpdate generated: ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + '\nShared by: ' + currentUserLabel() + '\n\n' +
+    narrative + '\n\n' + lines.join('\n') + shareFooter();
+  shareText(header + ' — ' + fmtDateDisplay(todayKey()), text);
 }
 function shareText(title, text) {
   if (navigator.share) {
