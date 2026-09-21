@@ -1578,6 +1578,8 @@ function renderReportForm(s) {
     reportField('Jobs per Week', 'rf_jobs_'+id, r.jobsPerWeek, 'e.g. 25')
   );
   html += reportSection('Contact Details',
+    reportField('Name', 'rf_cname_'+id, s.contact, 'e.g. Marcus Reyes') +
+    reportField('Contact Number', 'rf_cphone_'+id, s.phone, 'e.g. (954) 555-0142') +
     reportField('Title', 'rf_ctitle_'+id, r.contactTitle, 'e.g. Shop Manager') +
     reportSelect('Preferred Contact Method', 'rf_pref_'+id, ['', 'Call', 'Text', 'Email'].map(function(v) { return { v: v, l: v || '—' }; }), r.preferredContact)
   );
@@ -1634,6 +1636,8 @@ function saveReportModal() {
   var s = currentDay.stops.find(function(x) { return x.id === stopId; });
   if (!s) return;
   var r = ensureReport(s);
+  s.contact = val('rf_cname_'+stopId);
+  s.phone = val('rf_cphone_'+stopId);
   r.bays = val('rf_bays_'+stopId);
   r.jobsPerWeek = val('rf_jobs_'+stopId);
   r.contactTitle = val('rf_ctitle_'+stopId);
