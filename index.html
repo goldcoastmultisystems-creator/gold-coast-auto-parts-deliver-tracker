@@ -496,7 +496,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
         </div>
         <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-soft); cursor:pointer; margin-top:2px;">
           <input type="checkbox" id="teamNewAdmin" style="width:auto;">
-          Admin access — can manage the team and freely switch their own Driver/Dispatcher role (controls their own location tracking)
+          Admin access — can manage the team and freely switch their own Driver/Dispatcher role. Admins aren't location-tracked.
         </label>
         <div class="edit-actions"><button class="btn btn-gold btn-sm" onclick="addTeamMember()">+ Add</button></div>
       </div>
@@ -711,12 +711,13 @@ function toggleTrackingPaused() {
   updateTrackingForRole();
   showToast(isTrackingPaused() ? '📍 Location tracking paused.' : '📍 Location tracking resumed.', isTrackingPaused() ? 'red' : 'green');
 }
+function isTrackableSession() {
+  return !!(session && session.type === 'guest' && !session.isAdmin && session.role === 'Driver');
+}
 function syncTrackingToggleUI() {
   var btn = document.getElementById('trackingToggleBtn');
   if (!btn) return;
-  var roleSel = document.getElementById('driverRole');
-  var role = (session && session.type === 'guest') ? session.role : (roleSel ? roleSel.value : '');
-  var applicable = !!(session && role === 'Driver');
+  var applicable = isTrackableSession();
   btn.style.display = applicable ? '' : 'none';
   if (!applicable) return;
   var paused = isTrackingPaused();
@@ -724,8 +725,7 @@ function syncTrackingToggleUI() {
   btn.classList.toggle('tracking-off', paused);
 }
 function updateTrackingForRole() {
-  var role = (session && session.type === 'guest') ? session.role : document.getElementById('driverRole').value;
-  if (session && role === 'Driver' && FIREBASE_ENABLED && !isTrackingPaused()) startLocationTracking();
+  if (isTrackableSession() && FIREBASE_ENABLED && !isTrackingPaused()) startLocationTracking();
   else stopLocationTracking();
   syncTrackingToggleUI();
 }
