@@ -401,6 +401,12 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
   </div>
 </header>
 
+<div id="staleDriverBanner" style="display:none; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#1a1305; padding:10px 16px; font-size:12.5px; font-weight:700; text-align:center;">
+  <span id="staleDriverText"></span>
+  <button onclick="alertStaleDrivers()" style="background:#1a1305; color:#fbbf24; border:none; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:800; cursor:pointer;">📤 Alert Team</button>
+  <span style="cursor:pointer; font-weight:900;" onclick="dismissStaleBanner()">✕</span>
+</div>
+
 <div class="smart-bar-wrap">
   <div class="smart-bar-label">💬 Paste your dispatcher's list, or type a stop — I'll organize it for you</div>
   <div class="smart-bar-row">
@@ -677,11 +683,13 @@ function attachFirebaseListeners() {
     knownStopIds = {};
     currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
     renderAll();
+    checkStaleDrivers();
   });
   fbDb.ref('gcap/drivers').on('value', function(snap) {
     driverPositions = snap.val() || {};
     renderLiveMapMarkers();
     renderDriverListPanel();
+    checkStaleDrivers();
   });
 }
 function setSyncStatus(state) {
@@ -1102,6 +1110,7 @@ function init() {
   renderAll();
   initFirebase();
   if (session) { updateTrackingForRole(); maybeShowGeoPermissionTip(); }
+  setInterval(checkStaleDrivers, 5 * 60 * 1000);
 }
 
 function onSettingsChange() {
@@ -1525,6 +1534,7 @@ function setStatus(id, status) {
   s.status = status;
   s.updatedBy = (settings.driverName || (session && session.name) || 'Someone');
   s.updatedAt = nowTimeStr();
+  s.updatedAtMs = Date.now();
   saveDays(days);
   addActivity(STATUS_LABELS[status], s.loc + ' marked ' + STATUS_LABELS[status].toLowerCase() + ' by ' + s.updatedBy);
   showToast(s.loc + ' → ' + STATUS_LABELS[status], status === 'returned' || status === 'postponed' ? 'red' : 'green');
@@ -1557,6 +1567,7 @@ function confirmReturn() {
   s.status = 'returned';
   s.updatedBy = (settings.driverName || (session && session.name) || 'Someone');
   s.updatedAt = nowTimeStr();
+  s.updatedAtMs = Date.now();
   saveDays(days);
   addActivity('Returned Part', s.loc + ' — not accepted (' + reason + ') by ' + s.updatedBy);
   showToast(s.loc + ' → Returned Part', 'red');
@@ -2118,6 +2129,59 @@ var STATUS_NARRATIVE = {
 };
 function shareFooter() {
   return '\n\n— This update was generated ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + ' from the Gold Coast Auto Parts Delivery Tracker (goldcoastautoparts.netlify.app).';
+}
+
+/* ---------- STALE DRIVER MONITORING (no stop update in a while -> banner with a one-tap WhatsApp alert) ---------- */
+var STALE_THRESHOLD_MS = 3 * 60 * 60 * 1000;
+var staleDismissed = {};
+var currentStaleList = [];
+function fmtTimeFromMs(ms) {
+  var d = new Date(ms);
+  var h = d.getHours(), m = pad2(d.getMinutes());
+  var ap = h >= 12 ? 'PM' : 'AM'; var h12 = h % 12; if (h12 === 0) h12 = 12;
+  return h12 + ':' + m + ' ' + ap;
+}
+function checkStaleDrivers() {
+  var el = document.getElementById('staleDriverBanner');
+  if (!el || !driverPositions || !currentDay) return;
+  var names = Object.keys(driverPositions).map(function(id) { return driverPositions[id].name; }).filter(Boolean);
+  var uniqueNames = names.filter(function(n, i) { return names.indexOf(n) === i; });
+  var now = Date.now();
+  var staleList = [];
+  uniqueNames.forEach(function(name) {
+    if (staleDismissed[name]) return;
+    var stopsForName = currentDay.stops.filter(function(s) { return s.updatedBy === name && s.updatedAtMs; });
+    if (!stopsForName.length) return;
+    var lastMs = Math.max.apply(null, stopsForName.map(function(s) { return s.updatedAtMs; }));
+    if (now - lastMs > STALE_THRESHOLD_MS) {
+      staleList.push({ name: name, hours: Math.floor((now - lastMs) / (60 * 60 * 1000)), lastTimeStr: fmtTimeFromMs(lastMs) });
+    }
+  });
+  renderStaleBanner(staleList);
+}
+function renderStaleBanner(staleList) {
+  currentStaleList = staleList;
+  var el = document.getElementById('staleDriverBanner');
+  if (!staleList.length) { el.style.display = 'none'; return; }
+  var text = staleList.length === 1
+    ? '⏰ ' + staleList[0].name + " hasn't updated a stop in " + staleList[0].hours + '+ hours.'
+    : '⏰ ' + staleList.length + ' team members haven\'t updated in hours: ' + staleList.map(function(x) { return x.name; }).join(', ');
+  document.getElementById('staleDriverText').textContent = text;
+  el.style.display = 'flex';
+}
+function dismissStaleBanner() {
+  currentStaleList.forEach(function(x) { staleDismissed[x.name] = true; });
+  document.getElementById('staleDriverBanner').style.display = 'none';
+}
+function alertStaleDrivers() {
+  if (!currentStaleList.length) return;
+  var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Delivery Status Board — Team Alert';
+  var lines = currentStaleList.map(function(x) { return '⏰ ' + x.name + ' — no update in ' + x.hours + '+ hours (last update ' + x.lastTimeStr + ')'; });
+  var text = header + '\nUpdate generated: ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + '\n\n' +
+    'The following team member' + (currentStaleList.length === 1 ? ' has' : 's have') + ' not updated their stops recently:\n\n' +
+    lines.join('\n') + '\n\nPlease check in with them.' + shareFooter();
+  shareText('Team Alert', text);
+  dismissStaleBanner();
 }
 function shareStop(id) {
   var s = currentDay.stops.find(function(x) { return x.id === id; });
