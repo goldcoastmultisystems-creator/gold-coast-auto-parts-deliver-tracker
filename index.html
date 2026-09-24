@@ -394,6 +394,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <button class="hdr-btn" onclick="printReport()">End of Day Report</button>
       <button class="hdr-btn" onclick="openPartsList()">Parts to Pull</button>
       <button class="hdr-btn" onclick="openPartsToPurchase()">Parts to Purchase</button>
+      <button class="hdr-btn" onclick="openReturnsReport()">🔄 Returns</button>
       <button class="hdr-btn" id="manageTeamBtn" onclick="openTeamModal()" style="display:none;">👥 Manage Team</button>
       <button class="hdr-btn" onclick="doLogout()">Log Out</button>
     </div>
@@ -459,6 +460,31 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeAddStop()">Cancel</button>
       <button class="btn btn-navy" onclick="submitAddStop()">Add Stop</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="returnModal">
+  <div class="modal">
+    <h3>Return / Not Accepted</h3>
+    <p class="modal-sub">The body shop didn't accept this part — let us know why.</p>
+    <div class="field"><label>Stop</label><div id="returnModalLoc" style="font-weight:700; font-size:14px;"></div></div>
+    <div class="field">
+      <label>Reason</label>
+      <select id="rt_reason">
+        <option value="">— Select a reason —</option>
+        <option value="Wrong Part">Wrong Part</option>
+        <option value="Damaged in Transit">Damaged in Transit</option>
+        <option value="Incorrect Fitment">Incorrect Fitment</option>
+        <option value="No Longer Needed">No Longer Needed</option>
+        <option value="Duplicate Order">Duplicate Order</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="rt_notes" rows="3" placeholder="Any additional detail..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeReturnModal()">Cancel</button>
+      <button class="btn btn-navy" onclick="confirmReturn()">Mark as Returned</button>
     </div>
   </div>
 </div>
@@ -1302,7 +1328,8 @@ function renderStopCard(s, i, curId) {
   }).join('') + (s.videoUploading ? '<div class="video-uploading">Uploading…</div>' : '');
   var statusBtns = STATUS_ORDER.map(function(st) {
     var active = s.status === st ? ' active-'+st : '';
-    return '<button class="status-btn'+active+'" onclick="setStatus(\''+s.id+'\',\''+st+'\')">'+STATUS_LABELS[st]+'</button>';
+    var onclick = st === 'returned' ? 'openReturnModal(\''+s.id+'\')' : 'setStatus(\''+s.id+'\',\''+st+'\')';
+    return '<button class="status-btn'+active+'" onclick="'+onclick+'">'+STATUS_LABELS[st]+'</button>';
   }).join('');
   var chatLog = (s.chat||[]).length
     ? s.chat.map(function(c, ci) { return renderChatMsg(s.id, c, ci); }).join('')
@@ -1336,6 +1363,7 @@ function renderStopCard(s, i, curId) {
         (s.so ? '<div><b>SO#:</b> '+escapeHtml(s.so)+'</div>' : '') +
         (s.mop ? '<div><b>Payment:</b> '+escapeHtml(s.mop)+'</div>' : '') +
         (s.part ? '<div class="full"><b>Part:</b> '+escapeHtml(s.part)+'</div>' : '') +
+        (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+'</div>' : '') +
         (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a></div>' : '') +
       '</div>' +
       (noteText ? '<div class="note-flag">📝 '+escapeHtml(noteText)+'</div>' : '') +
@@ -1500,6 +1528,51 @@ function setStatus(id, status) {
   addActivity(STATUS_LABELS[status], s.loc + ' marked ' + STATUS_LABELS[status].toLowerCase() + ' by ' + s.updatedBy);
   showToast(s.loc + ' → ' + STATUS_LABELS[status], status === 'returned' || status === 'postponed' ? 'red' : 'green');
   renderAll();
+}
+
+/* ---------- RETURNS (part not accepted by the body shop) ---------- */
+var returnModalStopId = null;
+function openReturnModal(id) {
+  var s = currentDay.stops.find(function(x) { return x.id === id; });
+  if (!s) return;
+  returnModalStopId = id;
+  document.getElementById('returnModalLoc').textContent = s.loc + (s.addr ? ' — ' + s.addr : '');
+  document.getElementById('rt_reason').value = s.returnReason || '';
+  document.getElementById('rt_notes').value = s.returnNotes || '';
+  document.getElementById('returnModal').classList.add('open');
+}
+function closeReturnModal() {
+  document.getElementById('returnModal').classList.remove('open');
+  returnModalStopId = null;
+}
+function confirmReturn() {
+  var id = returnModalStopId;
+  var s = currentDay.stops.find(function(x) { return x.id === id; });
+  if (!s) return;
+  var reason = document.getElementById('rt_reason').value;
+  if (!reason) { alert('Please select a reason.'); return; }
+  s.returnReason = reason;
+  s.returnNotes = document.getElementById('rt_notes').value.trim();
+  s.status = 'returned';
+  s.updatedBy = (settings.driverName || (session && session.name) || 'Someone');
+  s.updatedAt = nowTimeStr();
+  saveDays(days);
+  addActivity('Returned Part', s.loc + ' — not accepted (' + reason + ') by ' + s.updatedBy);
+  showToast(s.loc + ' → Returned Part', 'red');
+  closeReturnModal();
+  renderAll();
+}
+function openReturnsReport() {
+  var returns = currentDay.stops.filter(function(s) { return s.status === 'returned'; });
+  var rows = returns.map(function(s) {
+    return '<tr><td>'+escapeHtml(s.loc)+'</td><td>'+escapeHtml(s.part||'—')+'</td><td>'+(s.so?escapeHtml(s.so):'—')+'</td>' +
+      '<td>'+escapeHtml(s.returnReason||'—')+'</td><td>'+escapeHtml(s.returnNotes||'')+'</td>' +
+      '<td>'+(s.updatedBy?escapeHtml(s.updatedBy)+' • '+escapeHtml(s.updatedAt||''):'—')+'</td></tr>';
+  }).join('');
+  var body = '<h1>Returns</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • parts not accepted by the body shop</h2>' +
+    (returns.length ? '<table><tr><th>Stop</th><th>Part # / Description</th><th>SO#</th><th>Reason</th><th>Notes</th><th>Marked By</th></tr>'+rows+'</table>'
+      : '<p style="color:#5b6a85;">No returns today.</p>');
+  openPageOverlay('Returns', reportDocShell('Returns', body));
 }
 
 /* ---------- CHAT ---------- */
@@ -2031,11 +2104,14 @@ function shareStop(id) {
   var videoLinks = (s.videos || []).map(function(v, i) { return 'Video ' + (i + 1) + ': ' + v; }).join('\n');
   var photoCount = (s.photos || []).length;
   var narrative = s.loc + (s.addr ? ' — ' + s.addr : '') + '\nThis ' + (TYPE_LABELS[s.type] || 'stop').toLowerCase() + ' ' +
-    (STATUS_NARRATIVE[s.status] || ('is marked ' + STATUS_LABELS[s.status])) + '.' +
+    (STATUS_NARRATIVE[s.status] || ('is marked ' + STATUS_LABELS[s.status])) +
+    (s.status === 'returned' && s.returnReason ? ' (' + s.returnReason + ')' : '') + '.' +
     (s.updatedBy ? ' Last updated by ' + s.updatedBy + ' at ' + s.updatedAt + '.' : '');
   var text = header + '\nUpdate generated: ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + '\nShared by: ' + currentUserLabel() + '\n\n' +
     narrative +
-    (s.so ? '\nSO# ' + s.so : '') + (s.part ? '\nPart: ' + s.part : '') + (s.mop ? '\nPayment: ' + s.mop : '') + (s.notes ? '\nNotes: ' + s.notes : '') +
+    (s.so ? '\nSO# ' + s.so : '') + (s.part ? '\nPart: ' + s.part : '') + (s.mop ? '\nPayment: ' + s.mop : '') +
+    (s.status === 'returned' && s.returnNotes ? '\nReturn Notes: ' + s.returnNotes : '') +
+    (s.notes ? '\nNotes: ' + s.notes : '') +
     (photoCount ? '\n' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + ' attached' : '') +
     (videoLinks ? '\n\n' + videoLinks : '') +
     shareFooter();
