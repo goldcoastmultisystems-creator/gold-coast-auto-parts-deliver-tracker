@@ -547,6 +547,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
   <div class="page-overlay-toolbar">
     <button onclick="closePageOverlay()">← Back</button>
     <span class="page-overlay-title" id="pageOverlayTitle"></span>
+    <button id="pageShareBtn" style="margin-left:auto; display:none;">📤 Share</button>
   </div>
   <iframe id="pageFrame" title="page"></iframe>
 </div>
@@ -1562,6 +1563,19 @@ function confirmReturn() {
   closeReturnModal();
   renderAll();
 }
+function buildReturnsShareText(returns) {
+  var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Delivery Status Board — Returns';
+  var lead = header + '\nUpdate generated: ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + '\nShared by: ' + currentUserLabel() + '\n\n';
+  if (!returns.length) return lead + 'No returns today.' + shareFooter();
+  var narrative = returns.length + ' part' + (returns.length === 1 ? ' was' : 's were') + ' not accepted by the body shop today.';
+  var lines = returns.map(function(s, i) {
+    return (i + 1) + '. ' + s.loc + (s.addr ? ' — ' + s.addr : '') +
+      (s.part ? '\n   Part: ' + s.part : '') + (s.so ? '\n   SO# ' + s.so : '') +
+      '\n   Reason: ' + (s.returnReason || '—') + (s.returnNotes ? ' — ' + s.returnNotes : '') +
+      (s.updatedBy ? '\n   Marked by ' + s.updatedBy + ' at ' + s.updatedAt : '');
+  });
+  return lead + narrative + '\n\n' + lines.join('\n\n') + shareFooter();
+}
 function openReturnsReport() {
   var returns = currentDay.stops.filter(function(s) { return s.status === 'returned'; });
   var rows = returns.map(function(s) {
@@ -1572,7 +1586,7 @@ function openReturnsReport() {
   var body = '<h1>Returns</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • parts not accepted by the body shop</h2>' +
     (returns.length ? '<table><tr><th>Stop</th><th>Part # / Description</th><th>SO#</th><th>Reason</th><th>Notes</th><th>Marked By</th></tr>'+rows+'</table>'
       : '<p style="color:#5b6a85;">No returns today.</p>');
-  openPageOverlay('Returns', reportDocShell('Returns', body));
+  openPageOverlay('Returns', reportDocShell('Returns', body), buildReturnsShareText(returns));
 }
 
 /* ---------- CHAT ---------- */
@@ -2012,10 +2026,18 @@ function toggleTeamMemberActive(id) {
   populateGuestNameSelect();
 }
 
-function openPageOverlay(title, html) {
+function openPageOverlay(title, html, shareTextValue) {
   document.getElementById('pageOverlayTitle').textContent = title;
   document.getElementById('pageFrame').srcdoc = html;
   document.getElementById('pageOverlay').classList.add('open');
+  var shareBtn = document.getElementById('pageShareBtn');
+  if (shareTextValue) {
+    shareBtn.style.display = '';
+    shareBtn.onclick = function() { shareText(title, shareTextValue); };
+  } else {
+    shareBtn.style.display = 'none';
+    shareBtn.onclick = null;
+  }
 }
 function closePageOverlay() { document.getElementById('pageOverlay').classList.remove('open'); }
 
