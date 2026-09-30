@@ -94,6 +94,13 @@ main { max-width: 1000px; margin: 0px auto; padding: 18px 16px 0px; }
 .update-toast.green { background: linear-gradient(135deg, var(--green), #10b981); box-shadow: 0 10px 32px rgba(52,211,153,0.4); }
 .update-toast.red { background: linear-gradient(135deg, var(--red), #ef4444); box-shadow: 0 10px 32px rgba(248,113,113,0.4); }
 .stops { display: flex; flex-direction: column; gap: 14px; }
+.route-group { margin-bottom: 22px; }
+.route-group:last-child { margin-bottom: 0; }
+.route-group-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gold-2); padding-bottom: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--glass-border-gold); }
+.route-group-count { background: rgba(212,164,65,0.16); border: 1px solid var(--glass-border-gold); color: var(--gold-2); border-radius: 20px; padding: 2px 9px; font-size: 11px; }
+.route-group .stop-card { margin-bottom: 14px; }
+.route-group .stop-card:last-child { margin-bottom: 0; }
+.assigned-badge { font-size: 10.5px; font-weight: 700; color: var(--blue); background: rgba(96,165,250,0.14); border: 1px solid rgba(96,165,250,0.3); border-radius: 6px; padding: 3px 7px; white-space: nowrap; }
 .stop-card { background: var(--glass); backdrop-filter: var(--blur); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.35); position: relative; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
 .stop-card:hover { border-color: rgba(255,255,255,0.18); }
 .stop-card.current { border: 1px solid var(--glass-border-gold); box-shadow: 0 0 0 1px rgba(212,164,65,0.3), 0 0 34px rgba(212,164,65,0.25), 0 10px 30px rgba(0,0,0,0.4); }
@@ -451,6 +458,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
         <option value="stop">Other / Stop</option>
       </select>
     </div>
+    <div class="field"><label>Assign to Driver</label><select id="f_assigned"></select></div>
     <div class="field"><label>Sales Order #</label><input id="f_so" placeholder="SO-XXXXX (optional)"></div>
     <div class="field"><label>Part # / Description</label><input id="f_part" placeholder="Part number and description"></div>
     <div class="field">
@@ -760,6 +768,26 @@ function toggleTrackingPaused() {
 }
 function isTrackableSession() {
   return !!(session && session.type === 'guest' && !session.isAdmin && session.role === 'Driver');
+}
+
+/* ---------- PER-DRIVER ROUTES ---------- */
+function isDriverSession() {
+  return !!(session && session.type === 'guest' && session.role === 'Driver');
+}
+function activeDriverNames() {
+  return (settings.team || []).filter(function(m) { return m.role === 'Driver' && m.active !== false; }).map(function(m) { return m.name; });
+}
+function visibleStops() {
+  if (!isDriverSession()) return currentDay.stops;
+  var name = session.name;
+  return currentDay.stops.filter(function(s) { return !s.assignedTo || s.assignedTo === name; });
+}
+function assignedDriverOptionsHtml(selected) {
+  var opts = '<option value=""'+(!selected?' selected':'')+'>— Unassigned (visible to all drivers) —</option>';
+  activeDriverNames().forEach(function(name) {
+    opts += '<option value="'+escapeHtml(name)+'"'+(selected===name?' selected':'')+'>'+escapeHtml(name)+"'s Route</option>";
+  });
+  return opts;
 }
 function syncTrackingToggleUI() {
   var btn = document.getElementById('trackingToggleBtn');
@@ -1288,7 +1316,7 @@ function renderAll() {
   if (leafletMap) renderLiveMapMarkers();
 }
 function renderSummary() {
-  var stops = currentDay.stops;
+  var stops = visibleStops();
   var counts = { total: stops.length, completed:0, onway:0, arrived:0, postponed:0, returned:0, pending:0 };
   stops.forEach(function(s) { counts[s.status] = (counts[s.status]||0) + 1; });
   var strip = document.getElementById('summaryStrip');
@@ -1310,7 +1338,7 @@ function renderFeed() {
 }
 function renderNextBanner() {
   var banner = document.getElementById('nextBanner');
-  var stops = currentDay.stops;
+  var stops = visibleStops();
   if (!stops.length) { banner.style.display = 'none'; return; }
   var next = stops.find(function(s) { return s.status !== 'completed'; });
   banner.style.display = 'flex';
@@ -1325,18 +1353,40 @@ function renderNextBanner() {
     (next.addr ? '<a href="https://maps.apple.com/?q='+encodeURIComponent(next.addr)+'" target="_blank" rel="noopener">Directions →</a>' : '');
 }
 function currentStopId() {
-  var next = currentDay.stops.find(function(s) { return s.status !== 'completed'; });
+  var next = visibleStops().find(function(s) { return s.status !== 'completed'; });
   return next ? next.id : null;
 }
 function renderStops() {
   var el = document.getElementById('stopsList');
-  var stops = currentDay.stops;
+  var stops = visibleStops();
   if (!stops.length) {
     el.innerHTML = '<div class="empty-state"><div class="big">No stops yet</div><div class="sm">Paste your dispatcher\'s list up top, or tap <b>+ Add Stop</b> to get started.</div></div>';
     return;
   }
   var curId = currentStopId();
-  el.innerHTML = stops.map(function(s, i) { return renderStopCard(s, i, curId); }).join('');
+  if (isDriverSession()) {
+    el.innerHTML = stops.map(function(s, i) { return renderStopCard(s, i, curId); }).join('');
+    return;
+  }
+  var groups = {}; var order = [];
+  stops.forEach(function(s) {
+    var key = s.assignedTo || '__unassigned__';
+    if (!groups[key]) { groups[key] = []; order.push(key); }
+    groups[key].push(s);
+  });
+  order.sort(function(a, b) {
+    if (a === '__unassigned__') return 1;
+    if (b === '__unassigned__') return -1;
+    return a.localeCompare(b);
+  });
+  el.innerHTML = order.map(function(key) {
+    var label = key === '__unassigned__' ? 'Unassigned — visible to all drivers' : key + "'s Route";
+    var groupStops = groups[key];
+    return '<div class="route-group">' +
+      '<div class="route-group-head">' + escapeHtml(label) + '<span class="route-group-count">' + groupStops.length + '</span></div>' +
+      groupStops.map(function(s, gi) { return renderStopCard(s, gi, curId); }).join('') +
+    '</div>';
+  }).join('');
 }
 function renderStopCard(s, i, curId) {
   var isCurrent = s.id === curId;
@@ -1383,6 +1433,7 @@ function renderStopCard(s, i, curId) {
         '<div class="addr">'+escapeHtml(s.addr||'')+'</div>' +
       '</div>' +
       '<span class="type-badge type-'+s.type+'">'+TYPE_LABELS[s.type]+'</span>' +
+      (s.assignedTo ? '<span class="assigned-badge">👤 '+escapeHtml(s.assignedTo)+'</span>' : '') +
       '<button class="stop-share-btn" onclick="shareStop(\''+s.id+'\')" title="Share">↗</button>' +
       '<button class="stop-edit-btn" onclick="editStop(\''+s.id+'\')" title="Edit">✎</button>' +
       '<button class="stop-delete-btn" onclick="deleteStop(\''+s.id+'\')" title="Delete">🗑</button>' +
@@ -1442,6 +1493,7 @@ function renderEditForm(s) {
         ['','Cash','Check','Charge Account'].map(function(v) { return '<option value="'+v+'"'+(s.mop===v?' selected':'')+'>'+(v||'—')+'</option>'; }).join('') +
       '</select></div>' +
     '</div>' +
+    '<div><label class="edit-label">Assign to Driver</label><select class="edit-input" id="e_assigned_'+s.id+'">'+assignedDriverOptionsHtml(s.assignedTo||'')+'</select></div>' +
     '<div><label class="edit-label">Notes</label><input class="edit-input" id="e_notes_'+s.id+'" value="'+escapeHtml(s.notes||'')+'"></div>' +
     '<div class="edit-actions">' +
       '<button class="btn btn-ghost btn-sm" onclick="cancelEditStop(\''+s.id+'\')">Cancel</button>' +
@@ -1451,7 +1503,7 @@ function renderEditForm(s) {
 }
 function renderEndReport() {
   var el = document.getElementById('endReport');
-  var stops = currentDay.stops;
+  var stops = visibleStops();
   var total = stops.length;
   var completed = stops.filter(function(s) { return s.status === 'completed'; });
   var deliveries = completed.filter(function(s) { return s.type === 'delivery'; }).length;
@@ -1489,6 +1541,7 @@ function openAddStop() {
   ['f_loc','f_addr','f_so','f_part','f_notes'].forEach(function(id) { document.getElementById(id).value = ''; });
   document.getElementById('f_type').value = 'pickup';
   document.getElementById('f_mop').value = '';
+  document.getElementById('f_assigned').innerHTML = assignedDriverOptionsHtml('');
   document.getElementById('addModal').classList.add('open');
 }
 function closeAddStop() { document.getElementById('addModal').classList.remove('open'); }
@@ -1499,6 +1552,7 @@ function submitAddStop() {
     id: uid(), loc: loc,
     addr: document.getElementById('f_addr').value.trim(),
     type: document.getElementById('f_type').value,
+    assignedTo: document.getElementById('f_assigned').value,
     so: document.getElementById('f_so').value.trim(),
     part: document.getElementById('f_part').value.trim(),
     mop: document.getElementById('f_mop').value,
@@ -1508,7 +1562,7 @@ function submitAddStop() {
   currentDay.stops.push(stop);
   saveDays(days);
   geocodeStop(stop);
-  addActivity('New Stop', loc + ' added to the list');
+  addActivity('New Stop', loc + ' added to the list' + (stop.assignedTo ? ' — assigned to ' + stop.assignedTo : ''));
   closeAddStop();
   renderAll();
 }
@@ -1541,9 +1595,13 @@ function saveEditStop(id) {
   s.part = document.getElementById('e_part_'+id).value.trim();
   s.mop = document.getElementById('e_mop_'+id).value;
   s.notes = document.getElementById('e_notes_'+id).value.trim();
+  var assignedEl = document.getElementById('e_assigned_'+id);
+  var newAssigned = assignedEl ? assignedEl.value : s.assignedTo;
+  var assignedChanged = newAssigned !== (s.assignedTo || '');
+  s.assignedTo = newAssigned;
   s.editing = false;
   saveDays(days);
-  addActivity('Edited', s.loc + ' details updated');
+  addActivity('Edited', s.loc + ' details updated' + (assignedChanged ? (newAssigned ? ' — reassigned to ' + newAssigned : ' — unassigned') : ''));
   renderAll();
   geocodeStop(s);
 }
