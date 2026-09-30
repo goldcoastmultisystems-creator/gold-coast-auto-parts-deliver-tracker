@@ -650,7 +650,7 @@ function metersBetween(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 function checkAutoArrival(lat, lng, driverName) {
-  var next = currentDay.stops.find(function(s) { return s.status === 'pending' || s.status === 'onway'; });
+  var next = visibleStops().find(function(s) { return s.status === 'pending' || s.status === 'onway'; });
   if (!next || typeof next.lat !== 'number' || typeof next.lng !== 'number') return;
   var dist = metersBetween(lat, lng, next.lat, next.lng);
   if (dist <= ARRIVAL_RADIUS_METERS) {
@@ -1950,6 +1950,7 @@ function setupDragAndDrop() {
   var list = document.getElementById('stopsList');
   var dragEl = null, dragId = null;
   list.addEventListener('pointerdown', function(e) {
+    if (!isDriverSession()) return;
     var handle = e.target.closest('.drag-handle');
     if (!handle) return;
     var card = handle.closest('.stop-card');
