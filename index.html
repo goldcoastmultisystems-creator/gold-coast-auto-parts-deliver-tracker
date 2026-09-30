@@ -724,7 +724,7 @@ function canManageTeam() {
 }
 function refreshSettingsUI() {
   document.getElementById('driverName').value = (session && session.name) || settings.driverName || '';
-  document.getElementById('driverRole').value = (session && session.type === 'guest' ? session.role : settings.driverRole) || 'Driver';
+  document.getElementById('driverRole').value = (session && session.role) || settings.driverRole || 'Driver';
   document.getElementById('companyName').value = settings.companyName || 'Gold Coast Auto Parts';
   document.getElementById('manageTeamBtn').style.display = canManageTeam() ? '' : 'none';
   syncRoleUI();
@@ -1126,6 +1126,10 @@ function init() {
   days = normalizeDays(loadDays());
   settings = loadSettings();
   session = loadSession();
+  if (session && session.type === 'owner' && !session.role) {
+    session.role = 'Dispatcher';
+    saveSession(session);
+  }
   if (enforcePageAccess()) return;
   currentDay = getDay(todayKey());
   currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
@@ -1163,7 +1167,7 @@ function onSettingsChange() {
   var nameVal = document.getElementById('driverName').value;
   if (session && (session.type === 'owner' || (session.type === 'guest' && session.isAdmin))) {
     session.name = nameVal;
-    if (session.type === 'guest') session.role = roleVal;
+    session.role = roleVal;
     saveSession(session);
   }
   settings.driverName = nameVal;
@@ -1214,7 +1218,7 @@ function ownerLogin() {
   if (email.toLowerCase() !== (settings.ownerEmail || '').toLowerCase() || pw !== settings.ownerPassword) {
     setAuthMsg('Incorrect email or password.', 'err'); return;
   }
-  session = { type: 'owner', name: settings.driverName || 'Owner' };
+  session = { type: 'owner', name: settings.driverName || 'Owner', role: 'Dispatcher' };
   saveSession(session);
   window.location.href = 'choose-dashboard.html';
 }
