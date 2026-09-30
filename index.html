@@ -394,7 +394,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <button class="hdr-btn" onclick="printReport()">End of Day Report</button>
       <button class="hdr-btn" onclick="openPartsList()">Parts to Pull</button>
       <button class="hdr-btn" onclick="openPartsToPurchase()">Parts to Purchase</button>
-      <button class="hdr-btn" onclick="openReturnsReport()">🔄 Returns</button>
+      <button class="hdr-btn" onclick="openReturnsModal()">🔄 Returns</button>
       <button class="hdr-btn" id="manageTeamBtn" onclick="openTeamModal()" style="display:none;">👥 Manage Team</button>
       <button class="hdr-btn" onclick="doLogout()">Log Out</button>
     </div>
@@ -491,6 +491,18 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeReturnModal()">Cancel</button>
       <button class="btn btn-navy" onclick="confirmReturn()">Mark as Returned</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="returnsModal">
+  <div class="modal wide">
+    <h3>Returns</h3>
+    <p class="modal-sub">Parts not accepted by the body shop. Each one stays here until you mark it shelved or delete it — regardless of what day it happened.</p>
+    <div id="returnsList"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeReturnsModal()">Close</button>
+      <button class="btn btn-navy" onclick="shareTodaysReturns()">📤 Share Today's Returns</button>
     </div>
   </div>
 </div>
@@ -1380,7 +1392,7 @@ function renderStopCard(s, i, curId) {
         (s.so ? '<div><b>SO#:</b> '+escapeHtml(s.so)+'</div>' : '') +
         (s.mop ? '<div><b>Payment:</b> '+escapeHtml(s.mop)+'</div>' : '') +
         (s.part ? '<div class="full"><b>Part:</b> '+escapeHtml(s.part)+'</div>' : '') +
-        (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+'</div>' : '') +
+        (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+(s.returnResolved ? ' <span style="color:var(--green); font-weight:700;">✅ Shelved</span>' : ' <span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>')+'</div>' : '') +
         (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a></div>' : '') +
       '</div>' +
       (noteText ? '<div class="note-flag">📝 '+escapeHtml(noteText)+'</div>' : '') +
@@ -1594,17 +1606,92 @@ function buildReturnsShareText(returns) {
   });
   return lead + narrative + '\n\n' + lines.join('\n\n') + shareFooter();
 }
-function openReturnsReport() {
+function shareTodaysReturns() {
   var returns = currentDay.stops.filter(function(s) { return s.status === 'returned'; });
-  var rows = returns.map(function(s) {
-    return '<tr><td>'+escapeHtml(s.loc)+'</td><td>'+escapeHtml(s.part||'—')+'</td><td>'+(s.so?escapeHtml(s.so):'—')+'</td>' +
-      '<td>'+escapeHtml(s.returnReason||'—')+'</td><td>'+escapeHtml(s.returnNotes||'')+'</td>' +
-      '<td>'+(s.updatedBy?escapeHtml(s.updatedBy)+' • '+escapeHtml(s.updatedAt||''):'—')+'</td></tr>';
+  shareText('Returns', buildReturnsShareText(returns));
+}
+function collectOpenReturns() {
+  var results = [];
+  Object.keys(days).sort().reverse().forEach(function(dateKey) {
+    var day = days[dateKey];
+    (day.stops || []).forEach(function(s) {
+      if (s.status === 'returned' && !s.returnResolved) results.push({ dateKey: dateKey, stop: s });
+    });
+  });
+  return results;
+}
+function openReturnsModal() {
+  document.getElementById('returnsModal').classList.add('open');
+  renderReturnsList();
+}
+function closeReturnsModal() { document.getElementById('returnsModal').classList.remove('open'); }
+function renderReturnsList() {
+  var el = document.getElementById('returnsList');
+  var open = collectOpenReturns();
+  if (!open.length) { el.innerHTML = '<div class="hist-empty">No open returns — nice and clean.</div>'; return; }
+  el.innerHTML = open.map(function(item) {
+    var s = item.stop;
+    return '<div class="team-row">' +
+      '<div style="flex:1 1 220px; min-width:220px;">' +
+        '<span class="tname">' + escapeHtml(s.loc) + '</span>' +
+        '<div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">' + fmtDateDisplay(item.dateKey) + (item.dateKey === todayKey() ? ' (Today)' : '') + ' • ' + escapeHtml(s.part || '—') + (s.so ? ' • SO# ' + escapeHtml(s.so) : '') + '</div>' +
+        '<div style="font-size:12px; margin-top:4px;"><b>Reason:</b> ' + escapeHtml(s.returnReason || '—') + (s.returnNotes ? ' — ' + escapeHtml(s.returnNotes) : '') + '</div>' +
+      '</div>' +
+      '<div class="team-row-actions">' +
+        '<button class="btn btn-gold btn-sm" onclick="resolveReturn(\'' + item.dateKey + '\',\'' + s.id + '\')">✅ Shelved</button>' +
+        '<button class="stop-delete-btn" style="width:34px;height:34px;font-size:14px;" onclick="deleteReturnEntry(\'' + item.dateKey + '\',\'' + s.id + '\')" title="Delete">🗑</button>' +
+      '</div>' +
+    '</div>';
   }).join('');
-  var body = '<h1>Returns</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • parts not accepted by the body shop</h2>' +
-    (returns.length ? '<table><tr><th>Stop</th><th>Part # / Description</th><th>SO#</th><th>Reason</th><th>Notes</th><th>Marked By</th></tr>'+rows+'</table>'
-      : '<p style="color:#5b6a85;">No returns today.</p>');
-  openPageOverlay('Returns', reportDocShell('Returns', body), buildReturnsShareText(returns));
+}
+function resolveReturn(dateKey, stopId) {
+  if (!confirm('Confirm this part has been placed back on the correct shelf?')) return;
+  var day = days[dateKey];
+  var s = day && day.stops.find(function(x) { return x.id === stopId; });
+  var who = (session && session.name) || settings.driverName || 'Someone';
+  var when = nowTimeStr();
+  if (s) { s.returnResolved = true; s.returnResolvedBy = who; s.returnResolvedAt = when; }
+  updateReturnStopRemote(dateKey, stopId, { returnResolved: true, returnResolvedBy: who, returnResolvedAt: when });
+  if (dateKey === todayKey()) {
+    localStorage.setItem('kgps_days', JSON.stringify(days));
+    addActivity('Return Resolved', (s ? s.loc : 'Stop') + ' — placed back on shelf by ' + who);
+    renderAll();
+  }
+  showToast('Marked as shelved ✓', 'green');
+  renderReturnsList();
+}
+function deleteReturnEntry(dateKey, stopId) {
+  if (!confirm('Delete this return entry? This cannot be undone.')) return;
+  var day = days[dateKey];
+  var s = day && day.stops.find(function(x) { return x.id === stopId; });
+  if (day) day.stops = day.stops.filter(function(x) { return x.id !== stopId; });
+  removeReturnStopRemote(dateKey, stopId);
+  if (dateKey === todayKey()) {
+    localStorage.setItem('kgps_days', JSON.stringify(days));
+    addActivity('Removed', (s ? s.loc : 'Return entry') + ' return was deleted');
+    renderAll();
+  }
+  showToast('Return deleted.', '');
+  renderReturnsList();
+}
+function updateReturnStopRemote(dateKey, stopId, changes) {
+  if (!FIREBASE_ENABLED || !fbDb) return;
+  fbDb.ref('gcap/days/' + dateKey).once('value').then(function(snap) {
+    var day = snap.val() || { stops: [] };
+    var stops = day.stops || [];
+    var idx = stops.findIndex(function(s) { return s.id === stopId; });
+    if (idx === -1) return;
+    Object.keys(changes).forEach(function(k) { stops[idx][k] = changes[k]; });
+    return fbDb.ref('gcap/days/' + dateKey + '/stops').set(stops);
+  }).catch(function(e) { console.error('updateReturnStopRemote failed', e); });
+}
+function removeReturnStopRemote(dateKey, stopId) {
+  if (!FIREBASE_ENABLED || !fbDb) return;
+  fbDb.ref('gcap/days/' + dateKey).once('value').then(function(snap) {
+    var day = snap.val() || { stops: [] };
+    var stops = (day.stops || []).filter(function(s) { return s.id !== stopId; });
+    return fbDb.ref('gcap/days/' + dateKey + '/stops').set(stops);
+  }).catch(function(e) { console.error('removeReturnStopRemote failed', e); });
 }
 
 /* ---------- CHAT ---------- */
