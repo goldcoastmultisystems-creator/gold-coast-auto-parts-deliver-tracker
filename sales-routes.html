@@ -739,7 +739,7 @@ function canManageTeam() {
   return !!(session && (session.type === 'owner' || session.isAdmin));
 }
 function refreshSettingsUI() {
-  document.getElementById('driverName').value = settings.driverName || '';
+  document.getElementById('driverName').value = (session && session.name) || settings.driverName || '';
   document.getElementById('companyName').value = settings.companyName || 'Gold Coast Auto Parts';
   document.getElementById('manageTeamBtn').style.display = canManageTeam() ? '' : 'none';
   syncRoleUI();
@@ -804,12 +804,12 @@ function startLocationTracking() {
   var id = getDriverSessionId();
   geoWatchId = navigator.geolocation.watchPosition(function(pos) {
     fbDb.ref('gcap/salesReps/' + id).set({
-      name: settings.driverName || (session && session.name) || 'Sales Rep',
+      name: (session && session.name) || settings.driverName || 'Sales Rep',
       lat: pos.coords.latitude, lng: pos.coords.longitude,
       heading: pos.coords.heading || null, speed: pos.coords.speed || null,
       accuracy: pos.coords.accuracy || null, updatedAt: Date.now()
     });
-    checkAutoArrival(pos.coords.latitude, pos.coords.longitude, settings.driverName || (session && session.name) || 'Sales Rep');
+    checkAutoArrival(pos.coords.latitude, pos.coords.longitude, (session && session.name) || settings.driverName || 'Sales Rep');
   }, function(err) {
     console.error('geo error', err);
     showToast('Location access denied — live tracking is off.', 'red');
@@ -978,6 +978,11 @@ function loadSettings() {
   try { return JSON.parse(localStorage.getItem('kgps_settings')) || {}; } catch(e) { return {}; }
 }
 function saveSettings(s) { localStorage.setItem('kgps_settings', JSON.stringify(s)); if (FIREBASE_ENABLED && fbDb) fbDb.ref('gcap/settings').set(s); }
+function updateSettingsFields(fields) {
+  Object.keys(fields).forEach(function(k) { settings[k] = fields[k]; });
+  localStorage.setItem('kgps_settings', JSON.stringify(settings));
+  if (FIREBASE_ENABLED && fbDb) fbDb.ref('gcap/settings').update(fields);
+}
 function loadSession() {
   try { return JSON.parse(localStorage.getItem('kgps_session')) || null; } catch(e) { return null; }
 }
@@ -1028,14 +1033,14 @@ function saveDays(d) {
   localStorage.setItem('kgps_sales_days', JSON.stringify(d));
   if (!FIREBASE_ENABLED || !fbDb) return;
   var key = todayKey();
-  if (!d[key]) { saveDaysChain = saveDaysChain.then(function() { return fbDb.ref('gcap/salesRoutes').set(d); }).catch(function(e){ console.error('saveDays failed', e); }); return; }
+  var fallbackLocalDay = d[key] || { stops: [], activity: [], archived: [] };
   saveDaysChain = saveDaysChain.then(function() {
     return fbDb.ref('gcap/salesRoutes/' + key).once('value').then(function(snap) {
       var serverDay = snap.val() || {};
-      var localDay = days[key] || d[key];
+      var localDay = (days && days[key]) || fallbackLocalDay;
       var mergedStops = mergeStopsForSave(serverDay.stops, localDay.stops, knownStopIds);
       var toWrite = { stops: mergedStops, activity: localDay.activity || [], archived: localDay.archived || [] };
-      if (days[key]) days[key].stops = mergedStops;
+      if (days && days[key]) days[key].stops = mergedStops;
       knownStopIds = {};
       mergedStops.forEach(function(s) { knownStopIds[s.id] = true; });
       return fbDb.ref('gcap/salesRoutes/' + key).set(toWrite);
@@ -1212,11 +1217,13 @@ function init() {
 
 function onSettingsChange() {
   var roleVal = document.getElementById('driverRole').value;
-  if (session && session.type === 'guest' && session.isAdmin) {
-    session.role = roleVal;
+  var nameVal = document.getElementById('driverName').value;
+  if (session && (session.type === 'owner' || (session.type === 'guest' && session.isAdmin))) {
+    session.name = nameVal;
+    if (session.type === 'guest') session.role = roleVal;
     saveSession(session);
   }
-  settings.driverName = document.getElementById('driverName').value;
+  settings.driverName = nameVal;
   settings.companyName = document.getElementById('companyName').value;
   saveSettings(settings);
   renderStops();
@@ -1286,7 +1293,7 @@ function guestLogin() {
   }
   session = { type: 'guest', name: memberObj.name, role: memberObj.role, memberId: memberObj.memberId, isAdmin: memberObj.isAdmin };
   saveSession(session);
-  settings.driverName = memberObj.name; saveSettings(settings);
+  updateSettingsFields({ driverName: memberObj.name });
   if (enforcePageAccess()) return;
   if (session.type === 'guest' && !session.isAdmin && session.role === 'Dispatcher') {
     window.location.href = 'choose-dashboard.html';
@@ -1964,7 +1971,7 @@ function setStatus(id, status) {
   var s = currentDay.stops.find(function(x) { return x.id === id; });
   if (!s) return;
   s.status = status;
-  s.updatedBy = (settings.driverName || (session && session.name) || 'Someone');
+  s.updatedBy = ((session && session.name) || settings.driverName || 'Someone');
   s.updatedAt = nowTimeStr();
   s.updatedAtMs = Date.now();
   saveDays(days);
@@ -1981,7 +1988,7 @@ function sendChat(stopId) {
   var s = currentDay.stops.find(function(x) { return x.id === stopId; });
   if (!s) return;
   s.chat = s.chat || [];
-  s.chat.push({ who: settings.driverName || (session && session.name) || 'Someone', text: text, time: nowTimeStr() });
+  s.chat.push({ who: (session && session.name) || settings.driverName || 'Someone', text: text, time: nowTimeStr() });
   saveDays(days);
   renderStops();
 }
