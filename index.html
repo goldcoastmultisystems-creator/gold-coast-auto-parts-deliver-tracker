@@ -2266,6 +2266,10 @@ function renderSmartPreview() {
       return '<div class="parse-row"><b>'+escapeHtml(p.loc)+'</b>' + (p.addr ? ' — '+escapeHtml(p.addr) : '') +
         '<div class="p-meta">'+TYPE_LABELS[p.type]+(p.so ? ' • SO '+escapeHtml(p.so) : '')+(p.part ? ' • '+escapeHtml(p.part) : '')+'</div></div>';
     }).join('') + '</div>' +
+    '<div style="margin-top:10px;">' +
+      '<label class="edit-label">Add to today\'s list, or keep this as its own route?</label>' +
+      '<select class="edit-input" id="smartAssign">' + assignedDriverOptionsHtml(null) + '</select>' +
+    '</div>' +
     '<div class="modal-actions" style="margin-top:10px;">' +
       '<button class="btn btn-ghost btn-sm" onclick="cancelSmartPreview()">Cancel</button>' +
       '<button class="btn btn-navy btn-sm" onclick="confirmSmartPreview()">Add ' + pendingParsed.length + ' Stop' + (pendingParsed.length === 1 ? '' : 's') + '</button>' +
@@ -2273,16 +2277,18 @@ function renderSmartPreview() {
 }
 function cancelSmartPreview() { pendingParsed = []; document.getElementById('smartResult').innerHTML = ''; }
 function confirmSmartPreview() {
+  var assignSel = document.getElementById('smartAssign');
+  var assignedTo = assignSel ? assignSel.value : '';
   var added = [];
   pendingParsed.forEach(function(p) {
     var stop = {
-      id: uid(), loc: p.loc, addr: p.addr, type: p.type, so: p.so, part: p.part, mop: p.mop, notes: p.notes,
+      id: uid(), loc: p.loc, addr: p.addr, type: p.type, assignedTo: assignedTo, so: p.so, part: p.part, mop: p.mop, notes: p.notes,
       status: 'pending', photos: [], chat: [], createdAt: nowTimeStr()
     };
     currentDay.stops.push(stop);
     added.push(stop);
   });
-  addActivity('Smart Add', pendingParsed.length + ' stop(s) added from pasted list');
+  addActivity('Smart Add', pendingParsed.length + ' stop(s) added from pasted list' + (assignedTo ? ' as ' + assignedTo + "'s route" : ''));
   saveDays(days);
   added.forEach(geocodeStop);
   var input = document.getElementById('smartInput');
