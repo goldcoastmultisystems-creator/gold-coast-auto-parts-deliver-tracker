@@ -402,6 +402,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <button class="hdr-btn" onclick="openPartsList()">Parts to Pull</button>
       <button class="hdr-btn" onclick="openPartsToPurchase()">Parts to Purchase</button>
       <button class="hdr-btn" onclick="openReturnsModal()">🔄 Returns</button>
+      <button class="hdr-btn" id="checksBtn" onclick="openChecksModal()">💵 Checks</button>
       <button class="hdr-btn" id="manageTeamBtn" onclick="openTeamModal()" style="display:none;">👥 Manage Team</button>
       <button class="hdr-btn" onclick="doLogout()">Log Out</button>
     </div>
@@ -515,6 +516,17 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
   </div>
 </div>
 
+<div class="modal-backdrop" id="checksModal">
+  <div class="modal wide">
+    <h3>Checks</h3>
+    <p class="modal-sub">Checks received from customers. Each one stays here — across every day — until it's marked deposited or deleted.</p>
+    <div id="checksList"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeChecksModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="teamModal">
   <div class="modal wide">
     <h3>Manage Team</h3>
@@ -599,6 +611,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 
 <input type="file" id="photoFileInput" accept="image/*" capture="environment" style="display:none;">
 <input type="file" id="videoFileInput" accept="video/*" capture="environment" style="display:none;">
+<input type="file" id="checkFileInput" accept="image/*" capture="environment" style="display:none;">
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
@@ -1316,7 +1329,7 @@ function addActivity(tag, text) {
 
 /* ---------- RENDER ---------- */
 function renderAll() {
-  renderSummary(); renderFeed(); renderStops(); renderNextBanner(); renderEndReport();
+  renderSummary(); renderFeed(); renderStops(); renderNextBanner(); renderEndReport(); updateChecksBadge();
   if (leafletMap) renderLiveMapMarkers();
 }
 function renderSummary() {
@@ -1454,7 +1467,9 @@ function renderStopCard(s, i, curId) {
       '<div class="photo-row" style="margin-top:10px;">' + photosHtml + videosHtml +
         '<div class="photo-placeholder" onclick="addPhoto(\''+s.id+'\')">+ Photo</div>' +
         (s.videoUploading ? '' : '<div class="photo-placeholder" onclick="addVideo(\''+s.id+'\')">+ Video</div>') +
+        '<div class="photo-placeholder" onclick="addCheck(\''+s.id+'\')">+ 💵 Check</div>' +
       '</div>' +
+      ((s.checks||[]).length ? '<div style="font-size:11.5px; color:var(--text-soft); margin-top:6px;">💵 ' + s.checks.length + ' check' + (s.checks.length>1?'s':'') + ' on this stop — see the Checks tab to review/deposit</div>' : '') +
       '<div class="status-row" style="margin-top:2px;">' + statusBtns + '</div>' +
       updatedByHtml +
       '<div class="chat">' +
@@ -1947,6 +1962,209 @@ function closeVideoModal() {
   player.pause();
   player.src = '';
   document.getElementById('videoModal').classList.remove('open');
+}
+
+/* ---------- CHECKS (payments received by check, held until deposited) ---------- */
+var CHECK_READ_ENDPOINT = '/.netlify/functions/read-check';
+var checkTargetStopId = null;
+var editingCheckIds = {};
+function addCheck(stopId) {
+  checkTargetStopId = stopId;
+  document.getElementById('checkFileInput').click();
+}
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('checkFileInput').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    var stopId = checkTargetStopId;
+    if (!file || !stopId) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var img = new Image();
+      img.onload = function() {
+        var maxW = 1000;
+        var scale = Math.min(1, maxW / img.width);
+        var canvas = document.createElement('canvas');
+        canvas.width = img.width * scale; canvas.height = img.height * scale;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        var s = currentDay.stops.find(function(x) { return x.id === stopId; });
+        if (!s) return;
+        s.checks = s.checks || [];
+        var entry = {
+          id: 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+          photo: dataUrl,
+          amount: null, checkNumber: null, payerName: null, bankName: null, checkDate: null,
+          status: 'processing', needsReview: false,
+          capturedBy: (session && session.name) || settings.driverName || 'Someone',
+          capturedAt: nowTimeStr()
+        };
+        s.checks.push(entry);
+        saveDays(days);
+        addActivity('Check Received', s.loc + ' — photo captured, reading details…');
+        renderAll();
+        readCheck(stopId, entry.id, dataUrl);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+});
+function readCheck(stopId, checkId, dataUrl) {
+  fetch(CHECK_READ_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: dataUrl, mediaType: 'image/jpeg' })
+  }).then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+    .then(function(res) {
+      var s = currentDay.stops.find(function(x) { return x.id === stopId; });
+      var c = s && (s.checks || []).find(function(x) { return x.id === checkId; });
+      if (!c) return;
+      if (res.ok && res.data && res.data.check) {
+        var f = res.data.check;
+        c.amount = f.amount || null;
+        c.checkNumber = f.checkNumber || null;
+        c.payerName = f.payerName || null;
+        c.bankName = f.bankName || null;
+        c.checkDate = f.checkDate || null;
+        c.needsReview = !(c.amount && c.checkNumber);
+      } else {
+        c.needsReview = true;
+      }
+      c.status = 'pending';
+      saveDays(days);
+      renderAll();
+    })
+    .catch(function(e) {
+      console.error('readCheck failed', e);
+      var s = currentDay.stops.find(function(x) { return x.id === stopId; });
+      var c = s && (s.checks || []).find(function(x) { return x.id === checkId; });
+      if (c) { c.status = 'pending'; c.needsReview = true; saveDays(days); renderAll(); }
+    });
+}
+function collectOpenChecks() {
+  var results = [];
+  Object.keys(days).sort().reverse().forEach(function(dateKey) {
+    var day = days[dateKey];
+    (day.stops || []).forEach(function(s) {
+      (s.checks || []).forEach(function(c) {
+        if (c.status !== 'deposited') results.push({ dateKey: dateKey, stop: s, check: c });
+      });
+    });
+  });
+  return results;
+}
+function updateChecksBadge() {
+  var btn = document.getElementById('checksBtn');
+  if (!btn) return;
+  var n = collectOpenChecks().length;
+  btn.textContent = '💵 Checks' + (n ? ' (' + n + ')' : '');
+}
+function openChecksModal() {
+  document.getElementById('checksModal').classList.add('open');
+  renderChecksList();
+}
+function closeChecksModal() { document.getElementById('checksModal').classList.remove('open'); }
+function renderChecksList() {
+  var el = document.getElementById('checksList');
+  var open = collectOpenChecks();
+  updateChecksBadge();
+  if (!open.length) { el.innerHTML = '<div class="hist-empty">No pending checks.</div>'; return; }
+  el.innerHTML = open.map(function(item) {
+    var c = item.check, s = item.stop;
+    var editing = !!editingCheckIds[c.id];
+    var body;
+    if (editing) {
+      body = '<div class="edit-row-2">' +
+          '<div><label class="edit-label">Amount ($)</label><input class="edit-input" id="chkAmt_'+c.id+'" value="'+escapeHtml(c.amount||'')+'" placeholder="e.g. 245.00"></div>' +
+          '<div><label class="edit-label">Check #</label><input class="edit-input" id="chkNum_'+c.id+'" value="'+escapeHtml(c.checkNumber||'')+'" placeholder="e.g. 1042"></div>' +
+        '</div>' +
+        '<div class="edit-row-2" style="margin-top:6px;">' +
+          '<div><label class="edit-label">From</label><input class="edit-input" id="chkPayer_'+c.id+'" value="'+escapeHtml(c.payerName||'')+'" placeholder="Payer / shop name"></div>' +
+          '<div><label class="edit-label">Bank</label><input class="edit-input" id="chkBank_'+c.id+'" value="'+escapeHtml(c.bankName||'')+'" placeholder="Bank name"></div>' +
+        '</div>' +
+        '<div class="edit-actions">' +
+          '<button class="btn btn-gold btn-sm" onclick="saveCheckEdit(\''+item.dateKey+'\',\''+s.id+'\',\''+c.id+'\')">Save</button>' +
+          '<button class="btn btn-ghost btn-sm" onclick="cancelCheckEdit(\''+c.id+'\')">Cancel</button>' +
+        '</div>';
+    } else {
+      body = '<span class="tname">' + escapeHtml(s.loc) + '</span>' +
+        '<div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">' + fmtDateDisplay(item.dateKey) + (item.dateKey === todayKey() ? ' (Today)' : '') + ' • Captured by ' + escapeHtml(c.capturedBy||'—') + ' at ' + (c.capturedAt||'') + '</div>' +
+        (c.status === 'processing'
+          ? '<div style="font-size:12px; margin-top:4px; color:var(--text-soft);">⏳ Reading check details…</div>'
+          : '<div style="font-size:12.5px; margin-top:4px;">' +
+              '<b>' + (c.amount ? '$'+escapeHtml(c.amount) : '—') + '</b>' +
+              (c.checkNumber ? ' • Check #' + escapeHtml(c.checkNumber) : '') +
+              (c.payerName ? ' • From ' + escapeHtml(c.payerName) : '') +
+              (c.bankName ? ' • ' + escapeHtml(c.bankName) : '') +
+              (c.needsReview ? ' <span style="color:var(--amber); font-weight:700;">⚠ Needs review</span>' : '') +
+            '</div>');
+    }
+    return '<div class="team-row">' +
+      '<img class="photo-thumb" src="'+c.photo+'" onclick="window.open(\''+c.photo+'\',\'_blank\')" title="Tap to view full size" style="flex:0 0 64px;">' +
+      '<div style="flex:1 1 220px; min-width:220px;">' + body + '</div>' +
+      (editing ? '' :
+      '<div class="team-row-actions">' +
+        '<button class="stop-edit-btn" onclick="startCheckEdit(\''+c.id+'\')" title="Edit details">✎</button>' +
+        '<button class="btn btn-gold btn-sm" onclick="depositCheck(\''+item.dateKey+'\',\''+s.id+'\',\''+c.id+'\')">✅ Deposited</button>' +
+        '<button class="stop-delete-btn" onclick="deleteCheckEntry(\''+item.dateKey+'\',\''+s.id+'\',\''+c.id+'\')" title="Delete">🗑</button>' +
+      '</div>') +
+    '</div>';
+  }).join('');
+}
+function startCheckEdit(checkId) { editingCheckIds[checkId] = true; renderChecksList(); }
+function cancelCheckEdit(checkId) { delete editingCheckIds[checkId]; renderChecksList(); }
+function saveCheckEdit(dateKey, stopId, checkId) {
+  var amount = document.getElementById('chkAmt_'+checkId).value.trim();
+  var checkNumber = document.getElementById('chkNum_'+checkId).value.trim();
+  var payerName = document.getElementById('chkPayer_'+checkId).value.trim();
+  var bankName = document.getElementById('chkBank_'+checkId).value.trim();
+  var day = days[dateKey];
+  var s = day && day.stops.find(function(x) { return x.id === stopId; });
+  var c = s && (s.checks || []).find(function(x) { return x.id === checkId; });
+  if (c) {
+    c.amount = amount || null; c.checkNumber = checkNumber || null;
+    c.payerName = payerName || null; c.bankName = bankName || null;
+    c.needsReview = !(c.amount && c.checkNumber);
+  }
+  delete editingCheckIds[checkId];
+  if (dateKey === todayKey()) { saveDays(days); renderAll(); }
+  else if (s) updateReturnStopRemote(dateKey, stopId, { checks: s.checks });
+  showToast('Check details updated.', 'green');
+  renderChecksList();
+}
+function depositCheck(dateKey, stopId, checkId) {
+  if (!confirm('Confirm this check has been deposited?')) return;
+  var who = (session && session.name) || settings.driverName || 'Someone';
+  var when = nowTimeStr();
+  var day = days[dateKey];
+  var s = day && day.stops.find(function(x) { return x.id === stopId; });
+  var c = s && (s.checks || []).find(function(x) { return x.id === checkId; });
+  if (c) { c.status = 'deposited'; c.depositedBy = who; c.depositedAt = when; }
+  if (dateKey === todayKey()) {
+    saveDays(days);
+    addActivity('Check Deposited', (s ? s.loc : 'Stop') + ' — ' + (c && c.amount ? '$'+c.amount : 'check') + ' deposited by ' + who);
+    renderAll();
+  } else if (s) {
+    updateReturnStopRemote(dateKey, stopId, { checks: s.checks });
+  }
+  showToast('Marked as deposited ✓', 'green');
+  renderChecksList();
+}
+function deleteCheckEntry(dateKey, stopId, checkId) {
+  if (!confirm('Delete this check entry? This cannot be undone.')) return;
+  var day = days[dateKey];
+  var s = day && day.stops.find(function(x) { return x.id === stopId; });
+  if (s) s.checks = (s.checks || []).filter(function(x) { return x.id !== checkId; });
+  if (dateKey === todayKey()) {
+    saveDays(days);
+    renderAll();
+  } else if (s) {
+    updateReturnStopRemote(dateKey, stopId, { checks: s.checks });
+  }
+  showToast('Check entry deleted.', '');
+  renderChecksList();
 }
 
 /* ---------- DRAG REORDER ---------- */
