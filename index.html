@@ -2189,8 +2189,53 @@ function deleteCheckEntry(dateKey, stopId, checkId) {
 var ASSISTANT_ENDPOINT = '/.netlify/functions/ask-assistant';
 var assistantHistory = [];
 var assistantBusy = false;
-var ASSISTANT_SUGGESTIONS = ['Summarize today', "What's still pending?", 'Which checks are not deposited yet?', 'Any open returns?'];
-function buildAssistantContext() {
+var ASSISTANT_SUGGESTIONS = ['Summarize today', "What's still pending?", 'Which checks are not deposited yet?', 'Do we have a Camry bumper in stock?'];
+var inventoryRows = null, inventoryMeta = null, inventoryLoading = null;
+var INV_STOPWORDS = { the:1, a:1, an:1, do:1, we:1, have:1, any:1, in:1, on:1, of:1, for:1, is:1, are:1, there:1, stock:1, much:1, many:1, how:1, what:1, whats:1, price:1, cost:1, much:1, qty:1, quantity:1, left:1, got:1, you:1, and:1, or:1, to:1, it:1, our:1, with:1, part:1, parts:1, available:1, inventory:1 };
+function loadInventory() {
+  if (inventoryRows) return Promise.resolve();
+  if (inventoryLoading) return inventoryLoading;
+  if (!FIREBASE_ENABLED || !fbDb) return Promise.resolve();
+  inventoryLoading = fbDb.ref('gcap/inventory/latest').once('value').then(function(snap) {
+    var doc = snap.val();
+    if (doc && doc.rowsJson) {
+      inventoryRows = JSON.parse(doc.rowsJson);
+      inventoryMeta = { total: doc.total || inventoryRows.length, syncedAt: doc.syncedAt || '' };
+    }
+  }).catch(function(e) { console.error('inventory load failed', e); }).then(function() { inventoryLoading = null; });
+  return inventoryLoading;
+}
+function searchInventory(text, limit) {
+  if (!inventoryRows) return [];
+  var tokens = String(text || '').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter(function(t) { return t.length >= 2 && !INV_STOPWORDS[t]; });
+  if (!tokens.length) return [];
+  var scored = [];
+  inventoryRows.forEach(function(r) {
+    var sku = String(r[0] || '').toLowerCase(), oem = String(r[1] || '').toLowerCase(), name = String(r[6] || '').toLowerCase();
+    var hay = sku + ' ' + oem + ' ' + name, score = 0;
+    tokens.forEach(function(t) {
+      if (sku === t || oem === t) score += 10;
+      else if (hay.indexOf(t) !== -1) score += 1;
+    });
+    if (score > 0) scored.push({ r: r, score: score + (r[2] > 0 ? 0.5 : 0) });
+  });
+  scored.sort(function(a, b) { return b.score - a.score; });
+  return scored.slice(0, limit || 15).map(function(x) { return x.r; });
+}
+function buildInventoryContext(question) {
+  if (!inventoryRows) return '\nINVENTORY: not loaded — tell the user inventory lookups are not available right now.';
+  var inStock = inventoryRows.filter(function(r) { return r[2] > 0; }).length;
+  var recent = '';
+  for (var i = assistantHistory.length - 1; i >= 0; i--) { if (assistantHistory[i].role === 'user') { recent = assistantHistory[i].text; break; } }
+  var matches = searchInventory(question + ' ' + recent, 15);
+  var L = ['\nINVENTORY CATALOG: ' + inventoryRows.length + ' SKUs (' + inStock + ' in stock, ' + (inventoryRows.length - inStock) + ' sold out), last synced ' + (inventoryMeta && inventoryMeta.syncedAt ? inventoryMeta.syncedAt.slice(0, 10) : 'unknown') + '.'];
+  L.push('Best catalog matches for the question (' + matches.length + '):');
+  matches.forEach(function(r) {
+    L.push('- ' + r[0] + ' | OEM ' + (r[1] || '—') + ' | ' + (r[2] > 0 ? 'IN STOCK qty ' + r[2] : 'SOLD OUT') + ' | ' + (r[4] != null ? '$' + r[4] : 'no price') + ' | ' + r[6] + (r[7] ? ' | grade ' + r[7] : ''));
+  });
+  return L.join('\n');
+}
+function buildAssistantContext(question) {
   var L = [];
   L.push('Today: ' + fmtDateDisplay(todayKey()) + ', current time ' + nowTimeStr());
   L.push('Drivers on the team: ' + (activeDriverNames().join(', ') || 'none'));
@@ -2215,9 +2260,10 @@ function buildAssistantContext() {
     var s = it.stop;
     L.push('- ' + (s.loc || 'Unnamed') + ' (' + it.dateKey + ') | ' + (s.part || 'part?') + (s.so ? ' | SO ' + s.so : '') + ' | reason: ' + (s.returnReason || '?') + (s.returnNotes ? ' — ' + s.returnNotes : ''));
   });
-  return L.join('\n');
+  return L.join('\n') + buildInventoryContext(question || '');
 }
 function openAssistantModal() {
+  loadInventory();
   document.getElementById('assistantModal').classList.add('open');
   renderAssistantLog();
   document.getElementById('assistantSuggest').innerHTML = assistantHistory.length ? '' : ASSISTANT_SUGGESTIONS.map(function(q) {
@@ -2251,10 +2297,12 @@ function sendAssistant() {
   assistantHistory.push({ role: 'user', text: q });
   assistantBusy = true;
   renderAssistantLog(true);
-  fetch(ASSISTANT_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question: q, history: prior, context: buildAssistantContext(), asker: ((session && session.name) || settings.driverName || '') + (session && session.role ? ' (' + session.role + ')' : '') })
+  loadInventory().then(function() {
+    return fetch(ASSISTANT_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q, history: prior, context: buildAssistantContext(q), asker: ((session && session.name) || settings.driverName || '') + (session && session.role ? ' (' + session.role + ')' : '') })
+    });
   }).then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
     .then(function(res) {
       var answer = res.ok && res.data && res.data.answer;

@@ -40,6 +40,8 @@ exports.handler = async function (event) {
     'You are talking to ' + asker + '. Answer questions using ONLY the live data snapshot below. ' +
     'Be brief and practical: short sentences, bullet points for lists, no preamble. ' +
     'If the answer is not in the data, say so plainly instead of guessing. ' +
+    'For inventory questions, use the INVENTORY CATALOG matches: give the SKU, whether it is in stock (with quantity) or sold out, and the selling price. ' +
+    'Only a few best matches are shown, so if nothing relevant appears say it may not be in the catalog and suggest checking the Stock Board. Never invent SKUs, quantities or prices. ' +
     'You are read-only: you cannot change stops, checks or returns; if asked to, tell them which button in the app to use.\n\n' +
     '--- LIVE DATA SNAPSHOT ---\n' + context;
 
