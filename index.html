@@ -403,6 +403,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <button class="hdr-btn" onclick="openPartsToPurchase()">Parts to Purchase</button>
       <button class="hdr-btn" onclick="openReturnsModal()">🔄 Returns</button>
       <button class="hdr-btn" id="checksBtn" onclick="openChecksModal()">💵 Checks</button>
+      <button class="hdr-btn" onclick="openAssistantModal()">🤖 Ask AI</button>
       <button class="hdr-btn" id="manageTeamBtn" onclick="openTeamModal()" style="display:none;">👥 Manage Team</button>
       <button class="hdr-btn" onclick="doLogout()">Log Out</button>
     </div>
@@ -523,6 +524,23 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
     <div id="checksList"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeChecksModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="assistantModal">
+  <div class="modal wide">
+    <h3>🤖 Ask AI</h3>
+    <p class="modal-sub">Ask about today's stops, routes, checks, or returns. It only reads the live board — it can't change anything.</p>
+    <div id="assistantLog" style="max-height:48vh; overflow-y:auto; margin-bottom:10px;"></div>
+    <div id="assistantSuggest" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>
+    <div class="chat-input-row">
+      <input type="text" id="assistantInput" placeholder="e.g. What's left on Anthony's route?" onkeydown="if(event.key==='Enter')sendAssistant()">
+      <button class="btn btn-sm btn-navy" id="assistantSendBtn" onclick="sendAssistant()">Ask</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="clearAssistant()">Clear</button>
+      <button class="btn btn-ghost" onclick="closeAssistantModal()">Close</button>
     </div>
   </div>
 </div>
@@ -2165,6 +2183,89 @@ function deleteCheckEntry(dateKey, stopId, checkId) {
   }
   showToast('Check entry deleted.', '');
   renderChecksList();
+}
+
+/* ---------- ASK AI (read-only Q&A over the live board) ---------- */
+var ASSISTANT_ENDPOINT = '/.netlify/functions/ask-assistant';
+var assistantHistory = [];
+var assistantBusy = false;
+var ASSISTANT_SUGGESTIONS = ['Summarize today', "What's still pending?", 'Which checks are not deposited yet?', 'Any open returns?'];
+function buildAssistantContext() {
+  var L = [];
+  L.push('Today: ' + fmtDateDisplay(todayKey()) + ', current time ' + nowTimeStr());
+  L.push('Drivers on the team: ' + (activeDriverNames().join(', ') || 'none'));
+  var stops = visibleStops();
+  L.push('\nTODAY\'S STOPS (' + stops.length + '):');
+  stops.forEach(function(s, i) {
+    L.push((i + 1) + '. ' + (s.loc || 'Unnamed') + ' | ' + (TYPE_LABELS[s.type] || s.type) + ' | status: ' + (STATUS_LABELS[s.status] || s.status) +
+      ' | route: ' + (s.assignedTo || 'unassigned') + (s.addr ? ' | ' + s.addr : '') + (s.so ? ' | SO ' + s.so : '') + (s.part ? ' | part: ' + s.part : '') +
+      (s.mop ? ' | payment: ' + s.mop : '') + (s.notes ? ' | notes: ' + s.notes : '') + (s.updatedBy ? ' | last update by ' + s.updatedBy + ' at ' + s.updatedAt : '') +
+      ((s.checks || []).length ? ' | checks captured: ' + s.checks.length : ''));
+  });
+  var checks = collectOpenChecks();
+  L.push('\nCHECKS NOT YET DEPOSITED (' + checks.length + '):');
+  checks.forEach(function(it) {
+    var c = it.check;
+    L.push('- ' + (it.stop.loc || 'Unnamed') + ' (' + it.dateKey + ') | ' + (c.amount ? '$' + c.amount : 'amount unknown') + (c.checkNumber ? ' | check #' + c.checkNumber : '') +
+      (c.payerName ? ' | from ' + c.payerName : '') + ' | captured by ' + (c.capturedBy || '?') + (c.needsReview ? ' | needs review' : ''));
+  });
+  var returns = collectOpenReturns();
+  L.push('\nOPEN RETURNS NOT YET SHELVED (' + returns.length + '):');
+  returns.forEach(function(it) {
+    var s = it.stop;
+    L.push('- ' + (s.loc || 'Unnamed') + ' (' + it.dateKey + ') | ' + (s.part || 'part?') + (s.so ? ' | SO ' + s.so : '') + ' | reason: ' + (s.returnReason || '?') + (s.returnNotes ? ' — ' + s.returnNotes : ''));
+  });
+  return L.join('\n');
+}
+function openAssistantModal() {
+  document.getElementById('assistantModal').classList.add('open');
+  renderAssistantLog();
+  document.getElementById('assistantSuggest').innerHTML = assistantHistory.length ? '' : ASSISTANT_SUGGESTIONS.map(function(q) {
+    return '<button class="btn btn-ghost btn-sm" onclick="askSuggestion(this)">' + escapeHtml(q) + '</button>';
+  }).join('');
+  document.getElementById('assistantInput').focus();
+}
+function closeAssistantModal() { document.getElementById('assistantModal').classList.remove('open'); }
+function clearAssistant() { assistantHistory = []; openAssistantModal(); }
+function askSuggestion(btn) {
+  document.getElementById('assistantInput').value = btn.textContent;
+  sendAssistant();
+}
+function renderAssistantLog(pending) {
+  var el = document.getElementById('assistantLog');
+  if (!assistantHistory.length && !pending) { el.innerHTML = '<div class="hist-empty">Ask a question to get started.</div>'; return; }
+  el.innerHTML = assistantHistory.map(function(m) {
+    var mine = m.role === 'user';
+    return '<div class="chat-msg' + (mine ? '' : ' ai') + '" style="white-space:pre-wrap; margin-bottom:6px;"><span class="who">' + (mine ? 'You' : '🤖 AI') + ':</span><span>' + escapeHtml(m.text) + '</span></div>';
+  }).join('') + (pending ? '<div class="chat-msg ai"><span class="who">🤖 AI:</span><span>Thinking…</span></div>' : '');
+  el.scrollTop = el.scrollHeight;
+}
+function sendAssistant() {
+  if (assistantBusy) return;
+  var input = document.getElementById('assistantInput');
+  var q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  document.getElementById('assistantSuggest').innerHTML = '';
+  var prior = assistantHistory.slice();
+  assistantHistory.push({ role: 'user', text: q });
+  assistantBusy = true;
+  renderAssistantLog(true);
+  fetch(ASSISTANT_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question: q, history: prior, context: buildAssistantContext(), asker: ((session && session.name) || settings.driverName || '') + (session && session.role ? ' (' + session.role + ')' : '') })
+  }).then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+    .then(function(res) {
+      var answer = res.ok && res.data && res.data.answer;
+      if (!answer) {
+        var err = (res.data && res.data.error) || '';
+        answer = /not configured/i.test(err) ? "The AI isn't switched on yet — the ANTHROPIC_API_KEY still needs to be added in Netlify." : "Sorry, I couldn't answer that right now. Please try again.";
+      }
+      assistantHistory.push({ role: 'assistant', text: answer });
+    })
+    .catch(function() { assistantHistory.push({ role: 'assistant', text: "Couldn't reach the AI — check your connection and try again." }); })
+    .then(function() { assistantBusy = false; renderAssistantLog(); });
 }
 
 /* ---------- DRAG REORDER ---------- */
