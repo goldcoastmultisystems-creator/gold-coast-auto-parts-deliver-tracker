@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Gold Coast Auto Parts — Inventory</title>
+<link rel="icon" type="image/png" href="./favicon.png">
+<link rel="apple-touch-icon" href="./favicon.png">
+<style>
+:root {
+  color-scheme: dark;
+  --void: #07070a;
+  --glass: rgba(255,255,255,0.045);
+  --glass-border: rgba(255,255,255,0.10); --glass-border-gold: rgba(212,164,65,0.45);
+  --gold: #d4a441; --gold-2: #f2d38a; --gold-ink: #1a1305;
+  --green: #34d399; --red: #f87171; --amber: #fbbf24;
+  --text: #f3f1ec; --text-soft: #a39d94;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: radial-gradient(ellipse 900px 700px at 15% 0%, rgba(212,164,65,0.18), transparent 60%), var(--void); color: var(--text); min-height: 100vh; }
+header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--glass-border-gold); background: rgba(10,9,6,0.8); }
+header .brand { display: flex; align-items: center; gap: 12px; }
+header img { height: 34px; }
+header h1 { font-size: 15px; margin: 0; }
+header .sub { font-size: 11.5px; color: var(--gold-2); }
+.hdr-btn { background: var(--glass); border: 1px solid var(--glass-border); color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.hdr-btn:hover { background: rgba(212,164,65,0.16); border-color: var(--glass-border-gold); }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stat { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px; text-align: center; }
+.stat .num { font-size: 22px; font-weight: 800; }
+.stat .lbl { font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
+.stat.good .num { color: var(--green); } .stat.bad .num { color: var(--red); }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.controls input { flex: 1 1 260px; border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px 12px; font-size: 14px; background: rgba(255,255,255,0.06); color: var(--text); }
+.seg { display: flex; border: 1px solid var(--glass-border); border-radius: 10px; overflow: hidden; }
+.seg button { background: transparent; border: none; color: var(--text-soft); padding: 9px 13px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.seg button.active { background: rgba(212,164,65,0.22); color: var(--gold-2); }
+.meta { font-size: 12px; color: var(--text-soft); margin-bottom: 8px; }
+.notice { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.4); color: var(--amber); border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-bottom: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-soft); padding: 8px 8px; border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; background: #0d0b08; }
+td { padding: 9px 8px; border-bottom: 1px solid var(--glass-border); vertical-align: top; }
+td.sku { font-weight: 700; color: var(--gold-2); white-space: nowrap; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+.pill { display: inline-block; border-radius: 99px; padding: 2px 9px; font-size: 11px; font-weight: 800; }
+.pill.in { background: rgba(52,211,153,0.15); color: var(--green); }
+.pill.out { background: rgba(248,113,113,0.15); color: var(--red); }
+.pill.low { background: rgba(251,191,36,0.15); color: var(--amber); }
+.sub2 { font-size: 11px; color: var(--text-soft); }
+.more { text-align: center; padding: 14px; }
+.btn { border: none; border-radius: 10px; padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn-navy { background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border-gold); color: var(--gold-2); }
+.btn-navy:hover { background: rgba(212,164,65,0.14); }
+.btn-ghost { background: transparent; border: 1px solid var(--glass-border); color: var(--text-soft); }
+.btn-ghost:hover { border-color: rgba(255,255,255,0.25); color: var(--text); }
+.btn-sm { padding: 6px 10px; font-size: 12px; border-radius: 7px; }
+.chat-msg { font-size: 12.5px; padding: 4px 0px; display: flex; gap: 6px; }
+.chat-msg.ai { background: rgba(212,164,65,0.08); border: 1px solid rgba(212,164,65,0.2); border-radius: 7px; padding: 5px 8px; margin: 2px 0; }
+.chat-msg .who { font-weight: 700; color: var(--gold-2); white-space: nowrap; }
+.chat-input-row { display: flex; gap: 6px; }
+.chat-input-row input { flex: 1 1 0%; border: 1px solid var(--glass-border); border-radius: 7px; padding: 7px 10px; font-size: 12.5px; background: rgba(255,255,255,0.06); color: var(--text); }
+.modal-backdrop { position: fixed; inset: 0px; background: rgba(0,0,0,0.65); backdrop-filter: blur(6px); display: none; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto; z-index: 50; }
+.modal-backdrop.open { display: flex; }
+.modal { background: rgba(20,17,12,0.92); border: 1px solid var(--glass-border-gold); box-shadow: 0 24px 80px rgba(0,0,0,0.6); border-radius: 18px; max-width: 520px; width: 100%; padding: 20px; margin-top: 20px; color: var(--text); }
+.modal.wide { max-width: 640px; }
+.modal h3 { margin: 0px 0px 6px; color: var(--gold-2); font-size: 16px; }
+.modal .modal-sub { font-size: 12.5px; color: var(--text-soft); margin: 0px 0px 14px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.hist-empty { font-size: 12.5px; color: var(--text-soft); font-style: italic; padding: 10px 4px; }
+@media (max-width: 640px) { .hide-sm { display: none; } td, th { padding: 8px 5px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img src="gca-logo.png" alt="Gold Coast Auto Parts">
+    <div><h1>Inventory</h1><div class="sub" id="who"></div></div>
+  </div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <button class="hdr-btn" onclick="openAssistantModal()">🤖 Ask AI</button>
+    <button class="hdr-btn" id="backDelivery" onclick="location.href='index.html'">🚚 Delivery</button>
+    <button class="hdr-btn" id="backSales" onclick="location.href='sales-routes.html'">🧾 Sales Routes</button>
+    <button class="hdr-btn" onclick="doLogout()">Log Out</button>
+  </div>
+</header>
+<main>
+  <div id="notice"></div>
+  <div class="stats" id="stats"></div>
+  <div class="controls">
+    <input id="q" type="search" placeholder="Search SKU, OEM number, make, model, part name…" oninput="renderTable(true)" autocomplete="off">
+    <div class="seg" id="seg">
+      <button data-f="all" class="active" onclick="setFilter('all')">All</button>
+      <button data-f="in" onclick="setFilter('in')">In stock</button>
+      <button data-f="out" onclick="setFilter('out')">Sold out</button>
+    </div>
+  </div>
+  <div class="meta" id="meta"></div>
+  <table>
+    <thead><tr><th>SKU</th><th>Part</th><th class="hide-sm">OEM #</th><th class="num">Qty</th><th class="num">Price</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="more" id="more"></div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script>
+var FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBQiE4TlMIcO6iyCob2G1js3eEVcmmjNmI",
+  authDomain: "gold-coast-auto-parts.firebaseapp.com",
+  databaseURL: "https://gold-coast-auto-parts-default-rtdb.firebaseio.com",
+  projectId: "gold-coast-auto-parts",
+  storageBucket: "gold-coast-auto-parts.firebasestorage.app",
+  messagingSenderId: "610239286841"
+};
+var FIREBASE_ENABLED = true;
+var fbDb = null, session = null, settings = {};
+var PAGE_SIZE = 100, shown = PAGE_SIZE, filter = 'all', LOW_QTY = 2;
+
+function loadSession() { try { return JSON.parse(localStorage.getItem('kgps_session')) || null; } catch (e) { return null; } }
+function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
+function doLogout() { localStorage.removeItem('kgps_session'); location.href = 'index.html'; }
+
+session = loadSession();
+if (!session) {
+  location.href = 'index.html';
+} else {
+  document.getElementById('who').textContent = (session.name || '') + (session.role ? ' • ' + session.role : '');
+  var isSalesOnly = session.type === 'guest' && !session.isAdmin && session.role === 'Sales Rep';
+  var isDriverOnly = session.type === 'guest' && !session.isAdmin && session.role === 'Driver';
+  document.getElementById('backSales').style.display = isDriverOnly ? 'none' : '';
+  document.getElementById('backDelivery').style.display = isSalesOnly ? 'none' : '';
+  startFirebase();
+}
+
+function startFirebase() {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  fbDb = firebase.database();
+  firebase.auth().onAuthStateChanged(function(user) {
+    if (!user) return;
+    loadInventory().then(function() { renderStats(); renderTable(true); });
+  });
+  firebase.auth().signInAnonymously().catch(function() { showNotice('Could not connect. Check your internet and refresh.'); });
+}
+function showNotice(msg) { document.getElementById('notice').innerHTML = msg ? '<div class="notice">' + escapeHtml(msg) + '</div>' : ''; }
+
+function setFilter(f) {
+  filter = f;
+  Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function(b) { b.classList.toggle('active', b.getAttribute('data-f') === f); });
+  renderTable(true);
+}
+function renderStats() {
+  if (!inventoryRows) {
+    showNotice('Inventory has not been loaded yet. It is copied over from the Stock Board — check back soon.');
+    document.getElementById('stats').innerHTML = '';
+    return;
+  }
+  var inStock = 0, low = 0, units = 0;
+  inventoryRows.forEach(function(r) { if (r[2] > 0) { inStock++; units += r[2]; if (r[2] <= LOW_QTY) low++; } });
+  var synced = inventoryMeta && inventoryMeta.syncedAt ? new Date(inventoryMeta.syncedAt) : null;
+  var ageH = synced ? (Date.now() - synced.getTime()) / 3600000 : null;
+  showNotice(ageH != null && ageH > 48 ? 'Inventory data is ' + Math.round(ageH / 24) + ' days old — the daily copy from the Stock Board may not be running.' : '');
+  document.getElementById('stats').innerHTML =
+    '<div class="stat"><div class="num">' + inventoryRows.length + '</div><div class="lbl">Catalog SKUs</div></div>' +
+    '<div class="stat good"><div class="num">' + inStock + '</div><div class="lbl">In stock</div></div>' +
+    '<div class="stat"><div class="num">' + low + '</div><div class="lbl">Low (≤' + LOW_QTY + ')</div></div>' +
+    '<div class="stat bad"><div class="num">' + (inventoryRows.length - inStock) + '</div><div class="lbl">Sold out</div></div>' +
+    '<div class="stat"><div class="num">' + units + '</div><div class="lbl">Units on hand</div></div>';
+}
+function matches(r, tokens) {
+  var hay = (String(r[0]) + ' ' + String(r[1] || '') + ' ' + String(r[6] || '')).toLowerCase();
+  return tokens.every(function(t) { return hay.indexOf(t) !== -1; });
+}
+function renderTable(reset) {
+  if (reset) shown = PAGE_SIZE;
+  var body = document.getElementById('rows');
+  if (!inventoryRows) { body.innerHTML = ''; document.getElementById('meta').textContent = ''; document.getElementById('more').innerHTML = ''; return; }
+  var tokens = document.getElementById('q').value.toLowerCase().split(/\s+/).filter(Boolean);
+  var list = inventoryRows.filter(function(r) {
+    if (filter === 'in' && !(r[2] > 0)) return false;
+    if (filter === 'out' && r[2] > 0) return false;
+    return !tokens.length || matches(r, tokens);
+  });
+  if (!tokens.length) list.sort(function(a, b) { return (b[2] > 0) - (a[2] > 0) || String(a[0]).localeCompare(String(b[0])); });
+  document.getElementById('meta').textContent = list.length + ' part' + (list.length === 1 ? '' : 's') + (inventoryMeta && inventoryMeta.syncedAt ? ' • synced ' + inventoryMeta.syncedAt.slice(0, 10) : '');
+  body.innerHTML = list.slice(0, shown).map(function(r) {
+    var q = r[2], pill = q <= 0 ? '<span class="pill out">Sold out</span>' : (q <= LOW_QTY ? '<span class="pill low">Low · ' + q + '</span>' : '<span class="pill in">' + q + '</span>');
+    return '<tr><td class="sku">' + escapeHtml(r[0]) + '</td><td>' + escapeHtml(r[6]) + (r[7] ? ' <span class="sub2">grade ' + escapeHtml(r[7]) + '</span>' : '') +
+      '</td><td class="hide-sm sub2">' + escapeHtml(r[1] || '—') + '</td><td class="num">' + pill + '</td><td class="num">' + (r[4] != null ? '$' + Number(r[4]).toFixed(2) : '—') + '</td></tr>';
+  }).join('') || '<tr><td colspan="5" class="sub2" style="padding:18px;">No parts match.</td></tr>';
+  document.getElementById('more').innerHTML = list.length > shown ? '<button class="hdr-btn" onclick="shown += PAGE_SIZE; renderTable(false)">Show more (' + (list.length - shown) + ' left)</button>' : '';
+}
+function assistantBoardContext() { return ''; }
+var assistantBoardName = 'inventory';
+</script>
+<script src="assistant.js"></script>
+</body>
+</html>

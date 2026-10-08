@@ -35,8 +35,10 @@ exports.handler = async function (event) {
     .map(function (m) { return { role: m.role, content: m.text.slice(0, 2000) }; });
   while (history.length && history[0].role !== 'user') history.shift();
 
+  var isSales = payload.board === 'sales';
   var system =
-    'You are the in-app assistant for Gold Coast Auto Parts, an auto parts distributor whose drivers deliver parts to body shops. ' +
+    'You are the in-app assistant for Gold Coast Auto Parts, an auto parts distributor ' +
+    (isSales ? 'whose sales reps visit body shops to win business and quote parts. ' : 'whose drivers deliver parts to body shops. ') +
     'You are talking to ' + asker + '. Answer questions using ONLY the live data snapshot below. ' +
     'Be brief and practical: short sentences, bullet points for lists, no preamble. ' +
     'If the answer is not in the data, say so plainly instead of guessing. ' +

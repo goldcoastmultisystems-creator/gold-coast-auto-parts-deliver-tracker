@@ -447,6 +447,8 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <button class="hdr-btn" onclick="shareList()">Share</button>
       <button class="hdr-btn" onclick="printReport()">End of Day Report</button>
       <button class="hdr-btn" onclick="openChecklist()">✅ Daily Checklist</button>
+      <button class="hdr-btn" onclick="openAssistantModal()">🤖 Ask AI</button>
+      <button class="hdr-btn" onclick="location.href='inventory.html'">📦 Inventory →</button>
       <button class="hdr-btn" id="manageTeamBtn" onclick="openTeamModal()" style="display:none;">👥 Manage Team</button>
       <button class="hdr-btn" onclick="doLogout()">Log Out</button>
     </div>
@@ -2564,7 +2566,22 @@ function shareText(title, text) {
   }
 }
 
+var assistantBoardName = 'sales';
+function assistantBoardContext() {
+  var L = [];
+  L.push('Today: ' + fmtDateDisplay(todayKey()) + ', current time ' + nowTimeStr());
+  var stops = currentDay.stops;
+  L.push('\nTODAY\'S SALES VISITS (' + stops.length + '):');
+  stops.forEach(function(s, i) {
+    L.push((i + 1) + '. ' + (s.loc || 'Unnamed') + ' | ' + (TYPE_LABELS[s.type] || s.type) + ' | status: ' + (STATUS_LABELS[s.status] || s.status) +
+      (s.addr ? ' | ' + s.addr : '') + (s.contact ? ' | contact: ' + s.contact : '') + (s.phone ? ' | phone: ' + s.phone : '') + (s.notes ? ' | notes: ' + s.notes : '') +
+      (s.updatedBy ? ' | last update by ' + s.updatedBy + ' at ' + s.updatedAt : ''));
+  });
+  return L.join('\n');
+}
+
 init();
 </script>
+<script src="assistant.js"></script>
 </body>
 </html>
