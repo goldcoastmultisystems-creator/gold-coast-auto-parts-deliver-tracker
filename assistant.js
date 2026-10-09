@@ -137,7 +137,7 @@ function sendAssistant() {
       var answer = res.ok && res.data && res.data.answer;
       if (!answer) {
         var err = (res.data && res.data.error) || '';
-        answer = /not configured/i.test(err) ? "The AI isn't switched on yet — the ANTHROPIC_API_KEY still needs to be added in Netlify." : "Sorry, I couldn't answer that right now. Please try again.";
+        answer = /not configured/i.test(err) ? "The AI isn't switched on yet — the GEMINI_API_KEY still needs to be added in Netlify." : (/limit/i.test(err) ? err : "Sorry, I couldn't answer that right now. Please try again.");
       }
       assistantHistory.push({ role: 'assistant', text: answer });
     })
