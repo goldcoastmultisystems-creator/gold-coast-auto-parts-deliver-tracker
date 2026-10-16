@@ -2,7 +2,7 @@
 // Provider: GEMINI_API_KEY (free tier, default) or ANTHROPIC_API_KEY (Claude). If both are set, Gemini
 // is used unless AI_PROVIDER=anthropic. Optional GEMINI_MODEL / ANTHROPIC_MODEL override the models.
 
-var GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+var GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 var ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
 function pickProvider() {
@@ -36,7 +36,7 @@ async function generate(opts) {
         parts.push({ text: m.text });
         return { role: m.role === 'assistant' ? 'model' : 'user', parts: parts };
       }),
-      generationConfig: { maxOutputTokens: maxTokens, temperature: 0.2, thinkingConfig: { thinkingBudget: 0 } }
+      generationConfig: { maxOutputTokens: maxTokens * 3, temperature: 0.2 }
     };
     if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
     if (opts.json) body.generationConfig.responseMimeType = 'application/json';
