@@ -3,6 +3,7 @@
 // is used unless AI_PROVIDER=anthropic. Optional GEMINI_MODEL / ANTHROPIC_MODEL override the models.
 
 var GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+var GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-flash-latest';
 var ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
 function pickProvider() {
@@ -40,14 +41,20 @@ async function generate(opts) {
     };
     if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
     if (opts.json) body.generationConfig.responseMimeType = 'application/json';
-    resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent', {
-      method: 'POST',
-      headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY, 'content-type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    data = await resp.json().catch(function () { return {}; });
+    var models = [GEMINI_MODEL];
+    if (GEMINI_FALLBACK_MODEL && GEMINI_FALLBACK_MODEL !== GEMINI_MODEL) models.push(GEMINI_FALLBACK_MODEL);
+    for (var mi = 0; mi < models.length; mi++) {
+      resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + models[mi] + ':generateContent', {
+        method: 'POST',
+        headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY, 'content-type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      data = await resp.json().catch(function () { return {}; });
+      if (resp.ok || [404, 429, 500, 503].indexOf(resp.status) === -1) break;
+    }
     if (!resp.ok) {
       if (resp.status === 429) throw fail(429, 'The free AI limit was reached for now. Please try again in a bit.');
+      if (resp.status === 503) throw fail(503, 'The AI is busy right now. Please try again in a minute.');
       throw fail(resp.status, (data && data.error && data.error.message) || 'AI request failed.');
     }
     var cand = data.candidates && data.candidates[0];
