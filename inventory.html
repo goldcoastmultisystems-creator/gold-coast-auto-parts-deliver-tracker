@@ -26,30 +26,46 @@ header h1 { font-size: 15px; margin: 0; }
 header .sub { font-size: 11.5px; color: var(--gold-2); }
 .hdr-btn { background: var(--glass); border: 1px solid var(--glass-border); color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 .hdr-btn:hover { background: rgba(212,164,65,0.16); border-color: var(--glass-border-gold); }
-main { max-width: 1100px; margin: 0 auto; padding: 16px; }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+main { max-width: 1150px; margin: 0 auto; padding: 16px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
 .stat { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px; text-align: center; }
+button.stat { color: inherit; font: inherit; cursor: pointer; }
 .stat .num { font-size: 22px; font-weight: 800; }
 .stat .lbl { font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
-.stat.good .num { color: var(--green); } .stat.bad .num { color: var(--red); }
-.controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.controls input { flex: 1 1 260px; border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px 12px; font-size: 14px; background: rgba(255,255,255,0.06); color: var(--text); }
-.seg { display: flex; border: 1px solid var(--glass-border); border-radius: 10px; overflow: hidden; }
-.seg button { background: transparent; border: none; color: var(--text-soft); padding: 9px 13px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.stat.good .num { color: var(--green); } .stat.bad .num { color: var(--red); } .stat.warn .num { color: var(--amber); }
+.stat.alert { border-color: rgba(248,113,113,0.5); }
+.viewtabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.viewtabs button { background: var(--glass); border: 1px solid var(--glass-border); color: var(--text-soft); padding: 9px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.viewtabs button.active { background: rgba(212,164,65,0.22); border-color: var(--glass-border-gold); color: var(--gold-2); }
+.badge { display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 4px; border-radius: 99px; background: rgba(248,113,113,0.25); color: var(--red); font-size: 11px; font-weight: 800; text-align: center; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.controls input[type=search] { flex: 1 1 260px; border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px 12px; font-size: 14px; background: rgba(255,255,255,0.06); color: var(--text); }
+.seg { display: flex; flex-wrap: wrap; border: 1px solid var(--glass-border); border-radius: 10px; overflow: hidden; }
+.seg button { background: transparent; border: none; color: var(--text-soft); padding: 9px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 .seg button.active { background: rgba(212,164,65,0.22); color: var(--gold-2); }
 .meta { font-size: 12px; color: var(--text-soft); margin-bottom: 8px; }
 .notice { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.4); color: var(--amber); border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-bottom: 12px; }
+.rules { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; font-size: 13px; }
+.rules label { display: flex; align-items: center; gap: 6px; color: var(--text-soft); }
+.rules .help { flex-basis: 100%; font-size: 12px; color: var(--text-soft); }
+input.num-input { width: 64px; border: 1px solid var(--glass-border); border-radius: 7px; padding: 6px 8px; font-size: 13px; background: rgba(255,255,255,0.06); color: var(--text); text-align: right; }
+input.num-input:disabled { opacity: .6; }
+select.wh { border: 1px solid var(--glass-border); border-radius: 7px; padding: 5px 6px; font-size: 12px; background: rgba(255,255,255,0.06); color: var(--text); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-soft); padding: 8px 8px; border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; background: #0d0b08; }
-td { padding: 9px 8px; border-bottom: 1px solid var(--glass-border); vertical-align: top; }
+td { padding: 8px 8px; border-bottom: 1px solid var(--glass-border); vertical-align: middle; }
 td.sku { font-weight: 700; color: var(--gold-2); white-space: nowrap; }
 td.num, th.num { text-align: right; white-space: nowrap; }
-.pill { display: inline-block; border-radius: 99px; padding: 2px 9px; font-size: 11px; font-weight: 800; }
-.pill.in { background: rgba(52,211,153,0.15); color: var(--green); }
+.star { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-soft); padding: 0 4px; }
+.star.on { color: var(--gold); }
+.star:disabled { cursor: default; opacity: .5; }
+.pill { display: inline-block; border-radius: 99px; padding: 2px 9px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.pill.ok { background: rgba(52,211,153,0.15); color: var(--green); }
 .pill.out { background: rgba(248,113,113,0.15); color: var(--red); }
 .pill.low { background: rgba(251,191,36,0.15); color: var(--amber); }
 .sub2 { font-size: 11px; color: var(--text-soft); }
 .more { text-align: center; padding: 14px; }
+.reorder-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .btn { border: none; border-radius: 10px; padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
 .btn-navy { background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border-gold); color: var(--gold-2); }
 .btn-navy:hover { background: rgba(212,164,65,0.14); }
@@ -69,7 +85,7 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .modal .modal-sub { font-size: 12.5px; color: var(--text-soft); margin: 0px 0px 14px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .hist-empty { font-size: 12.5px; color: var(--text-soft); font-style: italic; padding: 10px 4px; }
-@media (max-width: 640px) { .hide-sm { display: none; } td, th { padding: 8px 5px; } }
+@media (max-width: 640px) { .hide-sm { display: none; } td, th { padding: 7px 4px; } }
 </style>
 </head>
 <body>
@@ -88,20 +104,61 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 <main>
   <div id="notice"></div>
   <div class="stats" id="stats"></div>
-  <div class="controls">
-    <input id="q" type="search" placeholder="Search SKU, OEM number, make, model, part name…" oninput="renderTable(true)" autocomplete="off">
-    <div class="seg" id="seg">
-      <button data-f="all" class="active" onclick="setFilter('all')">All</button>
-      <button data-f="in" onclick="setFilter('in')">In stock</button>
-      <button data-f="out" onclick="setFilter('out')">Sold out</button>
-    </div>
+  <div class="viewtabs">
+    <button id="tabAll" class="active" onclick="setView('all')">All parts</button>
+    <button id="tabReorder" onclick="setView('reorder')">Reorder list <span class="badge" id="reorderBadge">0</span></button>
   </div>
-  <div class="meta" id="meta"></div>
-  <table>
-    <thead><tr><th>SKU</th><th>Part</th><th class="hide-sm">OEM #</th><th class="num">Qty</th><th class="num">Price</th></tr></thead>
-    <tbody id="rows"></tbody>
-  </table>
-  <div class="more" id="more"></div>
+
+  <div id="allView">
+    <div class="controls">
+      <input id="q" type="search" placeholder="Search SKU, OEM number, make, model, part name…" oninput="renderTable(true)" autocomplete="off">
+    </div>
+    <div class="controls">
+      <div class="seg" id="seg">
+        <button data-f="all" class="active" onclick="setFilter('all')">All</button>
+        <button data-f="ok" onclick="setFilter('ok')">In stock</button>
+        <button data-f="low" onclick="setFilter('low')">Low stock</button>
+        <button data-f="out" onclick="setFilter('out')">Sold out</button>
+        <button data-f="watch" onclick="setFilter('watch')">★ Watching</button>
+      </div>
+      <div class="seg" id="whSeg">
+        <button data-w="all" class="active" onclick="setWarehouseFilter('all')">All locations</button>
+        <button data-w="E2" onclick="setWarehouseFilter('E2')">E2</button>
+        <button data-w="E5" onclick="setWarehouseFilter('E5')">E5</button>
+        <button data-w="E9" onclick="setWarehouseFilter('E9')">E9</button>
+        <button data-w="none" onclick="setWarehouseFilter('none')">Unassigned</button>
+      </div>
+    </div>
+    <div class="meta" id="meta"></div>
+    <table>
+      <thead><tr>
+        <th title="Watch for reorder alerts">★</th><th>SKU</th><th>Part</th><th class="hide-sm">OEM #</th><th class="hide-sm">Loc</th>
+        <th>Status</th><th class="num">Qty</th><th class="num hide-sm" title="Flag as low stock when on hand is at or below this number">Low at</th><th class="num">Price</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="more" id="more"></div>
+  </div>
+
+  <div id="reorderView" style="display:none;">
+    <div class="rules">
+      <label>Flag as low at <input class="num-input" id="defMin" type="number" min="0" step="1" onchange="setDefault('defaultMin', this.value)"> or fewer</label>
+      <label>Order up to <input class="num-input" id="defTarget" type="number" min="0" step="1" onchange="setDefault('defaultTarget', this.value)"> units</label>
+      <div class="help">Only parts you're watching (★) show up here. These levels apply to every part unless you set its own: "Low at" in the All parts view, "Order up to" in the table below.</div>
+    </div>
+    <div class="reorder-bar">
+      <div class="meta" id="reorderSummary" style="margin:0;"></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-navy btn-sm" onclick="shareReorder()">📤 Share list</button>
+        <button class="btn btn-ghost btn-sm" onclick="copyReorder()">📋 Copy</button>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>SKU</th><th>Part</th><th class="hide-sm">Loc</th><th>Status</th><th class="num">On hand</th><th class="num hide-sm">Low at</th><th class="num">Order up to</th><th class="num">Order</th></tr></thead>
+      <tbody id="reorderRows"></tbody>
+    </table>
+    <div class="hist-empty" id="reorderEmpty" style="display:none;"></div>
+  </div>
 </main>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
@@ -118,11 +175,16 @@ var FIREBASE_CONFIG = {
 };
 var FIREBASE_ENABLED = true;
 var fbDb = null, session = null, settings = {};
-var PAGE_SIZE = 100, shown = PAGE_SIZE, filter = 'all', LOW_QTY = 2;
+var PAGE_SIZE = 100, shown = PAGE_SIZE, filter = 'all', whFilter = 'all', view = 'all', canEdit = false;
+var WAREHOUSES = ['E2', 'E5', 'E9'];
+var inv = { defaultMin: 1, defaultTarget: 3, mins: {}, targets: {}, watch: {}, warehouses: {} };
+var LEVEL_LABEL = { ok: 'In Stock', low: 'Low Stock', out: 'Sold Out' };
 
 function loadSession() { try { return JSON.parse(localStorage.getItem('kgps_session')) || null; } catch (e) { return null; } }
 function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
 function doLogout() { localStorage.removeItem('kgps_session'); location.href = 'index.html'; }
+function fbKey(sku) { return String(sku).replace(/[.#$\/\[\]%]/g, function(c) { return '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'); }); }
+function numOrNull(v) { var n = parseInt(v, 10); return isFinite(n) && n >= 0 ? n : null; }
 
 session = loadSession();
 if (!session) {
@@ -131,6 +193,7 @@ if (!session) {
   document.getElementById('who').textContent = (session.name || '') + (session.role ? ' • ' + session.role : '');
   var isSalesOnly = session.type === 'guest' && !session.isAdmin && session.role === 'Sales Rep';
   var isDriverOnly = session.type === 'guest' && !session.isAdmin && session.role === 'Driver';
+  canEdit = session.type === 'owner' || !!session.isAdmin || session.role === 'Dispatcher';
   document.getElementById('backSales').style.display = isDriverOnly ? 'none' : '';
   document.getElementById('backDelivery').style.display = isSalesOnly ? 'none' : '';
   startFirebase();
@@ -141,58 +204,159 @@ function startFirebase() {
   fbDb = firebase.database();
   firebase.auth().onAuthStateChanged(function(user) {
     if (!user) return;
-    loadInventory().then(function() { renderStats(); renderTable(true); });
+    fbDb.ref('gcap/inventory/settings').on('value', function(snap) {
+      var v = snap.val() || {};
+      inv.defaultMin = numOrNull(v.defaultMin) == null ? 1 : numOrNull(v.defaultMin);
+      inv.defaultTarget = numOrNull(v.defaultTarget) == null ? 3 : numOrNull(v.defaultTarget);
+      inv.mins = v.mins || {}; inv.targets = v.targets || {}; inv.watch = v.watch || {}; inv.warehouses = v.warehouses || {};
+      if (inventoryRows) refreshAll(false);
+    });
+    loadInventory().then(function() { refreshAll(true); });
   });
   firebase.auth().signInAnonymously().catch(function() { showNotice('Could not connect. Check your internet and refresh.'); });
 }
 function showNotice(msg) { document.getElementById('notice').innerHTML = msg ? '<div class="notice">' + escapeHtml(msg) + '</div>' : ''; }
 
+/* ---- stock status ---- */
+function minFor(sku) { var m = inv.mins[fbKey(sku)]; return m == null ? inv.defaultMin : m; }
+function targetFor(sku) { var t = inv.targets[fbKey(sku)]; return t == null ? inv.defaultTarget : t; }
+function levelOf(r) { var q = r[2] || 0; return q <= 0 ? 'out' : (q <= minFor(r[0]) ? 'low' : 'ok'); }
+function isWatched(sku) { return !!inv.watch[fbKey(sku)]; }
+function warehouseOf(sku) { return inv.warehouses[fbKey(sku)] || ''; }
+function reorderItems() {
+  if (!inventoryRows) return [];
+  return inventoryRows.filter(function(r) { return isWatched(r[0]) && levelOf(r) !== 'ok'; }).map(function(r) {
+    return { r: r, level: levelOf(r), target: targetFor(r[0]), order: Math.max(0, targetFor(r[0]) - (r[2] || 0)) };
+  }).sort(function(a, b) { return (a.level === 'out' ? 0 : 1) - (b.level === 'out' ? 0 : 1) || String(a.r[0]).localeCompare(String(b.r[0])); });
+}
+
+/* ---- saving shared settings ---- */
+function saveSetting(path, value) {
+  if (!canEdit || !fbDb) return;
+  fbDb.ref('gcap/inventory/settings/' + path).set(value == null ? null : value).catch(function() { showNotice('Could not save that change. Check your connection.'); });
+}
+function toggleWatch(sku) { saveSetting('watch/' + fbKey(sku), isWatched(sku) ? null : true); }
+function setMin(sku, v) { saveSetting('mins/' + fbKey(sku), numOrNull(v)); }
+function setTarget(sku, v) { saveSetting('targets/' + fbKey(sku), numOrNull(v)); }
+function setWarehouse(sku, code) { saveSetting('warehouses/' + fbKey(sku), code || null); }
+function setDefault(name, v) { var n = numOrNull(v); if (n != null) saveSetting(name, n); }
+
+/* ---- views ---- */
+function setView(v) {
+  view = v;
+  document.getElementById('tabAll').classList.toggle('active', v === 'all');
+  document.getElementById('tabReorder').classList.toggle('active', v === 'reorder');
+  document.getElementById('allView').style.display = v === 'all' ? '' : 'none';
+  document.getElementById('reorderView').style.display = v === 'reorder' ? '' : 'none';
+  refreshAll(false);
+}
 function setFilter(f) {
   filter = f;
   Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function(b) { b.classList.toggle('active', b.getAttribute('data-f') === f); });
   renderTable(true);
 }
+function setWarehouseFilter(w) {
+  whFilter = w;
+  Array.prototype.forEach.call(document.querySelectorAll('#whSeg button'), function(b) { b.classList.toggle('active', b.getAttribute('data-w') === w); });
+  renderTable(true);
+}
+function refreshAll(reset) { renderStats(); if (view === 'all') renderTable(!!reset); else renderReorder(); }
+
 function renderStats() {
   if (!inventoryRows) {
     showNotice('Inventory has not been loaded yet. It is copied over from the Stock Board — check back soon.');
     document.getElementById('stats').innerHTML = '';
     return;
   }
-  var inStock = 0, low = 0, units = 0;
-  inventoryRows.forEach(function(r) { if (r[2] > 0) { inStock++; units += r[2]; if (r[2] <= LOW_QTY) low++; } });
+  var counts = { ok: 0, low: 0, out: 0 }, units = 0;
+  inventoryRows.forEach(function(r) { counts[levelOf(r)]++; units += Math.max(0, r[2] || 0); });
+  var need = reorderItems().length;
+  document.getElementById('reorderBadge').textContent = need;
+  document.getElementById('reorderBadge').style.display = need ? '' : 'none';
   var synced = inventoryMeta && inventoryMeta.syncedAt ? new Date(inventoryMeta.syncedAt) : null;
   var ageH = synced ? (Date.now() - synced.getTime()) / 3600000 : null;
   showNotice(ageH != null && ageH > 48 ? 'Inventory data is ' + Math.round(ageH / 24) + ' days old — the daily copy from the Stock Board may not be running.' : '');
   document.getElementById('stats').innerHTML =
     '<div class="stat"><div class="num">' + inventoryRows.length + '</div><div class="lbl">Catalog SKUs</div></div>' +
-    '<div class="stat good"><div class="num">' + inStock + '</div><div class="lbl">In stock</div></div>' +
-    '<div class="stat"><div class="num">' + low + '</div><div class="lbl">Low (≤' + LOW_QTY + ')</div></div>' +
-    '<div class="stat bad"><div class="num">' + (inventoryRows.length - inStock) + '</div><div class="lbl">Sold out</div></div>' +
+    '<div class="stat good"><div class="num">' + counts.ok + '</div><div class="lbl">In stock</div></div>' +
+    '<div class="stat warn"><div class="num">' + counts.low + '</div><div class="lbl">Low stock</div></div>' +
+    '<div class="stat bad"><div class="num">' + counts.out + '</div><div class="lbl">Sold out</div></div>' +
+    '<button class="stat' + (need ? ' alert' : '') + '" type="button" onclick="setView(\'reorder\')"><div class="num" style="color:' + (need ? 'var(--red)' : 'inherit') + '">' + need + '</div><div class="lbl">Needs reorder</div></button>' +
     '<div class="stat"><div class="num">' + units + '</div><div class="lbl">Units on hand</div></div>';
 }
 function matches(r, tokens) {
   var hay = (String(r[0]) + ' ' + String(r[1] || '') + ' ' + String(r[6] || '')).toLowerCase();
   return tokens.every(function(t) { return hay.indexOf(t) !== -1; });
 }
+function pill(level) { return '<span class="pill ' + level + '">' + LEVEL_LABEL[level] + '</span>'; }
 function renderTable(reset) {
   if (reset) shown = PAGE_SIZE;
   var body = document.getElementById('rows');
   if (!inventoryRows) { body.innerHTML = ''; document.getElementById('meta').textContent = ''; document.getElementById('more').innerHTML = ''; return; }
   var tokens = document.getElementById('q').value.toLowerCase().split(/\s+/).filter(Boolean);
   var list = inventoryRows.filter(function(r) {
-    if (filter === 'in' && !(r[2] > 0)) return false;
-    if (filter === 'out' && r[2] > 0) return false;
+    var lv = levelOf(r);
+    if (filter === 'watch') { if (!isWatched(r[0])) return false; }
+    else if (filter !== 'all' && lv !== filter) return false;
+    var wh = warehouseOf(r[0]);
+    if (whFilter === 'none' ? !!wh : (whFilter !== 'all' && wh !== whFilter)) return false;
     return !tokens.length || matches(r, tokens);
   });
-  if (!tokens.length) list.sort(function(a, b) { return (b[2] > 0) - (a[2] > 0) || String(a[0]).localeCompare(String(b[0])); });
-  document.getElementById('meta').textContent = list.length + ' part' + (list.length === 1 ? '' : 's') + (inventoryMeta && inventoryMeta.syncedAt ? ' • synced ' + inventoryMeta.syncedAt.slice(0, 10) : '');
+  if (!tokens.length) list.sort(function(a, b) { return String(a[0]).localeCompare(String(b[0])); });
+  document.getElementById('meta').textContent = list.length + ' part' + (list.length === 1 ? '' : 's') + (inventoryMeta && inventoryMeta.syncedAt ? ' • synced ' + inventoryMeta.syncedAt.slice(0, 10) : '') + (canEdit ? '' : ' • view only');
   body.innerHTML = list.slice(0, shown).map(function(r) {
-    var q = r[2], pill = q <= 0 ? '<span class="pill out">Sold out</span>' : (q <= LOW_QTY ? '<span class="pill low">Low · ' + q + '</span>' : '<span class="pill in">' + q + '</span>');
-    return '<tr><td class="sku">' + escapeHtml(r[0]) + '</td><td>' + escapeHtml(r[6]) + (r[7] ? ' <span class="sub2">grade ' + escapeHtml(r[7]) + '</span>' : '') +
-      '</td><td class="hide-sm sub2">' + escapeHtml(r[1] || '—') + '</td><td class="num">' + pill + '</td><td class="num">' + (r[4] != null ? '$' + Number(r[4]).toFixed(2) : '—') + '</td></tr>';
-  }).join('') || '<tr><td colspan="5" class="sub2" style="padding:18px;">No parts match.</td></tr>';
+    var sku = r[0], q = r[2] || 0, k = escapeHtml(sku), own = inv.mins[fbKey(sku)];
+    var whCell = canEdit
+      ? '<select class="wh" onchange="setWarehouse(\'' + k + '\', this.value)"><option value="">—</option>' + WAREHOUSES.map(function(w) { return '<option' + (warehouseOf(sku) === w ? ' selected' : '') + '>' + w + '</option>'; }).join('') + '</select>'
+      : escapeHtml(warehouseOf(sku) || '—');
+    var lowCell = canEdit
+      ? '<input class="num-input" type="number" min="0" step="1" value="' + (own == null ? '' : own) + '" placeholder="' + inv.defaultMin + '" onchange="setMin(\'' + k + '\', this.value)">'
+      : minFor(sku);
+    return '<tr><td><button class="star' + (isWatched(sku) ? ' on' : '') + '"' + (canEdit ? '' : ' disabled') + ' onclick="toggleWatch(\'' + k + '\')" title="Watch for reorder alerts">' + (isWatched(sku) ? '★' : '☆') + '</button></td>' +
+      '<td class="sku">' + k + '</td><td>' + escapeHtml(r[6]) + (r[7] ? ' <span class="sub2">grade ' + escapeHtml(r[7]) + '</span>' : '') + '</td>' +
+      '<td class="hide-sm sub2">' + escapeHtml(r[1] || '—') + '</td><td class="hide-sm">' + whCell + '</td>' +
+      '<td>' + pill(levelOf(r)) + '</td><td class="num">' + q + '</td><td class="num hide-sm">' + lowCell + '</td>' +
+      '<td class="num">' + (r[4] != null ? '$' + Number(r[4]).toFixed(2) : '—') + '</td></tr>';
+  }).join('') || '<tr><td colspan="9" class="sub2" style="padding:18px;">No parts match.</td></tr>';
   document.getElementById('more').innerHTML = list.length > shown ? '<button class="hdr-btn" onclick="shown += PAGE_SIZE; renderTable(false)">Show more (' + (list.length - shown) + ' left)</button>' : '';
 }
+
+/* ---- reorder list ---- */
+function renderReorder() {
+  var active = document.activeElement;
+  if (active && active.tagName === 'INPUT' && document.getElementById('reorderView').contains(active) && active.id !== 'defMin' && active.id !== 'defTarget') return;
+  document.getElementById('defMin').value = inv.defaultMin; document.getElementById('defTarget').value = inv.defaultTarget;
+  document.getElementById('defMin').disabled = document.getElementById('defTarget').disabled = !canEdit;
+  var items = reorderItems(), tbody = document.getElementById('reorderRows'), empty = document.getElementById('reorderEmpty');
+  var watchedCount = Object.keys(inv.watch).length, totalOrder = items.reduce(function(a, it) { return a + it.order; }, 0);
+  document.getElementById('reorderSummary').textContent = items.length ? items.length + ' part' + (items.length === 1 ? '' : 's') + ' to reorder • ' + totalOrder + ' units' : '';
+  empty.style.display = items.length ? 'none' : '';
+  empty.textContent = watchedCount ? 'Nothing needs reordering — every watched part is above its low level.' : 'No parts are being watched yet. Tap the ☆ next to a part in All parts to watch it.';
+  tbody.innerHTML = items.map(function(it) {
+    var r = it.r, k = escapeHtml(r[0]), own = inv.targets[fbKey(r[0])];
+    var tgt = canEdit ? '<input class="num-input" type="number" min="0" step="1" value="' + (own == null ? '' : own) + '" placeholder="' + inv.defaultTarget + '" onchange="setTarget(\'' + k + '\', this.value)">' : it.target;
+    return '<tr><td class="sku">' + k + '</td><td>' + escapeHtml(r[6]) + '</td><td class="hide-sm">' + escapeHtml(warehouseOf(r[0]) || '—') + '</td><td>' + pill(it.level) + '</td>' +
+      '<td class="num">' + (r[2] || 0) + '</td><td class="num hide-sm">' + minFor(r[0]) + '</td><td class="num">' + tgt + '</td><td class="num"><b>' + it.order + '</b></td></tr>';
+  }).join('');
+}
+function reorderText() {
+  var items = reorderItems();
+  if (!items.length) return '';
+  return 'Gold Coast Auto Parts — reorder list (' + new Date().toLocaleDateString() + ')\n' + items.map(function(it) {
+    return '• ' + it.r[0] + ' — ' + it.r[6] + ' | on hand ' + (it.r[2] || 0) + ', order ' + it.order + (warehouseOf(it.r[0]) ? ' | ' + warehouseOf(it.r[0]) : '');
+  }).join('\n') + '\n\nSent from the Gold Coast Auto Parts web app.';
+}
+function copyReorder() {
+  var t = reorderText();
+  if (!t) { alert('Nothing to reorder right now.'); return; }
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function() { alert('Reorder list copied.'); }, function() { prompt('Copy this list:', t); });
+}
+function shareReorder() {
+  var t = reorderText();
+  if (!t) { alert('Nothing to reorder right now.'); return; }
+  if (navigator.share) navigator.share({ title: 'Reorder list', text: t }).catch(function() {}); else copyReorder();
+}
+
 function assistantBoardContext() { return ''; }
 var assistantBoardName = 'inventory';
 </script>
