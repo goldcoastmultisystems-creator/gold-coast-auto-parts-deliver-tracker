@@ -670,7 +670,7 @@ function metersBetween(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 function checkAutoArrival(lat, lng, driverName) {
-  var next = visibleStops().find(function(s) { return s.status === 'pending' || s.status === 'onway'; });
+  var next = myStops(driverName).find(function(s) { return s.status === 'pending' || s.status === 'onway'; });
   if (!next || typeof next.lat !== 'number' || typeof next.lng !== 'number') return;
   var dist = metersBetween(lat, lng, next.lat, next.lng);
   if (dist <= ARRIVAL_RADIUS_METERS) {
@@ -797,13 +797,14 @@ function isDriverSession() {
 function activeDriverNames() {
   return (settings.team || []).filter(function(m) { return m.role === 'Driver' && m.active !== false; }).map(function(m) { return m.name; });
 }
-function visibleStops() {
-  if (!isDriverSession()) return currentDay.stops;
-  var name = session.name;
-  return currentDay.stops.filter(function(s) { return !s.assignedTo || s.assignedTo === name; });
+function visibleStops() { return currentDay.stops; }
+function myStops(name) {
+  var who = name || (isDriverSession() ? session.name : '');
+  if (!who) return currentDay.stops;
+  return currentDay.stops.filter(function(s) { return !s.assignedTo || s.assignedTo === who; });
 }
 function assignedDriverOptionsHtml(selected) {
-  var opts = '<option value=""'+(!selected?' selected':'')+'>— Unassigned (visible to all drivers) —</option>';
+  var opts = '<option value=""'+(!selected?' selected':'')+'>— Unassigned —</option>';
   activeDriverNames().forEach(function(name) {
     opts += '<option value="'+escapeHtml(name)+'"'+(selected===name?' selected':'')+'>'+escapeHtml(name)+"'s Route</option>";
   });
@@ -1362,7 +1363,7 @@ function renderFeed() {
 }
 function renderNextBanner() {
   var banner = document.getElementById('nextBanner');
-  var stops = visibleStops();
+  var stops = myStops();
   if (!stops.length) { banner.style.display = 'none'; return; }
   var next = stops.find(function(s) { return s.status !== 'completed'; });
   banner.style.display = 'flex';
@@ -1377,7 +1378,7 @@ function renderNextBanner() {
     (next.addr ? '<a href="https://maps.apple.com/?q='+encodeURIComponent(next.addr)+'" target="_blank" rel="noopener">Directions →</a>' : '');
 }
 function currentStopId() {
-  var next = visibleStops().find(function(s) { return s.status !== 'completed'; });
+  var next = myStops().find(function(s) { return s.status !== 'completed'; });
   return next ? next.id : null;
 }
 function renderStops() {
@@ -1388,10 +1389,7 @@ function renderStops() {
     return;
   }
   var curId = currentStopId();
-  if (isDriverSession()) {
-    el.innerHTML = stops.map(function(s, i) { return renderStopCard(s, i, curId); }).join('');
-    return;
-  }
+  var me = isDriverSession() ? session.name : '';
   var groups = {}; var order = [];
   stops.forEach(function(s) {
     var key = s.assignedTo || '__unassigned__';
@@ -1399,12 +1397,14 @@ function renderStops() {
     groups[key].push(s);
   });
   order.sort(function(a, b) {
+    if (me && a === me) return -1;
+    if (me && b === me) return 1;
     if (a === '__unassigned__') return 1;
     if (b === '__unassigned__') return -1;
     return a.localeCompare(b);
   });
   el.innerHTML = order.map(function(key) {
-    var label = key === '__unassigned__' ? 'Unassigned — visible to all drivers' : key + "'s Route";
+    var label = key === '__unassigned__' ? 'Unassigned' : (key === me ? 'Your Route — ' + key : key + "'s Route");
     var groupStops = groups[key];
     return '<div class="route-group">' +
       '<div class="route-group-head">' + escapeHtml(label) + '<span class="route-group-count">' + groupStops.length + '</span></div>' +
@@ -2234,40 +2234,45 @@ function assistantBoardContext() {
 /* ---------- DRAG REORDER ---------- */
 function setupDragAndDrop() {
   var list = document.getElementById('stopsList');
-  var dragEl = null, dragId = null;
+  var dragEl = null, container = null;
+  function cardsIn(box) { return Array.prototype.filter.call(box.children, function(c) { return c.classList.contains('stop-card'); }); }
   list.addEventListener('pointerdown', function(e) {
-    if (!isDriverSession()) return;
     var handle = e.target.closest('.drag-handle');
     if (!handle) return;
     var card = handle.closest('.stop-card');
     if (!card) return;
-    dragId = card.getAttribute('data-id');
+    var stop = currentDay.stops.find(function(x) { return x.id === card.getAttribute('data-id'); });
+    if (isDriverSession() && stop && stop.assignedTo && stop.assignedTo !== session.name) return;
     dragEl = card;
+    container = card.parentNode;
     card.classList.add('dragging');
     document.body.classList.add('reordering');
     e.preventDefault();
   });
   document.addEventListener('pointermove', function(e) {
     if (!dragEl) return;
-    var cards = Array.prototype.slice.call(list.querySelectorAll('.stop-card'));
+    var cards = cardsIn(container);
     var y = e.clientY;
     for (var i = 0; i < cards.length; i++) {
       var c = cards[i];
       if (c === dragEl) continue;
       var r = c.getBoundingClientRect();
-      var mid = r.top + r.height / 2;
-      if (y < mid) { list.insertBefore(dragEl, c); return; }
+      if (y < r.top + r.height / 2) { container.insertBefore(dragEl, c); return; }
     }
-    list.appendChild(dragEl);
+    container.appendChild(dragEl);
   });
   document.addEventListener('pointerup', function() {
     if (!dragEl) return;
     dragEl.classList.remove('dragging');
     document.body.classList.remove('reordering');
-    var order = Array.prototype.slice.call(list.querySelectorAll('.stop-card')).map(function(c) { return c.getAttribute('data-id'); });
-    currentDay.stops.sort(function(a, b) { return order.indexOf(a.id) - order.indexOf(b.id); });
+    var ids = cardsIn(container).map(function(c) { return c.getAttribute('data-id'); });
+    var slots = [];
+    currentDay.stops.forEach(function(s, i) { if (ids.indexOf(s.id) !== -1) slots.push(i); });
+    var byId = {};
+    currentDay.stops.forEach(function(s) { byId[s.id] = s; });
+    slots.forEach(function(slot, n) { currentDay.stops[slot] = byId[ids[n]]; });
     saveDays(days);
-    dragEl = null; dragId = null;
+    dragEl = null; container = null;
     renderAll();
   });
 }
