@@ -107,18 +107,18 @@ function zohoOrderText(o) {
   var extras = [o.reference ? 'Ref ' + o.reference : ''].concat((o.customFields || []).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; })).filter(Boolean).join(' • ');
   var status = [o.orderStatus || o.status, o.paid && 'payment ' + o.paid, o.shipped && 'shipment ' + o.shipped].filter(Boolean).map(function(x) { return String(x).replace(/_/g, ' '); }).join(' • ');
   var lines = (o.lines || []).map(function(l) {
-    return '• ' + l.qty + '× ' + l.name + (l.sku ? ' (' + l.sku + ')' : '') + (l.amount != null ? ' — ' + zohoMoney(m, l.amount) : '');
+    return '• ' + l.qty + '× ' + l.name + (l.sku && String(l.name).indexOf(l.sku) === -1 ? ' (' + l.sku + ')' : '') + (l.amount != null ? ' — ' + zohoMoney(m, l.amount) : '');
   });
-  return 'Gold Coast Auto Parts — Sales Order ' + o.number + '\n' + o.customer +
-    (who ? '\nShared by: ' + who : '') + '\n' +
-    (extras ? '\n' + extras : '') +
-    '\nOrder date: ' + o.date + (o.deliveryDate ? ' • Deliver: ' + o.deliveryDate : '') +
-    (o.method ? '\nDelivery method: ' + o.method : '') + (o.terms ? '\nPayment terms: ' + o.terms : '') + (o.salesperson ? '\nSalesperson: ' + o.salesperson : '') +
-    (status ? '\nStatus: ' + status : '') +
-    (o.shipTo && o.shipTo.text ? '\n\n📍 Ship to: ' + (o.shipTo.attention ? o.shipTo.attention + ', ' : '') + o.shipTo.text + (o.shipTo.phone ? '\n☎ ' + o.shipTo.phone : '') : '') +
-    (lines.length ? '\n\nItems:\n' + lines.join('\n') : '') +
-    (m.total != null ? '\n\nTotal: ' + zohoMoney(m, m.total) : '') +
-    (o.notes ? '\n\nNotes: ' + o.notes : '') + footer;
+  return '🧾 Gold Coast Auto Parts — Sales Order ' + o.number + '\n🏢 ' + o.customer +
+    (who ? '\n👤 Shared by: ' + who : '') + '\n' +
+    (extras ? '\n🔖 ' + extras : '') +
+    '\n📅 Order date: ' + o.date + (o.deliveryDate ? ' • Deliver: ' + o.deliveryDate : '') +
+    (o.method ? '\n🚚 Delivery method: ' + o.method : '') + (o.terms ? '\n💳 Payment terms: ' + o.terms : '') + (o.salesperson ? '\n🧑‍💼 Salesperson: ' + o.salesperson : '') +
+    (status ? '\n⏳ Status: ' + status : '') +
+    (o.shipTo && o.shipTo.text ? '\n\n📍 Ship to: ' + (o.shipTo.attention ? o.shipTo.attention + ', ' : '') + o.shipTo.text + (o.shipTo.phone ? '\n📞 ' + o.shipTo.phone : '') : '') +
+    (lines.length ? '\n\n🔧 Items:\n' + lines.join('\n') : '') +
+    (m.total != null ? '\n\n💰 Total: ' + zohoMoney(m, m.total) : '') +
+    (o.notes ? '\n\n📝 Notes: ' + o.notes : '') + footer;
 }
 function zohoFindOrder(id) { return zohoState.orders.find(function(o) { return o.id === id; }); }
 function zohoWhatsApp(id) {

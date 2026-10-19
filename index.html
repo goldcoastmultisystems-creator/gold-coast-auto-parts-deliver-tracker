@@ -2182,7 +2182,7 @@ function zohoImportOrders(orders, assignedTo) {
     if (zohoIsImported(o)) return;
     var stop = {
       id: uid(), loc: o.customer || 'Zoho order', addr: o.address || '', type: 'delivery', assignedTo: assignedTo || '',
-      so: o.number || '', part: o.lines.map(function(l) { return l.qty + '× ' + l.name + (l.sku ? ' (' + l.sku + ')' : ''); }).join('; '),
+      so: o.number || '', part: o.lines.map(function(l) { return l.qty + '× ' + l.name + (l.sku && String(l.name).indexOf(l.sku) === -1 ? ' (' + l.sku + ')' : ''); }).join('; '),
       mop: o.terms || '', notes: [o.reference ? 'Ref ' + o.reference : '', (o.customFields || []).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; }).filter(Boolean).join(' • '), o.method ? 'Delivery: ' + o.method : '', o.notes || ''].filter(Boolean).join(' • '), status: 'pending', photos: [], chat: [], createdAt: nowTimeStr(), zohoId: o.id
     };
     currentDay.stops.push(stop);
@@ -2626,18 +2626,19 @@ function alertStaleDrivers() {
 }
 function stopShareText(s) {
   var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Delivery Status Board';
-  var videoLinks = (s.videos || []).map(function(v, i) { return 'Video ' + (i + 1) + ': ' + v; }).join('\n');
+  var videoLinks = (s.videos || []).map(function(v, i) { return '🎥 Video ' + (i + 1) + ': ' + v; }).join('\n');
   var photoCount = (s.photos || []).length;
-  var narrative = s.loc + (s.addr ? ' — ' + s.addr : '') + '\nThis ' + (TYPE_LABELS[s.type] || 'stop').toLowerCase() + ' ' +
+  var STATUS_EMOJI = { pending: '⏳', onway: '🚚', arrived: '📌', completed: '✅', postponed: '⏸️', returned: '🔄' };
+  var narrative = '🏢 ' + s.loc + (s.addr ? '\n📍 ' + s.addr : '') + '\n' + (STATUS_EMOJI[s.status] || 'ℹ️') + ' This ' + (TYPE_LABELS[s.type] || 'stop').toLowerCase() + ' ' +
     (STATUS_NARRATIVE[s.status] || ('is marked ' + STATUS_LABELS[s.status])) +
     (s.status === 'returned' && s.returnReason ? ' (' + s.returnReason + ')' : '') + '.' +
     (s.updatedBy ? ' Last updated by ' + s.updatedBy + ' at ' + s.updatedAt + '.' : '');
-  var text = header + '\nUpdate generated: ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + '\nShared by: ' + currentUserLabel() + '\n\n' +
+  var text = '🚚 ' + header + '\n🕒 Update generated: ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + '\n👤 Shared by: ' + currentUserLabel() + '\n\n' +
     narrative +
-    (s.so ? '\nSO# ' + s.so : '') + (s.part ? '\nPart: ' + s.part : '') + (s.mop ? '\nPayment: ' + s.mop : '') +
-    (s.status === 'returned' && s.returnNotes ? '\nReturn Notes: ' + s.returnNotes : '') +
-    (s.notes ? '\nNotes: ' + s.notes : '') +
-    (photoCount ? '\n' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + ' attached' : '') +
+    (s.so ? '\n🧾 SO# ' + s.so : '') + (s.part ? '\n🔧 Part: ' + s.part : '') + (s.mop ? '\n💳 Payment: ' + s.mop : '') +
+    (s.status === 'returned' && s.returnNotes ? '\n↩️ Return Notes: ' + s.returnNotes : '') +
+    (s.notes ? '\n📝 Notes: ' + s.notes : '') +
+    (photoCount ? '\n📷 ' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + ' attached' : '') +
     (videoLinks ? '\n\n' + videoLinks : '') +
     shareFooter();
   return text;
