@@ -86,7 +86,7 @@ exports.handler = async function (event) {
         id: o.salesorder_id, number: o.salesorder_number, reference: o.reference_number || '',
         customer: o.customer_name || d.customer_name || '', date: o.date || '', deliveryDate: o.delivery_date || d.delivery_date || '',
         status: lower(o.status), shipped: o.shipped_status || '', paid: o.paid_status || '', method: o.delivery_method || d.delivery_method || '',
-        salesperson: o.salesperson_name || '', address: addressText(ship), phone: ship.phone || d.contact_person_details && d.contact_person_details[0] && d.contact_person_details[0].phone || '',
+        salesperson: o.salesperson_name || '', location: o.location_name || d.location_name || '', address: addressText(ship), phone: ship.phone || d.contact_person_details && d.contact_person_details[0] && d.contact_person_details[0].phone || '',
         terms: d.payment_terms_label || '', notes: d.notes || '',
         lines: (d.line_items || []).map(function (li) { return { name: li.name || li.description || '', sku: li.sku || '', qty: li.quantity }; })
       };
