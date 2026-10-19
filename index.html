@@ -2639,7 +2639,7 @@ function stopShareText(s) {
     (s.updatedBy ? ' Last updated by ' + s.updatedBy + ' at ' + s.updatedAt + '.' : '');
   var text = '🚚 ' + header + '\n🕒 Update generated: ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + '\n👤 Shared by: ' + currentUserLabel() + '\n\n' +
     narrative +
-    (s.so ? '\n🧾 SO# ' + s.so : '') + (s.part ? '\n🔧 Part: ' + cleanPartText(s.part) : '') + (s.mop ? '\n💳 Payment: ' + s.mop : '') +
+    (s.so ? '\n🧾 SO# ' + s.so : '') + (partsLine(s.part) ? '\n' + partsLine(s.part) : '') + (s.mop ? '\n💳 Payment: ' + s.mop : '') +
     (s.status === 'returned' && s.returnNotes ? '\n↩️ Return Notes: ' + s.returnNotes : '') +
     (s.notes ? '\n📝 Notes: ' + s.notes : '') +
     (photoCount ? '\n📷 ' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + ' attached' : '') +
@@ -2673,6 +2673,25 @@ function shareStop(id) {
 }
 var SHARE_STATUS_EMOJI = { pending: '⏳', onway: '🚚', arrived: '📌', completed: '✅', postponed: '⏸️', returned: '🔄' };
 function cleanPartText(p) { return String(p || '').replace(/\b([A-Za-z0-9]{5,})\s*\(\1\)/g, '$1'); }
+function partItems(part) {
+  var s = cleanPartText(part), items = [], depth = 0, cur = '';
+  for (var i = 0; i < s.length; i++) {
+    var ch = s.charAt(i);
+    if (ch === '(') depth++; else if (ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === ';' && depth === 0) { items.push(cur); cur = ''; } else cur += ch;
+  }
+  items.push(cur);
+  return items.map(function(x) {
+    x = x.replace(/\s+/g, ' ').trim();
+    var m = /^(\d+)\s*×\s*(.*)$/.exec(x);
+    return m ? (Number(m[1]) > 1 ? m[1] + '× ' : '') + m[2] : x;
+  }).filter(Boolean);
+}
+function partsLine(part) {
+  var items = partItems(part);
+  if (!items.length) return '';
+  return items.length === 1 ? '🔧 ' + items[0] : '🔧\n' + items.map(function(x) { return '- ' + x; }).join('\n');
+}
 function listShareText() {
   var stops = visibleStops();
   if (!stops.length) return '';
@@ -2683,7 +2702,7 @@ function listShareText() {
     .map(function(k) { return SHARE_STATUS_EMOJI[k] + ' ' + counts[k] + ' ' + STATUS_LABELS[k].toLowerCase(); }).join(' • ');
   function stopBlock(s, i) {
     return (i + 1) + '. ' + (SHARE_STATUS_EMOJI[s.status] || '•') + ' ' + s.loc + (s.so ? ' — SO# ' + s.so : '') +
-      (s.addr ? '\n   📍 ' + s.addr : '') + (s.part ? '\n   🔧 ' + cleanPartText(s.part) : '') + (s.mop ? '\n   💳 ' + s.mop : '') +
+      (s.addr ? '\n   📍 ' + s.addr : '') + (partsLine(s.part) ? '\n   ' + partsLine(s.part) : '') + (s.mop ? '\n   💳 ' + s.mop : '') +
       (s.updatedBy ? '\n   🕒 ' + STATUS_LABELS[s.status] + ' — ' + s.updatedBy + ', ' + s.updatedAt : '');
   }
   var groups = {}, order = [];
