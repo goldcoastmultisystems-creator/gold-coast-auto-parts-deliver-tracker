@@ -1467,7 +1467,7 @@ function renderStopCard(s, i, curId) {
       '<div class="details">' +
         (s.so ? '<div><b>SO#:</b> '+escapeHtml(s.so)+'</div>' : '') +
         (s.mop ? '<div><b>Payment:</b> '+escapeHtml(s.mop)+'</div>' : '') +
-        (s.part ? '<div class="full"><b>Part:</b> '+escapeHtml(s.part)+'</div>' : '') +
+        (s.part ? '<div class="full"><b>Part:</b> '+escapeHtml(cleanPartText(s.part))+'</div>' : '') +
         (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+(s.returnResolved ? ' <span style="color:var(--green); font-weight:700;">✅ Shelved</span>' : ' <span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>')+'</div>' : '') +
         (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a></div>' : '') +
       '</div>' +
@@ -2639,7 +2639,7 @@ function stopShareText(s) {
     (s.updatedBy ? ' Last updated by ' + s.updatedBy + ' at ' + s.updatedAt + '.' : '');
   var text = '🚚 ' + header + '\n🕒 Update generated: ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + '\n👤 Shared by: ' + currentUserLabel() + '\n\n' +
     narrative +
-    (s.so ? '\n🧾 SO# ' + s.so : '') + (s.part ? '\n🔧 Part: ' + s.part : '') + (s.mop ? '\n💳 Payment: ' + s.mop : '') +
+    (s.so ? '\n🧾 SO# ' + s.so : '') + (s.part ? '\n🔧 Part: ' + cleanPartText(s.part) : '') + (s.mop ? '\n💳 Payment: ' + s.mop : '') +
     (s.status === 'returned' && s.returnNotes ? '\n↩️ Return Notes: ' + s.returnNotes : '') +
     (s.notes ? '\n📝 Notes: ' + s.notes : '') +
     (photoCount ? '\n📷 ' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + ' attached' : '') +
@@ -2672,6 +2672,7 @@ function shareStop(id) {
   }
 }
 var SHARE_STATUS_EMOJI = { pending: '⏳', onway: '🚚', arrived: '📌', completed: '✅', postponed: '⏸️', returned: '🔄' };
+function cleanPartText(p) { return String(p || '').replace(/\b([A-Za-z0-9]{5,})\s*\(\1\)/g, '$1'); }
 function listShareText() {
   var stops = visibleStops();
   if (!stops.length) return '';
@@ -2682,7 +2683,7 @@ function listShareText() {
     .map(function(k) { return SHARE_STATUS_EMOJI[k] + ' ' + counts[k] + ' ' + STATUS_LABELS[k].toLowerCase(); }).join(' • ');
   function stopBlock(s, i) {
     return (i + 1) + '. ' + (SHARE_STATUS_EMOJI[s.status] || '•') + ' ' + s.loc + (s.so ? ' — SO# ' + s.so : '') +
-      (s.addr ? '\n   📍 ' + s.addr : '') + (s.part ? '\n   🔧 ' + s.part : '') + (s.mop ? '\n   💳 ' + s.mop : '') +
+      (s.addr ? '\n   📍 ' + s.addr : '') + (s.part ? '\n   🔧 ' + cleanPartText(s.part) : '') + (s.mop ? '\n   💳 ' + s.mop : '') +
       (s.updatedBy ? '\n   🕒 ' + STATUS_LABELS[s.status] + ' — ' + s.updatedBy + ', ' + s.updatedAt : '');
   }
   var groups = {}, order = [];
@@ -2691,7 +2692,7 @@ function listShareText() {
   var body = order.map(function(k) {
     var list = groups[k];
     var title = order.length === 1 && k === '' ? '' : (k ? "👤 " + k + "'s route" : '👥 Unassigned') + ' (' + list.length + ')\n';
-    return title + list.map(stopBlock).join('\n');
+    return title + list.map(stopBlock).join('\n\n');
   }).join('\n\n');
   return '🚚 ' + header + '\n📅 ' + fmtDateDisplay(todayKey()) + ' • 🕒 ' + nowTimeStr() + '\n👤 Shared by: ' + currentUserLabel() + '\n\n' +
     '📦 ' + stops.length + ' order' + (stops.length === 1 ? '' : 's') + ' today' + (summary ? ': ' + summary : '') + '\n\n' + body + shareFooter();
