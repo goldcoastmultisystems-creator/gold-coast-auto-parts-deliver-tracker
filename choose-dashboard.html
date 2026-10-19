@@ -51,8 +51,6 @@ function loadSession() {
 var session = loadSession();
 if (!session) {
   window.location.href = 'index.html';
-} else if (session.type === 'guest' && !session.isAdmin && session.role === 'Driver') {
-  window.location.href = 'index.html';
 } else if (session.type === 'guest' && !session.isAdmin && session.role === 'Sales Rep') {
   window.location.href = 'sales-routes.html';
 } else {

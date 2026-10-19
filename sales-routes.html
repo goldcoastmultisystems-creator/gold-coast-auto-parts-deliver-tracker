@@ -1174,20 +1174,11 @@ function getDay(key) {
   return days[key];
 }
 
-function enforcePageAccess() {
-  if (session && session.type === 'guest' && !session.isAdmin && session.role === 'Driver') {
-    window.location.href = 'index.html';
-    return true;
-  }
-  return false;
-}
-
 function init() {
   maybeShowStorageWarning();
   days = normalizeDays(loadDays());
   settings = loadSettings();
   session = loadSession();
-  if (enforcePageAccess()) return;
   currentDay = getDay(todayKey());
   currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
   if (!settings.team) { settings.team = []; saveSettings(settings); }
@@ -1297,8 +1288,7 @@ function guestLogin() {
   session = { type: 'guest', name: memberObj.name, role: memberObj.role, memberId: memberObj.memberId, isAdmin: memberObj.isAdmin, auth: memberObj.memberId ? { type: 'team', memberId: memberObj.memberId, pin: pin } : null };
   saveSession(session);
   updateSettingsFields({ driverName: memberObj.name });
-  if (enforcePageAccess()) return;
-  if (session.type === 'guest' && !session.isAdmin && session.role === 'Dispatcher') {
+  if (session.type === 'guest' && !session.isAdmin && (session.role === 'Dispatcher' || session.role === 'Driver')) {
     window.location.href = 'choose-dashboard.html';
     return;
   }

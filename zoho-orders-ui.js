@@ -17,7 +17,7 @@ function zohoAuthPayload() {
   return a.type === 'owner' ? { type: 'owner', email: a.email, password: a.password } : { type: 'team', memberId: a.memberId, pin: a.pin };
 }
 function zohoPanelAllowed() {
-  return !!session && !(session.type === 'guest' && !session.isAdmin && session.role === 'Driver');
+  return !!session;
 }
 function mountZohoPanel() {
   if (document.getElementById('zohoPanelWrap')) return;

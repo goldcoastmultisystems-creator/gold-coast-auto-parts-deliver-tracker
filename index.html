@@ -764,11 +764,6 @@ function syncRoleUI() {
     if (session && session.type === 'guest') sel.value = session.role || 'Driver';
   }
   nameInput.disabled = !!(session && session.type === 'guest');
-  var salesBtn = document.getElementById('salesNavBtn');
-  if (salesBtn) {
-    var hideSales = !!(session && session.type === 'guest' && !session.isAdmin && session.role === 'Driver');
-    salesBtn.style.display = hideSales ? 'none' : '';
-  }
   syncTrackingToggleUI();
 }
 
@@ -1265,7 +1260,7 @@ function guestLogin() {
   saveSession(session);
   updateSettingsFields({ driverName: memberObj.name, driverRole: memberObj.role });
   if (enforcePageAccess()) return;
-  if (session.type === 'guest' && !session.isAdmin && session.role === 'Dispatcher') {
+  if (session.type === 'guest' && !session.isAdmin && (session.role === 'Dispatcher' || session.role === 'Driver')) {
     window.location.href = 'choose-dashboard.html';
     return;
   }

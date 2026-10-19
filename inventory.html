@@ -196,9 +196,7 @@ if (!session) {
 } else {
   document.getElementById('who').textContent = (session.name || '') + (session.role ? ' • ' + session.role : '');
   var isSalesOnly = session.type === 'guest' && !session.isAdmin && session.role === 'Sales Rep';
-  var isDriverOnly = session.type === 'guest' && !session.isAdmin && session.role === 'Driver';
   canEdit = session.type === 'owner' || !!session.isAdmin || session.role === 'Dispatcher';
-  document.getElementById('backSales').style.display = isDriverOnly ? 'none' : '';
   document.getElementById('backDelivery').style.display = isSalesOnly ? 'none' : '';
   startFirebase();
 }
