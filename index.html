@@ -403,6 +403,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <button class="hdr-btn" onclick="openPartsToPurchase()">Parts to Purchase</button>
       <button class="hdr-btn" onclick="openReturnsModal()">🔄 Returns</button>
       <button class="hdr-btn" id="checksBtn" onclick="openChecksModal()">💵 Checks</button>
+      <button class="hdr-btn" onclick="openZohoOrders()">🧾 Zoho Orders</button>
       <button class="hdr-btn" onclick="openAssistantModal()">🤖 Ask AI</button>
       <button class="hdr-btn" onclick="location.href='inventory.html'">📦 Inventory Management →</button>
       <button class="hdr-btn" id="manageTeamBtn" onclick="openTeamModal()" style="display:none;">👥 Manage Team</button>
@@ -1233,7 +1234,7 @@ function ownerLogin() {
   if (email.toLowerCase() !== (settings.ownerEmail || '').toLowerCase() || pw !== settings.ownerPassword) {
     setAuthMsg('Incorrect email or password.', 'err'); return;
   }
-  session = { type: 'owner', name: settings.driverName || 'Owner', role: 'Dispatcher' };
+  session = { type: 'owner', name: settings.driverName || 'Owner', role: 'Dispatcher', auth: { type: 'owner', email: email, password: pw } };
   saveSession(session);
   window.location.href = 'choose-dashboard.html';
 }
@@ -1255,7 +1256,7 @@ function guestLogin() {
     if (pin !== member.pin) { setAuthMsg('Incorrect password.', 'err'); return; }
     memberObj = { name: member.name, role: member.role, memberId: member.id, isAdmin: !!member.isAdmin };
   }
-  session = { type: 'guest', name: memberObj.name, role: memberObj.role, memberId: memberObj.memberId, isAdmin: memberObj.isAdmin };
+  session = { type: 'guest', name: memberObj.name, role: memberObj.role, memberId: memberObj.memberId, isAdmin: memberObj.isAdmin, auth: memberObj.memberId ? { type: 'team', memberId: memberObj.memberId, pin: pin } : null };
   saveSession(session);
   updateSettingsFields({ driverName: memberObj.name, driverRole: memberObj.role });
   if (enforcePageAccess()) return;
@@ -2169,6 +2170,32 @@ function deleteCheckEntry(dateKey, stopId, checkId) {
   renderChecksList();
 }
 
+/* ---------- ZOHO ORDERS -> deliveries (dashboard lives in zoho-orders-ui.js) ---------- */
+function zohoCanImport() { return !!session && !isDriverSession() && (session.type === 'owner' || !!session.isAdmin || session.role === 'Dispatcher'); }
+function zohoIsImported(o) {
+  return Object.keys(days).some(function(k) { return (days[k].stops || []).some(function(s) { return s.zohoId === o.id; }); });
+}
+function zohoImportOrders(orders, assignedTo) {
+  var added = [];
+  orders.forEach(function(o) {
+    if (zohoIsImported(o)) return;
+    var stop = {
+      id: uid(), loc: o.customer || 'Zoho order', addr: o.address || '', type: 'delivery', assignedTo: assignedTo || '',
+      so: o.number || '', part: o.lines.map(function(l) { return l.qty + '× ' + l.name + (l.sku ? ' (' + l.sku + ')' : ''); }).join('; '),
+      mop: o.terms || '', notes: o.notes || '', status: 'pending', photos: [], chat: [], createdAt: nowTimeStr(), zohoId: o.id
+    };
+    currentDay.stops.push(stop);
+    added.push(stop);
+  });
+  if (added.length) {
+    addActivity('Zoho Import', added.length + ' order(s) added from Zoho' + (assignedTo ? ' as ' + assignedTo + "'s route" : ''));
+    saveDays(days);
+    added.forEach(geocodeStop);
+    renderAll();
+  }
+  return added.length;
+}
+
 /* ---------- ASK AI board snapshot (chat panel + inventory lookup live in assistant.js) ---------- */
 var assistantBoardName = 'delivery';
 function assistantBoardContext() {
@@ -2661,5 +2688,6 @@ function shareText(title, text) {
 init();
 </script>
 <script src="assistant.js"></script>
+<script src="zoho-orders-ui.js"></script>
 </body>
 </html>

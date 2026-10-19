@@ -84,6 +84,9 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .modal h3 { margin: 0px 0px 6px; color: var(--gold-2); font-size: 16px; }
 .modal .modal-sub { font-size: 12.5px; color: var(--text-soft); margin: 0px 0px 14px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.edit-input { width: 100%; border: 1px solid var(--glass-border); border-radius: 7px; padding: 6px 9px; font-size: 12.5px; background: rgba(255,255,255,0.06); color: var(--text); }
+.team-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--glass-border); flex-wrap: wrap; }
+.team-row .tname { font-weight: 700; color: var(--text); font-size: 13.5px; }
 .hist-empty { font-size: 12.5px; color: var(--text-soft); font-style: italic; padding: 10px 4px; }
 @media (max-width: 640px) { .hide-sm { display: none; } td, th { padding: 7px 4px; } }
 </style>
@@ -95,6 +98,7 @@ td.num, th.num { text-align: right; white-space: nowrap; }
     <div><h1>Inventory Management</h1><div class="sub" id="who"></div></div>
   </div>
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <button class="hdr-btn" onclick="openZohoOrders()">🧾 Zoho Orders</button>
     <button class="hdr-btn" onclick="openAssistantModal()">🤖 Ask AI</button>
     <button class="hdr-btn" id="backDelivery" onclick="location.href='index.html'">🚚 Delivery</button>
     <button class="hdr-btn" id="backSales" onclick="location.href='sales-routes.html'">🧾 Sales Routes</button>
@@ -361,5 +365,6 @@ function assistantBoardContext() { return ''; }
 var assistantBoardName = 'inventory';
 </script>
 <script src="assistant.js"></script>
+<script src="zoho-orders-ui.js"></script>
 </body>
 </html>
