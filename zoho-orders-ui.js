@@ -1,6 +1,12 @@
 /* Zoho Sales Orders panel shown at the top of the Delivery, Sales Rep and Inventory pages (read-only).
    The delivery page can add orders as stops by defining: zohoCanImport(), zohoIsImported(order),
    zohoImportOrders(orders, driver) and assignedDriverOptionsHtml(). Needs assistant.js loaded first (inventory lookup). */
+/* Dark, readable dropdown lists on every page (the browser's default list is white with light text). */
+(function() {
+  var st = document.createElement('style');
+  st.textContent = 'select { color-scheme: dark; } select option, select optgroup { background-color: #1a1713; color: #f3f1ec; }';
+  document.head.appendChild(st);
+})();
 var ZOHO_ORDERS_ENDPOINT = '/.netlify/functions/zoho-orders';
 var ZOHO_REFRESH_MS = 5 * 60 * 1000;
 var zohoState = { orders: [], counts: {}, loading: false, loaded: false, error: '', statuses: 'confirmed', q: '', selected: {}, truncated: false, open: {}, collapsed: false, lastLoaded: 0 };
