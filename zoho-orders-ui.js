@@ -100,6 +100,62 @@ function renderZohoOrders() {
   renderZohoList();
   renderZohoActions();
 }
+function zohoMoney(m, n) {
+  if (n == null || n === '' || isNaN(Number(n))) return '';
+  var v = Number(n), sym = (m && m.symbol) || '$';
+  return (v < 0 ? '-' : '') + sym + Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function zohoStatusChip(label, value) {
+  if (!value) return '';
+  value = String(value).replace(/_/g, ' ');
+  var v = String(value).toLowerCase(), good = /paid|fulfilled|shipped|delivered|invoiced|packed|closed/.test(v) && !/un|not|part/.test(v), bad = /unpaid|pending|not |partially|backorder/.test(v);
+  var color = good ? 'var(--green)' : (bad ? 'var(--amber)' : 'var(--text-soft)');
+  return '<span style="font-size:11.5px; margin-right:12px;"><span style="color:var(--text-soft);">' + escapeHtml(label) + '</span> <b style="color:' + color + ';">' + escapeHtml(value) + '</b></span>';
+}
+function zohoField(label, value) {
+  if (!value) return '';
+  return '<div style="min-width:150px;"><div style="font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft);">' + escapeHtml(label) + '</div><div style="font-size:12.5px;">' + escapeHtml(String(value)) + '</div></div>';
+}
+function zohoAddressBlock(title, a) {
+  if (!a || !a.text) return '';
+  return '<div style="flex:1 1 220px;"><div style="font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft);">' + title + '</div>' +
+    '<div style="font-size:12.5px;">' + (a.company ? '<b>' + escapeHtml(a.company) + '</b><br>' : '') + (a.attention ? escapeHtml(a.attention) + '<br>' : '') + escapeHtml(a.text) + (a.phone ? '<br>' + escapeHtml(a.phone) : '') + '</div></div>';
+}
+function zohoDetailHtml(o) {
+  var m = o.money || {};
+  var cell = 'padding:6px 8px; border-bottom:1px solid var(--glass-border); vertical-align:top;';
+  var rows = o.lines.map(function(l) {
+    var progress = [l.packed != null ? l.packed + ' packed' : '', l.invoiced != null ? l.invoiced + ' invoiced' : '', l.shipped ? l.shipped + ' shipped' : '', l.backordered ? l.backordered + ' backordered' : ''].filter(Boolean).join(' • ');
+    return '<tr><td style="' + cell + '"><b>' + escapeHtml(l.name) + '</b>' + (l.sku ? '<div style="font-size:11px; color:var(--gold-2);">SKU: ' + escapeHtml(l.sku) + '</div>' : '') +
+      (l.description && l.description !== l.name ? '<div style="font-size:11px; color:var(--text-soft);">' + escapeHtml(l.description) + '</div>' : '') + '<div style="font-size:11px;">' + zohoStockTag(l).trim() + '</div></td>' +
+      '<td style="' + cell + ' text-align:right; white-space:nowrap;">' + escapeHtml(String(l.qty)) + (l.unit ? ' <span style="color:var(--text-soft); font-size:11px;">' + escapeHtml(l.unit) + '</span>' : '') + '</td>' +
+      '<td style="' + cell + ' font-size:11.5px;">' + escapeHtml(l.location || '') + '</td>' +
+      '<td style="' + cell + ' font-size:11.5px; color:var(--text-soft);">' + escapeHtml(progress) + '</td>' +
+      '<td style="' + cell + ' text-align:right; white-space:nowrap;">' + zohoMoney(m, l.rate) + '</td>' +
+      '<td style="' + cell + ' text-align:right; white-space:nowrap; font-weight:700;">' + zohoMoney(m, l.amount) + '</td></tr>';
+  }).join('');
+  function totalRow(label, value, bold) { return value == null || value === '' ? '' : '<tr><td style="padding:3px 8px; text-align:right; color:var(--text-soft);">' + label + '</td><td style="padding:3px 8px; text-align:right;' + (bold ? ' font-weight:800; font-size:14px;' : '') + '">' + zohoMoney(m, value) + '</td></tr>'; }
+  return '<div style="margin-top:10px; padding:10px; border:1px solid var(--glass-border); border-radius:10px; background:rgba(0,0,0,0.25);">' +
+    (o.backordered ? '<div style="background:rgba(251,191,36,0.12); border:1px solid rgba(251,191,36,0.4); color:var(--amber); border-radius:8px; padding:6px 10px; font-size:12px; margin-bottom:8px;">⚠ Some items need backordering.</div>' : '') +
+    '<div style="margin-bottom:8px;">' + zohoStatusChip('Order', o.orderStatus || o.status) + zohoStatusChip('Invoice', o.invoiced) + zohoStatusChip('Payment', o.paid) + zohoStatusChip('Shipment', o.shipped) + '</div>' +
+    '<div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:10px;">' + zohoAddressBlock('Billing address', o.billTo) + zohoAddressBlock('Shipping address', o.shipTo) + '</div>' +
+    '<div style="display:flex; gap:14px 24px; flex-wrap:wrap; margin-bottom:10px;">' +
+      zohoField('Reference #', o.reference) + zohoField('Order date', o.date) + zohoField('Delivery date', o.deliveryDate) + zohoField('Payment terms', o.terms) + zohoField('Delivery method', o.method) +
+      zohoField('Salesperson', o.salesperson) + zohoField('Location', o.location) + zohoField('Contact', [o.contact, o.contactEmail].filter(Boolean).join(' • ')) +
+      (o.customFields || []).map(function(c) { return zohoField(c.label, c.value); }).join('') + '</div>' +
+    (o.lines.length
+      ? '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:12.5px;"><thead><tr>' +
+        ['Items &amp; description', 'Ordered', 'Location', 'Status', 'Rate', 'Amount'].map(function(h, i) { return '<th style="text-align:' + (i === 0 || i === 2 || i === 3 ? 'left' : 'right') + '; font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft); padding:6px 8px; border-bottom:1px solid var(--glass-border);">' + h + '</th>'; }).join('') +
+        '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        '<div style="display:flex; justify-content:flex-end;"><table style="border-collapse:collapse; font-size:12.5px;">' +
+          totalRow('Sub total', m.subTotal) + (o.totalQty != null ? '<tr><td colspan="2" style="padding:0 8px 4px; text-align:right; font-size:11px; color:var(--text-soft);">Total quantity: ' + escapeHtml(String(o.totalQty)) + '</td></tr>' : '') +
+          (m.discount ? totalRow('Discount', -Math.abs(m.discount)) : '') + totalRow('Shipping', m.shipping || null) + totalRow('Tax', m.tax || null) + totalRow('Adjustment', m.adjustment || null) + totalRow('Total', m.total, true) +
+        '</table></div>'
+      : '<div style="color:var(--text-soft); font-size:12.5px;">No line items.</div>') +
+    (o.notes ? '<div style="margin-top:8px; font-size:12.5px;"><b>Notes:</b> ' + escapeHtml(o.notes) + '</div>' : '') +
+    (o.termsText ? '<details style="margin-top:8px;"><summary style="cursor:pointer; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft);">Terms &amp; conditions</summary><div style="font-size:11.5px; color:var(--text-soft); white-space:pre-wrap; margin-top:4px;">' + escapeHtml(o.termsText) + '</div></details>' : '') +
+  '</div>';
+}
 function zohoVisible() {
   return zohoState.orders.filter(function(o) { return !zohoState.q || (o.customer + ' ' + o.number + ' ' + o.reference).toLowerCase().indexOf(zohoState.q) !== -1; });
 }
@@ -118,16 +174,18 @@ function renderZohoList() {
   el.innerHTML = list.map(function(o) {
     var done = canImport && typeof zohoIsImported === 'function' && zohoIsImported(o);
     var chips = [o.method, o.shipped && 'shipment ' + o.shipped, o.paid && o.paid, o.location].filter(Boolean).map(escapeHtml).join(' • ');
+    var open = !!zohoState.open[o.id];
     return '<div class="team-row" style="align-items:flex-start;">' +
       (canImport ? '<input type="checkbox" style="width:auto; margin-top:4px;"' + (done ? ' disabled' : (zohoState.selected[o.id] ? ' checked' : '')) + ' onchange="zohoToggleSelect(\'' + escapeHtml(o.id) + '\')">' : '') +
-      '<div style="flex:1 1 260px; min-width:220px; cursor:pointer;" onclick="zohoToggleOpen(\'' + escapeHtml(o.id) + '\')">' +
-        '<span class="tname">' + escapeHtml(o.customer) + '</span> <span style="font-size:12px; color:var(--gold-2);">' + escapeHtml(o.number) + '</span>' +
-        (done ? ' <span style="font-size:11px; color:var(--green); font-weight:700;">✓ On delivery board</span>' : '') +
-        '<div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">' + escapeHtml(o.date) + (o.deliveryDate ? ' • deliver ' + escapeHtml(o.deliveryDate) : '') + (chips ? ' • ' + chips : '') + '</div>' +
-        (zohoState.open[o.id]
-          ? '<div style="font-size:12.5px; margin-top:6px;">' + (o.address ? '📍 ' + escapeHtml(o.address) + '<br>' : '') + (o.terms ? 'Terms: ' + escapeHtml(o.terms) + '<br>' : '') + (o.notes ? 'Notes: ' + escapeHtml(o.notes) + '<br>' : '') +
-            (o.lines.length ? o.lines.map(function(l) { return '• ' + escapeHtml(String(l.qty)) + '× ' + escapeHtml(l.name) + (l.sku ? ' <span style="color:var(--text-soft);">(' + escapeHtml(l.sku) + ')</span>' : '') + zohoStockTag(l); }).join('<br>') : '<span style="color:var(--text-soft);">No line items.</span>') + '</div>'
-          : '<div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">' + (o.address ? escapeHtml(o.address) + ' • ' : '') + o.lines.length + ' item' + (o.lines.length === 1 ? '' : 's') + ' — tap for details</div>') +
+      '<div style="flex:1 1 260px; min-width:220px;">' +
+        '<div style="cursor:pointer;" onclick="zohoToggleOpen(\'' + escapeHtml(o.id) + '\')">' +
+          '<div style="display:flex; gap:8px; align-items:baseline;"><span class="tname">' + escapeHtml(o.customer) + '</span> <span style="font-size:12px; color:var(--gold-2);">' + escapeHtml(o.number) + '</span>' +
+          (done ? ' <span style="font-size:11px; color:var(--green); font-weight:700;">✓ On delivery board</span>' : '') +
+          (o.backordered ? ' <span style="font-size:11px; color:var(--amber); font-weight:700;">⚠ Backorder</span>' : '') +
+          '<span style="margin-left:auto; font-weight:700;">' + zohoMoney(o.money, o.money && o.money.total) + '</span></div>' +
+          '<div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">' + escapeHtml(o.date) + (o.deliveryDate ? ' • deliver ' + escapeHtml(o.deliveryDate) : '') + (chips ? ' • ' + chips : '') + '</div>' +
+          (open ? '' : '<div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">' + (o.address ? escapeHtml(o.address) + ' • ' : '') + o.lines.length + ' item' + (o.lines.length === 1 ? '' : 's') + ' — tap for full order ▾</div>') +
+        '</div>' + (open ? zohoDetailHtml(o) : '') +
       '</div></div>';
   }).join('');
 }

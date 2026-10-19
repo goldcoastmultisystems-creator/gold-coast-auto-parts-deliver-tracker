@@ -2182,7 +2182,7 @@ function zohoImportOrders(orders, assignedTo) {
     var stop = {
       id: uid(), loc: o.customer || 'Zoho order', addr: o.address || '', type: 'delivery', assignedTo: assignedTo || '',
       so: o.number || '', part: o.lines.map(function(l) { return l.qty + '× ' + l.name + (l.sku ? ' (' + l.sku + ')' : ''); }).join('; '),
-      mop: o.terms || '', notes: o.notes || '', status: 'pending', photos: [], chat: [], createdAt: nowTimeStr(), zohoId: o.id
+      mop: o.terms || '', notes: [o.reference ? 'Ref ' + o.reference : '', (o.customFields || []).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; }).filter(Boolean).join(' • '), o.method ? 'Delivery: ' + o.method : '', o.notes || ''].filter(Boolean).join(' • '), status: 'pending', photos: [], chat: [], createdAt: nowTimeStr(), zohoId: o.id
     };
     currentDay.stops.push(stop);
     added.push(stop);

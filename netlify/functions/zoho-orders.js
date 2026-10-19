@@ -81,14 +81,33 @@ exports.handler = async function (event) {
         var dr = await fetch(INVENTORY_URL + '/salesorders/' + encodeURIComponent(o.salesorder_id) + '?organization_id=' + org, { headers: headers });
         d = ((await dr.json().catch(function () { return {}; })).salesorder) || {};
       } catch (e) { d = {}; }
-      var ship = d.shipping_address || {};
+      var ship = d.shipping_address || {}, bill = d.billing_address || {};
+      var person = (d.contact_person_details && d.contact_person_details[0]) || {};
       return {
-        id: o.salesorder_id, number: o.salesorder_number, reference: o.reference_number || '',
-        customer: o.customer_name || d.customer_name || '', date: o.date || '', deliveryDate: o.delivery_date || d.delivery_date || '',
-        status: lower(o.status), shipped: o.shipped_status || '', paid: o.paid_status || '', method: o.delivery_method || d.delivery_method || '',
-        salesperson: o.salesperson_name || '', location: o.location_name || d.location_name || '', address: addressText(ship), phone: ship.phone || d.contact_person_details && d.contact_person_details[0] && d.contact_person_details[0].phone || '',
-        terms: d.payment_terms_label || '', notes: d.notes || '',
-        lines: (d.line_items || []).map(function (li) { return { name: li.name || li.description || '', sku: li.sku || '', qty: li.quantity }; })
+        id: o.salesorder_id, number: o.salesorder_number, reference: o.reference_number || d.reference_number || '',
+        customer: o.customer_name || d.customer_name || '', date: o.date || d.date || '', deliveryDate: o.delivery_date || d.delivery_date || '',
+        status: lower(o.status), orderStatus: d.order_status || o.order_status || '', invoiced: d.invoiced_status || o.invoiced_status || '',
+        shipped: d.shipped_status || o.shipped_status || '', paid: d.paid_status || o.paid_status || '',
+        method: d.delivery_method || o.delivery_method || '', salesperson: d.salesperson_name || o.salesperson_name || '',
+        location: d.location_name || o.location_name || '', address: addressText(ship), phone: ship.phone || person.phone || '',
+        shipTo: { attention: ship.attention || '', company: ship.company_name || '', text: addressText(ship), phone: ship.phone || '' },
+        billTo: { attention: bill.attention || '', text: addressText(bill), phone: bill.phone || '' },
+        contact: [person.first_name, person.last_name].filter(Boolean).join(' '), contactEmail: person.email || '',
+        terms: d.payment_terms_label || '', notes: d.notes || '', termsText: d.terms || '',
+        customFields: (d.custom_fields || []).map(function (c) { return { label: c.label || c.placeholder || c.api_name || '', value: c.value_formatted || c.value || '' }; }).filter(function (c) { return c.label; }),
+        backordered: !!d.is_backordered,
+        money: {
+          symbol: d.currency_symbol || '$', subTotal: d.sub_total, discount: d.discount_total != null ? d.discount_total : d.discount_amount,
+          shipping: d.shipping_charge, adjustment: d.adjustment, tax: d.tax_total, total: d.total != null ? d.total : o.total
+        },
+        totalQty: d.total_quantity,
+        lines: (d.line_items || []).map(function (li) {
+          return {
+            name: li.name || '', sku: li.sku || '', description: li.description || '', qty: li.quantity, unit: li.unit || '',
+            location: li.location_name || '', rate: li.rate, amount: li.item_total, discount: li.discount,
+            packed: li.quantity_packed, invoiced: li.quantity_invoiced, shipped: li.quantity_shipped, backordered: li.quantity_backordered
+          };
+        })
       };
     }));
 
