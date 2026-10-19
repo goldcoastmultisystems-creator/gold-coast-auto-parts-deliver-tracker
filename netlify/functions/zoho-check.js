@@ -33,6 +33,21 @@ exports.handler = async function () {
   if (!soResp.ok) return reply(502, { ok: false, step: 'salesorders', status: soResp.status, error: soData.message || 'Could not read sales orders (check the organization ID and scopes).' });
 
   var orders = soData.salesorders || [];
+  var detailShape = null;
+  var firstOpen = orders.find(function (o) { return String(o.status).toLowerCase() === 'confirmed'; }) || orders[0];
+  if (firstOpen) {
+    var dr = await fetch(INVENTORY_URL + '/salesorders/' + encodeURIComponent(firstOpen.salesorder_id) + '?organization_id=' + org, { headers: headers });
+    var dd = ((await dr.json().catch(function () { return {}; })).salesorder) || {};
+    var types = {};
+    Object.keys(dd).forEach(function (k) { var v = dd[k]; types[k] = Array.isArray(v) ? 'array(' + v.length + ')' : (v && typeof v === 'object' ? 'object' : typeof v); });
+    detailShape = {
+      fieldTypes: types,
+      lineItemFields: dd.line_items && dd.line_items[0] ? Object.keys(dd.line_items[0]) : [],
+      shippingAddressFields: dd.shipping_address ? Object.keys(dd.shipping_address) : [],
+      billingAddressFields: dd.billing_address ? Object.keys(dd.billing_address) : [],
+      customFieldLabels: (dd.custom_fields || []).map(function (c) { return c.label || c.api_name || c.placeholder; })
+    };
+  }
   var byStatus = {};
   orders.forEach(function (o) { byStatus[o.status || 'unknown'] = (byStatus[o.status || 'unknown'] || 0) + 1; });
   return reply(200, {
@@ -41,6 +56,7 @@ exports.handler = async function () {
     orderCountChecked: orders.length,
     hasMore: !!(soData.page_context && soData.page_context.has_more_page),
     statusCounts: byStatus,
-    orderFieldNames: orders[0] ? Object.keys(orders[0]) : []
+    orderFieldNames: orders[0] ? Object.keys(orders[0]) : [],
+    detailShape: detailShape
   });
 };
