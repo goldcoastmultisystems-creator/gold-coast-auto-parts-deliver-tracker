@@ -100,6 +100,39 @@ function renderZohoOrders() {
   renderZohoList();
   renderZohoActions();
 }
+function zohoOrderText(o) {
+  var m = o.money || {};
+  var who = (typeof currentUserLabel === 'function') ? currentUserLabel() : ((session && session.name) || '');
+  var footer = (typeof shareFooter === 'function') ? shareFooter() : '\n\n— Sent from the Gold Coast Auto Parts web app (goldcoastautoparts.netlify.app).';
+  var extras = [o.reference ? 'Ref ' + o.reference : ''].concat((o.customFields || []).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; })).filter(Boolean).join(' • ');
+  var status = [o.orderStatus || o.status, o.paid && 'payment ' + o.paid, o.shipped && 'shipment ' + o.shipped].filter(Boolean).map(function(x) { return String(x).replace(/_/g, ' '); }).join(' • ');
+  var lines = (o.lines || []).map(function(l) {
+    return '• ' + l.qty + '× ' + l.name + (l.sku ? ' (' + l.sku + ')' : '') + (l.amount != null ? ' — ' + zohoMoney(m, l.amount) : '');
+  });
+  return 'Gold Coast Auto Parts — Sales Order ' + o.number + '\n' + o.customer +
+    (who ? '\nShared by: ' + who : '') + '\n' +
+    (extras ? '\n' + extras : '') +
+    '\nOrder date: ' + o.date + (o.deliveryDate ? ' • Deliver: ' + o.deliveryDate : '') +
+    (o.method ? '\nDelivery method: ' + o.method : '') + (o.terms ? '\nPayment terms: ' + o.terms : '') + (o.salesperson ? '\nSalesperson: ' + o.salesperson : '') +
+    (status ? '\nStatus: ' + status : '') +
+    (o.shipTo && o.shipTo.text ? '\n\n📍 Ship to: ' + (o.shipTo.attention ? o.shipTo.attention + ', ' : '') + o.shipTo.text + (o.shipTo.phone ? '\n☎ ' + o.shipTo.phone : '') : '') +
+    (lines.length ? '\n\nItems:\n' + lines.join('\n') : '') +
+    (m.total != null ? '\n\nTotal: ' + zohoMoney(m, m.total) : '') +
+    (o.notes ? '\n\nNotes: ' + o.notes : '') + footer;
+}
+function zohoFindOrder(id) { return zohoState.orders.find(function(o) { return o.id === id; }); }
+function zohoWhatsApp(id) {
+  var o = zohoFindOrder(id);
+  if (o) window.open('https://wa.me/?text=' + encodeURIComponent(zohoOrderText(o)), '_blank');
+}
+function zohoShare(id) {
+  var o = zohoFindOrder(id);
+  if (!o) return;
+  var text = zohoOrderText(o);
+  if (navigator.share) { navigator.share({ title: 'Sales Order ' + o.number, text: text }).catch(function() {}); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function() { if (typeof showToast === 'function') showToast('Order copied — paste it anywhere.', 'green'); }, function() { window.prompt('Copy this text:', text); });
+  else window.prompt('Copy this text:', text);
+}
 function zohoMoney(m, n) {
   if (n == null || n === '' || isNaN(Number(n))) return '';
   var v = Number(n), sym = (m && m.symbol) || '$';
@@ -185,7 +218,11 @@ function renderZohoList() {
           '<span style="margin-left:auto; font-weight:700;">' + zohoMoney(o.money, o.money && o.money.total) + '</span></div>' +
           '<div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">' + escapeHtml(o.date) + (o.deliveryDate ? ' • deliver ' + escapeHtml(o.deliveryDate) : '') + (chips ? ' • ' + chips : '') + '</div>' +
           (open ? '' : '<div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">' + (o.address ? escapeHtml(o.address) + ' • ' : '') + o.lines.length + ' item' + (o.lines.length === 1 ? '' : 's') + ' — tap for full order ▾</div>') +
-        '</div>' + (open ? zohoDetailHtml(o) : '') +
+        '</div>' +
+        '<div style="display:flex; gap:6px; margin-top:6px;">' +
+          '<button class="btn btn-sm" style="background:rgba(52,211,153,0.14); border:1px solid rgba(52,211,153,0.55); color:#34d399;" onclick="zohoWhatsApp(\'' + escapeHtml(o.id) + '\')">💬 WhatsApp</button>' +
+          '<button class="btn btn-ghost btn-sm" onclick="zohoShare(\'' + escapeHtml(o.id) + '\')">↗ Share</button></div>' +
+        (open ? zohoDetailHtml(o) : '') +
       '</div></div>';
   }).join('');
 }

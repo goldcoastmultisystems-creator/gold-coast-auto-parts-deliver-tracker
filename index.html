@@ -1454,7 +1454,8 @@ function renderStopCard(s, i, curId) {
       '</div>' +
       '<span class="type-badge type-'+s.type+'">'+TYPE_LABELS[s.type]+'</span>' +
       (s.assignedTo ? '<span class="assigned-badge">👤 '+escapeHtml(s.assignedTo)+'</span>' : '') +
-      '<button class="stop-share-btn" onclick="shareStop(\''+s.id+'\')" title="Share">↗</button>' +
+      '<button class="stop-share-btn" onclick="whatsappStop(\''+s.id+'\')" title="Send on WhatsApp" style="border-color:rgba(52,211,153,0.55); background:rgba(52,211,153,0.14); color:#34d399;">💬</button>' +
+      '<button class="stop-share-btn" onclick="shareStop(\''+s.id+'\')" title="Share (with photos)">↗</button>' +
       '<button class="stop-edit-btn" onclick="editStop(\''+s.id+'\')" title="Edit">✎</button>' +
       '<button class="stop-delete-btn" onclick="deleteStop(\''+s.id+'\')" title="Delete">🗑</button>' +
     '</div>' +
@@ -2623,9 +2624,7 @@ function alertStaleDrivers() {
   shareText('Team Alert', text);
   dismissStaleBanner();
 }
-function shareStop(id) {
-  var s = currentDay.stops.find(function(x) { return x.id === id; });
-  if (!s) return;
+function stopShareText(s) {
   var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Delivery Status Board';
   var videoLinks = (s.videos || []).map(function(v, i) { return 'Video ' + (i + 1) + ': ' + v; }).join('\n');
   var photoCount = (s.photos || []).length;
@@ -2641,7 +2640,18 @@ function shareStop(id) {
     (photoCount ? '\n' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + ' attached' : '') +
     (videoLinks ? '\n\n' + videoLinks : '') +
     shareFooter();
-
+  return text;
+}
+function whatsappStop(id) {
+  var s = currentDay.stops.find(function(x) { return x.id === id; });
+  if (!s) return;
+  window.open('https://wa.me/?text=' + encodeURIComponent(stopShareText(s)), '_blank');
+  if (s.photos && s.photos.length) showToast('WhatsApp text opened — photos can be sent with the ↗ Share button instead.', '');
+}
+function shareStop(id) {
+  var s = currentDay.stops.find(function(x) { return x.id === id; });
+  if (!s) return;
+  var text = stopShareText(s);
   var photoFiles = (s.photos || []).map(function(p, i) {
     try { return dataUrlToFile(p, (s.loc || 'stop').replace(/[^a-z0-9]+/gi, '_') + '-photo-' + (i + 1) + '.jpg'); }
     catch (e) { return null; }
