@@ -720,8 +720,10 @@ function attachFirebaseListeners() {
     }
     days = incoming;
     currentDay = getDay(key);
+    currentDayKey = key;
     knownStopIds = {};
     currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
+    carryOverUnfinished();
     renderAll();
     checkStaleDrivers();
   });
@@ -1009,7 +1011,71 @@ function saveDays(d) {
 }
 
 function pad2(n) { return n < 10 ? '0'+n : ''+n; }
-function todayKey() { var d = new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function dayKeyFromDate(d) { return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function todayKey() { return dayKeyFromDate(new Date()); }
+
+/* ---------- NEW DAY: unfinished stops carry over instead of staying behind ---------- */
+var CARRY_LOOKBACK_DAYS = 3;
+var CARRY_STATUSES = ['pending', 'onway', 'arrived', 'postponed'];
+var currentDayKey = null;
+function removeStopsFromDayRemote(dateKey, ids) {
+  if (!FIREBASE_ENABLED || !fbDb) return;
+  fbDb.ref('gcap/days/' + dateKey).once('value').then(function(snap) {
+    var day = snap.val();
+    if (!day || !day.stops) return;
+    var kept = day.stops.filter(function(s) { return ids.indexOf(s.id) === -1; });
+    if (kept.length === day.stops.length) return;
+    return fbDb.ref('gcap/days/' + dateKey + '/stops').set(kept);
+  }).catch(function(e) { console.error('removeStopsFromDayRemote failed', e); });
+}
+function carryOverUnfinished() {
+  if (!days || !currentDay) return;
+  var today = todayKey();
+  var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - CARRY_LOOKBACK_DAYS);
+  var cutoffKey = dayKeyFromDate(cutoff);
+  var have = {}, haveSO = {};
+  currentDay.stops.forEach(function(s) { have[s.id] = true; if (s.so) haveSO[String(s.so).trim().toLowerCase()] = true; });
+  var sources = {}, moved = [];
+  Object.keys(days).filter(function(k) { return k < today && k >= cutoffKey; }).sort().reverse().forEach(function(k) {
+    (days[k].stops || []).forEach(function(s) {
+      if (CARRY_STATUSES.indexOf(s.status) === -1) return;
+      if (have[s.id]) { (sources[k] = sources[k] || []).push(s.id); return; }
+      var so = s.so ? String(s.so).trim().toLowerCase() : '';
+      if (so && haveSO[so]) return;
+      (sources[k] = sources[k] || []).push(s.id);
+      have[s.id] = true;
+      if (so) haveSO[so] = true;
+      var copy = JSON.parse(JSON.stringify(s));
+      copy.carriedFrom = copy.carriedFrom || k;
+      copy.status = 'pending';
+      moved.push(copy);
+    });
+  });
+  var srcKeys = Object.keys(sources);
+  if (!srcKeys.length) return;
+  moved.forEach(function(s) { currentDay.stops.push(s); knownStopIds[s.id] = true; });
+  if (moved.length) addActivity('Carried Over', moved.length + ' unfinished stop' + (moved.length === 1 ? '' : 's') + ' carried over from ' + srcKeys.map(fmtDateDisplay).join(', '));
+  srcKeys.forEach(function(k) {
+    var ids = sources[k];
+    days[k].stops = days[k].stops.filter(function(s) { return ids.indexOf(s.id) === -1; });
+    removeStopsFromDayRemote(k, ids);
+  });
+  localStorage.setItem('kgps_days', JSON.stringify(days));
+}
+function checkDayRollover() {
+  var k = todayKey();
+  if (!currentDayKey || currentDayKey === k || !days) return;
+  currentDayKey = k;
+  currentDay = getDay(k);
+  knownStopIds = {};
+  currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
+  var pill = document.getElementById('todayPill');
+  if (pill) pill.textContent = fmtDateDisplay(k);
+  carryOverUnfinished();
+  renderAll();
+}
+setInterval(checkDayRollover, 60 * 1000);
+document.addEventListener('visibilitychange', function() { if (!document.hidden) checkDayRollover(); });
 function fmtDateDisplay(key) { var p = key.split('-'); return p[1]+'/'+p[2]+'/'+p[0]; }
 function nowTimeStr() {
   var d = new Date(); var h = d.getHours(); var m = pad2(d.getMinutes());
@@ -1148,7 +1214,9 @@ function init() {
   }
   if (enforcePageAccess()) return;
   currentDay = getDay(todayKey());
+  currentDayKey = todayKey();
   currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
+  carryOverUnfinished();
   if (!settings.team) { settings.team = []; saveSettings(settings); }
 
   document.getElementById('todayPill').textContent = fmtDateDisplay(todayKey());
@@ -1453,6 +1521,7 @@ function renderStopCard(s, i, curId) {
       '</div>' +
       '<span class="type-badge type-'+s.type+'">'+TYPE_LABELS[s.type]+'</span>' +
       (s.assignedTo ? '<span class="assigned-badge">👤 '+escapeHtml(s.assignedTo)+'</span>' : '') +
+      (s.carriedFrom ? '<span class="assigned-badge" title="Unfinished, carried over from an earlier day">↪ from '+fmtDateDisplay(s.carriedFrom)+'</span>' : '') +
       '<button class="stop-share-btn" onclick="whatsappStop(\''+s.id+'\')" title="Send on WhatsApp" style="border-color:rgba(52,211,153,0.55); background:rgba(52,211,153,0.14); color:#34d399;">💬</button>' +
       '<button class="stop-share-btn" onclick="shareStop(\''+s.id+'\')" title="Share (with photos)">↗</button>' +
       '<button class="stop-edit-btn" onclick="editStop(\''+s.id+'\')" title="Edit">✎</button>' +
