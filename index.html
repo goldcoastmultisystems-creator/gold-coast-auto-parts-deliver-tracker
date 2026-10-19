@@ -436,7 +436,11 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 
   <div class="section-title">
     <h2>Today's Stops</h2>
-    <div class="actions"><button class="btn btn-gold" onclick="openAddStop()">+ Add Stop</button></div>
+    <div class="actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-sm" style="background:rgba(52,211,153,0.14); border:1px solid rgba(52,211,153,0.55); color:#34d399;" onclick="whatsappList()" title="Send today's stops on WhatsApp">💬 WhatsApp</button>
+      <button class="btn btn-ghost btn-sm" onclick="shareList()" title="Share today's stops">↗ Share</button>
+      <button class="btn btn-gold" onclick="openAddStop()">+ Add Stop</button>
+    </div>
   </div>
   <div class="stops" id="stopsList"></div>
 
@@ -2667,21 +2671,42 @@ function shareStop(id) {
     shareText('Gold Coast Auto Parts Stop', text);
   }
 }
-function shareList() {
-  var stops = currentDay.stops;
-  if (!stops.length) { showToast('No stops to share yet.', ''); return; }
+var SHARE_STATUS_EMOJI = { pending: '⏳', onway: '🚚', arrived: '📌', completed: '✅', postponed: '⏸️', returned: '🔄' };
+function listShareText() {
+  var stops = visibleStops();
+  if (!stops.length) return '';
   var counts = { completed:0, onway:0, arrived:0, postponed:0, returned:0, pending:0 };
   stops.forEach(function(s) { counts[s.status] = (counts[s.status]||0) + 1; });
-  var header = (settings.companyName || 'Gold Coast Auto Parts') + ' — Delivery Status Board';
-  var narrative = "Today's route has " + stops.length + ' stop' + (stops.length === 1 ? '' : 's') + ' total: ' +
-    counts.completed + ' completed, ' + counts.onway + ' en route, ' + counts.arrived + ' at location, ' +
-    counts.postponed + ' postponed, ' + counts.returned + ' returned part, and ' + counts.pending + ' still pending.';
-  var lines = stops.map(function(s, i) {
-    return (i+1)+'. '+s.loc+(s.addr?' — '+s.addr:'')+' — '+STATUS_LABELS[s.status] + (s.updatedBy ? ' (by '+s.updatedBy+', '+s.updatedAt+')' : '');
-  });
-  var text = header + '\nUpdate generated: ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + '\nShared by: ' + currentUserLabel() + '\n\n' +
-    narrative + '\n\n' + lines.join('\n') + shareFooter();
-  shareText(header + ' — ' + fmtDateDisplay(todayKey()), text);
+  var header = (settings.companyName || 'Gold Coast Auto Parts') + " — Today's Stops";
+  var summary = ['completed', 'onway', 'arrived', 'pending', 'postponed', 'returned'].filter(function(k) { return counts[k]; })
+    .map(function(k) { return SHARE_STATUS_EMOJI[k] + ' ' + counts[k] + ' ' + STATUS_LABELS[k].toLowerCase(); }).join(' • ');
+  function stopBlock(s, i) {
+    return (i + 1) + '. ' + (SHARE_STATUS_EMOJI[s.status] || '•') + ' ' + s.loc + (s.so ? ' — SO# ' + s.so : '') +
+      (s.addr ? '\n   📍 ' + s.addr : '') + (s.part ? '\n   🔧 ' + s.part : '') + (s.mop ? '\n   💳 ' + s.mop : '') +
+      (s.updatedBy ? '\n   🕒 ' + STATUS_LABELS[s.status] + ' — ' + s.updatedBy + ', ' + s.updatedAt : '');
+  }
+  var groups = {}, order = [];
+  stops.forEach(function(s) { var k = s.assignedTo || ''; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(s); });
+  order.sort(function(a, b) { return a === '' ? 1 : (b === '' ? -1 : a.localeCompare(b)); });
+  var body = order.map(function(k) {
+    var list = groups[k];
+    var title = order.length === 1 && k === '' ? '' : (k ? "👤 " + k + "'s route" : '👥 Unassigned') + ' (' + list.length + ')\n';
+    return title + list.map(stopBlock).join('\n');
+  }).join('\n\n');
+  return '🚚 ' + header + '\n📅 ' + fmtDateDisplay(todayKey()) + ' • 🕒 ' + nowTimeStr() + '\n👤 Shared by: ' + currentUserLabel() + '\n\n' +
+    '📦 ' + stops.length + ' order' + (stops.length === 1 ? '' : 's') + ' today' + (summary ? ': ' + summary : '') + '\n\n' + body + shareFooter();
+}
+function shareList() {
+  var text = listShareText();
+  if (!text) { showToast('No stops to share yet.', ''); return; }
+  shareText((settings.companyName || 'Gold Coast Auto Parts') + " — Today's Stops — " + fmtDateDisplay(todayKey()), text);
+}
+function whatsappList() {
+  var text = listShareText();
+  if (!text) { showToast('No stops to share yet.', ''); return; }
+  var url = 'https://wa.me/?text=' + encodeURIComponent(text);
+  if (url.length > 7500) { showToast('That list is long — use ↗ Share to send it all at once.', ''); }
+  window.open(url, '_blank');
 }
 function shareText(title, text) {
   if (navigator.share) {
