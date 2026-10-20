@@ -85,7 +85,9 @@ function zohoStockTag(line) {
   if (!line.sku || typeof inventoryRows === 'undefined' || !inventoryRows) return '';
   var row = inventoryRows.find(function(r) { return String(r[0]).toLowerCase() === String(line.sku).toLowerCase(); });
   if (!row) return ' <span style="color:var(--text-soft);">(not in catalog)</span>';
-  return row[2] > 0 ? ' <span style="color:var(--green);">• ' + row[2] + ' in stock</span>' : ' <span style="color:var(--red);">• sold out</span>';
+  var loc = typeof invLocText === 'function' ? invLocText(row[0]) : '';
+  return (row[2] > 0 ? ' <span style="color:var(--green);">• ' + row[2] + ' in stock</span>' : ' <span style="color:var(--red);">• sold out</span>') +
+    (loc ? ' <span style="color:var(--gold-2);">• 📍 ' + escapeHtml(loc) + '</span>' : '');
 }
 function renderZohoOrders() {
   if (!document.getElementById('zohoControls')) return;

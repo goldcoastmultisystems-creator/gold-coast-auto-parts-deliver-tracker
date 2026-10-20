@@ -5,6 +5,12 @@ var ASSISTANT_ENDPOINT = '/.netlify/functions/ask-assistant';
 var assistantHistory = [];
 var assistantBusy = false;
 var inventoryRows = null, inventoryMeta = null, inventoryLoading = null;
+var inventoryLoc = { wh: {}, shelf: {} };
+function invLocKey(sku) { return String(sku).replace(/[.#$\/\[\]%]/g, function(c) { return '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'); }); }
+function invLocText(sku) {
+  var k = invLocKey(sku), w = inventoryLoc.wh[k], s = inventoryLoc.shelf[k];
+  return [w, s && 'Shelf ' + s].filter(Boolean).join(' · ');
+}
 var INV_STOPWORDS = { the:1, a:1, an:1, do:1, we:1, have:1, any:1, in:1, on:1, of:1, for:1, is:1, are:1, there:1, stock:1, much:1, many:1, how:1, what:1, whats:1, price:1, cost:1, qty:1, quantity:1, left:1, got:1, you:1, and:1, or:1, to:1, it:1, our:1, with:1, part:1, parts:1, available:1, inventory:1 };
 
 function assistantSuggestions() {
@@ -26,6 +32,10 @@ function loadInventory() {
       inventoryRows = JSON.parse(doc.rowsJson);
       inventoryMeta = { total: doc.total || inventoryRows.length, syncedAt: doc.syncedAt || '' };
     }
+    return fbDb.ref('gcap/inventory/settings').once('value');
+  }).then(function(snap) {
+    var s = (snap && snap.val()) || {};
+    inventoryLoc = { wh: s.warehouses || {}, shelf: s.shelves || {} };
   }).catch(function(e) { console.error('inventory load failed', e); }).then(function() { inventoryLoading = null; });
   return inventoryLoading;
 }
@@ -55,7 +65,7 @@ function buildInventoryContext(question) {
   var L = ['\nINVENTORY CATALOG: ' + inventoryRows.length + ' SKUs (' + inStock + ' in stock, ' + (inventoryRows.length - inStock) + ' sold out), last synced ' + (inventoryMeta && inventoryMeta.syncedAt ? inventoryMeta.syncedAt.slice(0, 10) : 'unknown') + '.'];
   L.push('Best catalog matches for the question (' + matches.length + '):');
   matches.forEach(function(r) {
-    L.push('- ' + r[0] + ' | OEM ' + (r[1] || '—') + ' | ' + (r[2] > 0 ? 'IN STOCK qty ' + r[2] : 'SOLD OUT') + ' | ' + (r[4] != null ? '$' + r[4] : 'no price') + ' | ' + r[6] + (r[7] ? ' | grade ' + r[7] : ''));
+    L.push('- ' + r[0] + ' | OEM ' + (r[1] || '—') + ' | ' + (r[2] > 0 ? 'IN STOCK qty ' + r[2] : 'SOLD OUT') + ' | ' + (r[4] != null ? '$' + r[4] : 'no price') + ' | ' + r[6] + (r[7] ? ' | grade ' + r[7] : '') + (invLocText(r[0]) ? ' | location ' + invLocText(r[0]) : ''));
   });
   return L.join('\n');
 }
