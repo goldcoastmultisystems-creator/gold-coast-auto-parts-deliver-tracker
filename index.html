@@ -1469,8 +1469,13 @@ function renderStops() {
   el.innerHTML = order.map(function(key) {
     var label = key === '__unassigned__' ? 'Unassigned' : (key === me ? 'Your Route — ' + key : key + "'s Route");
     var groupStops = groups[key];
+    var openCount = groupStops.filter(function(s) { return ROUTE_OPEN_STATUSES.indexOf(s.status) !== -1; }).length;
+    var saving = routeHint(key);
+    var routeBtn = openCount > 1
+      ? '<button class="btn btn-ghost btn-sm" style="margin-left:auto; text-transform:none; letter-spacing:0;" onclick="openRouteModal(\'' + escapeHtml(key) + '\')">🧭 Suggest route' + (saving ? ' · 💡 saves ~' + saving.toFixed(1) + ' mi' : '') + '</button>'
+      : '';
     return '<div class="route-group">' +
-      '<div class="route-group-head">' + escapeHtml(label) + '<span class="route-group-count">' + groupStops.length + '</span></div>' +
+      '<div class="route-group-head" style="display:flex; align-items:center; gap:8px;">' + escapeHtml(label) + '<span class="route-group-count">' + groupStops.length + '</span>' + routeBtn + '</div>' +
       groupStops.map(function(s, gi) { return renderStopCard(s, gi, curId); }).join('') +
     '</div>';
   }).join('');
@@ -2339,6 +2344,123 @@ function setupDragAndDrop() {
     dragEl = null; container = null;
     renderAll();
   });
+}
+
+/* ---------- ROUTE SUGGESTION (nearest-first / furthest-first by straight-line distance) ---------- */
+var DEPOT = { lat: 26.078564, lng: -80.204977, label: 'the Davie warehouse' };
+var ROUTE_OPEN_STATUSES = ['pending', 'onway', 'arrived', 'postponed'];
+var routeUI = { key: null, mode: 'nearest' };
+function stopHasCoords(s) { return typeof s.lat === 'number' && typeof s.lng === 'number'; }
+function milesBetween(a, b) { return metersBetween(a.lat, a.lng, b.lat, b.lng) / 1609.344; }
+function routeStart(groupKey) {
+  if (groupKey && groupKey !== '__unassigned__') {
+    var best = null;
+    Object.keys(driverPositions || {}).forEach(function(id) {
+      var d = driverPositions[id];
+      if (d && d.name === groupKey && typeof d.lat === 'number' && Date.now() - (d.updatedAt || 0) < 30 * 60 * 1000 && (!best || d.updatedAt > best.updatedAt)) best = d;
+    });
+    if (best) return { lat: best.lat, lng: best.lng, label: groupKey + "'s live location" };
+  }
+  return { lat: DEPOT.lat, lng: DEPOT.lng, label: DEPOT.label };
+}
+function routeGroupStops(key) {
+  return currentDay.stops.filter(function(s) { return (s.assignedTo || '__unassigned__') === key && ROUTE_OPEN_STATUSES.indexOf(s.status) !== -1; });
+}
+function routeOrder(stops, start, mode) {
+  var withLoc = stops.filter(stopHasCoords), noLoc = stops.filter(function(s) { return !stopHasCoords(s); });
+  var ordered = [];
+  if (mode === 'furthest') {
+    ordered = withLoc.slice().sort(function(a, b) { return milesBetween(start, b) - milesBetween(start, a); });
+  } else {
+    var cur = start, left = withLoc.slice();
+    while (left.length) {
+      var bi = 0;
+      for (var i = 1; i < left.length; i++) if (milesBetween(cur, left[i]) < milesBetween(cur, left[bi])) bi = i;
+      cur = left.splice(bi, 1)[0];
+      ordered.push(cur);
+    }
+  }
+  return ordered.concat(noLoc);
+}
+function routeLength(list, start) {
+  var total = 0, cur = start;
+  list.filter(stopHasCoords).forEach(function(s) { total += milesBetween(cur, s); cur = s; });
+  return total;
+}
+function canReorderGroup(key) {
+  if (!isDriverSession()) return true;
+  return key === '__unassigned__' || key === session.name;
+}
+function routeHint(key) {
+  var stops = routeGroupStops(key);
+  if (stops.length < 2) return null;
+  var start = routeStart(key);
+  var cur = routeLength(stops, start), best = routeLength(routeOrder(stops, start, 'nearest'), start);
+  var save = cur - best;
+  return save >= 0.5 && save >= cur * 0.05 ? save : null;
+}
+function ensureRouteModal() {
+  if (document.getElementById('routeModal')) return;
+  var div = document.createElement('div');
+  div.className = 'modal-backdrop';
+  div.id = 'routeModal';
+  div.innerHTML = '<div class="modal wide"><h3>🧭 Route suggestion</h3><p class="modal-sub" id="routeSub"></p>' +
+    '<div id="routeModes" style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;"></div>' +
+    '<div id="routeSummary" style="font-size:12.5px; margin-bottom:8px;"></div>' +
+    '<div id="routeList" style="max-height:46vh; overflow-y:auto;"></div>' +
+    '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeRouteModal()">Cancel</button><button class="btn btn-gold" id="routeApplyBtn" onclick="applyRouteSuggestion()">Apply this order</button></div></div>';
+  document.body.appendChild(div);
+}
+function openRouteModal(key) {
+  ensureRouteModal();
+  routeUI.key = key;
+  routeGroupStops(key).forEach(geocodeStop);
+  document.getElementById('routeModal').classList.add('open');
+  renderRouteModal();
+}
+function closeRouteModal() { document.getElementById('routeModal').classList.remove('open'); }
+function setRouteMode(m) { routeUI.mode = m; renderRouteModal(); }
+function renderRouteModal() {
+  var key = routeUI.key, stops = routeGroupStops(key), start = routeStart(key);
+  var label = key === '__unassigned__' ? 'Unassigned stops' : key + "'s route";
+  document.getElementById('routeSub').textContent = label + ' • starting from ' + start.label + ' • straight-line distance (real roads run a bit longer)';
+  document.getElementById('routeModes').innerHTML =
+    ['nearest', 'furthest'].map(function(m) {
+      var on = routeUI.mode === m;
+      return '<button class="btn btn-sm ' + (on ? 'btn-gold' : 'btn-ghost') + '" onclick="setRouteMode(\'' + m + '\')">' + (m === 'nearest' ? 'Nearest first' : 'Furthest first') + '</button>';
+    }).join('');
+  var suggested = routeOrder(stops, start, routeUI.mode);
+  var cur = routeLength(stops, start), nw = routeLength(suggested, start);
+  var diff = cur - nw;
+  document.getElementById('routeSummary').innerHTML = !stops.length ? 'No open stops in this route.' :
+    'Current order: <b>' + cur.toFixed(1) + ' mi</b> • Suggested: <b>' + nw.toFixed(1) + ' mi</b> ' +
+    (diff > 0.05 ? '<span style="color:var(--green); font-weight:700;">(saves about ' + diff.toFixed(1) + ' mi)</span>' : (diff < -0.05 ? '<span style="color:var(--amber); font-weight:700;">(' + Math.abs(diff).toFixed(1) + ' mi longer than now — ' + (routeUI.mode === 'furthest' ? 'furthest-first trades distance for doing the long trips early' : 'your current order is already shorter') + ')</span>' : '<span style="color:var(--text-soft);">(same as now)</span>'));
+  var prev = start;
+  document.getElementById('routeList').innerHTML = suggested.map(function(s, i) {
+    var hasLoc = stopHasCoords(s), leg = hasLoc ? milesBetween(prev, s) : null;
+    if (hasLoc) prev = s;
+    return '<div class="team-row"><div style="flex:0 0 28px; font-weight:800; color:var(--gold-2);">' + (i + 1) + '</div><div style="flex:1 1 200px;"><span class="tname">' + escapeHtml(s.loc || 'Stop') + '</span>' +
+      '<div style="font-size:11.5px; color:var(--text-soft);">' + escapeHtml(s.addr || '') + '</div></div>' +
+      '<div style="font-size:12px; text-align:right; white-space:nowrap;">' + (hasLoc ? leg.toFixed(1) + ' mi' + (i === 0 ? ' from start' : ' from previous') : '<span style="color:var(--amber);">no map location yet</span>') + '</div></div>';
+  }).join('') || '';
+  var can = canReorderGroup(key) && stops.length > 1;
+  var btn = document.getElementById('routeApplyBtn');
+  btn.style.display = can ? '' : 'none';
+}
+function applyRouteSuggestion() {
+  var key = routeUI.key;
+  if (!canReorderGroup(key)) return;
+  var stops = routeGroupStops(key), start = routeStart(key);
+  var ordered = routeOrder(stops, start, routeUI.mode);
+  var ids = {}; stops.forEach(function(s) { ids[s.id] = true; });
+  var slots = [];
+  currentDay.stops.forEach(function(s, i) { if (ids[s.id]) slots.push(i); });
+  slots.forEach(function(slot, n) { currentDay.stops[slot] = ordered[n]; });
+  addActivity('Route Reordered', (key === '__unassigned__' ? 'Unassigned stops' : key + "'s route") + ' reordered ' + (routeUI.mode === 'furthest' ? 'furthest first' : 'nearest first') + ' by ' + ((session && session.name) || 'someone'));
+  saveDays(days);
+  closeRouteModal();
+  renderAll();
+  showToast('Route reordered ✓', 'green');
 }
 
 /* ---------- SMART BAR (heuristic local parser) ---------- */
