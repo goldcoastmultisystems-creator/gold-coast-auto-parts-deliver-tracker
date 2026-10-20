@@ -131,6 +131,8 @@ td.num, th.num { text-align: right; white-space: nowrap; }
         <button data-w="E2" onclick="setWarehouseFilter('E2')">E2</button>
         <button data-w="E5" onclick="setWarehouseFilter('E5')">E5</button>
         <button data-w="E9" onclick="setWarehouseFilter('E9')">E9</button>
+        <button data-w="Miramar" onclick="setWarehouseFilter('Miramar')">Miramar</button>
+        <button data-w="Dawson" onclick="setWarehouseFilter('Dawson')">Dawson</button>
         <button data-w="none" onclick="setWarehouseFilter('none')">Unassigned</button>
       </div>
     </div>
@@ -181,8 +183,8 @@ var FIREBASE_CONFIG = {
 var FIREBASE_ENABLED = true;
 var fbDb = null, session = null, settings = {};
 var PAGE_SIZE = 100, shown = PAGE_SIZE, filter = 'all', whFilter = 'all', view = 'all', canEdit = false;
-var WAREHOUSES = ['E2', 'E5', 'E9'];
-var inv = { defaultMin: 1, defaultTarget: 3, mins: {}, targets: {}, watch: {}, warehouses: {}, shelves: {} };
+var WAREHOUSES = ['E2', 'E5', 'E9', 'Miramar', 'Dawson'];
+var inv = { defaultMin: 1, defaultTarget: 3, mins: {}, targets: {}, watch: {}, warehouses: {}, shelves: {}, locNotes: {} };
 var LEVEL_LABEL = { ok: 'In Stock', low: 'Low Stock', out: 'Sold Out' };
 
 function loadSession() { try { return JSON.parse(localStorage.getItem('kgps_session')) || null; } catch (e) { return null; } }
@@ -211,7 +213,7 @@ function startFirebase() {
       var v = snap.val() || {};
       inv.defaultMin = numOrNull(v.defaultMin) == null ? 1 : numOrNull(v.defaultMin);
       inv.defaultTarget = numOrNull(v.defaultTarget) == null ? 3 : numOrNull(v.defaultTarget);
-      inv.mins = v.mins || {}; inv.targets = v.targets || {}; inv.watch = v.watch || {}; inv.warehouses = v.warehouses || {}; inv.shelves = v.shelves || {};
+      inv.mins = v.mins || {}; inv.targets = v.targets || {}; inv.watch = v.watch || {}; inv.warehouses = v.warehouses || {}; inv.shelves = v.shelves || {}; inv.locNotes = v.locNotes || {};
       inventoryLoc = { wh: inv.warehouses, shelf: inv.shelves };
       if (inventoryRows) refreshAll(false);
     });
@@ -228,6 +230,7 @@ function levelOf(r) { var q = r[2] || 0; return q <= 0 ? 'out' : (q <= minFor(r[
 function isWatched(sku) { return !!inv.watch[fbKey(sku)]; }
 function warehouseOf(sku) { return inv.warehouses[fbKey(sku)] || ''; }
 function shelfOf(sku) { return inv.shelves[fbKey(sku)] || ''; }
+function alsoOf(sku) { return inv.locNotes[fbKey(sku)] || ''; }
 function locText(sku) { var w = warehouseOf(sku), s = shelfOf(sku); return [w, s && 'Shelf ' + s].filter(Boolean).join(' · '); }
 function reorderItems() {
   if (!inventoryRows) return [];
@@ -244,8 +247,8 @@ function saveSetting(path, value) {
 function toggleWatch(sku) { saveSetting('watch/' + fbKey(sku), isWatched(sku) ? null : true); }
 function setMin(sku, v) { saveSetting('mins/' + fbKey(sku), numOrNull(v)); }
 function setTarget(sku, v) { saveSetting('targets/' + fbKey(sku), numOrNull(v)); }
-function setWarehouse(sku, code) { saveSetting('warehouses/' + fbKey(sku), code || null); }
-function setShelf(sku, v) { v = String(v || '').trim().toUpperCase().slice(0, 20); saveSetting('shelves/' + fbKey(sku), v || null); }
+function setWarehouse(sku, code) { saveSetting('warehouses/' + fbKey(sku), code || null); if (alsoOf(sku)) saveSetting('locNotes/' + fbKey(sku), null); }
+function setShelf(sku, v) { v = String(v || '').trim().toUpperCase().slice(0, 40); saveSetting('shelves/' + fbKey(sku), v || null); if (alsoOf(sku)) saveSetting('locNotes/' + fbKey(sku), null); }
 function setDefault(name, v) { var n = numOrNull(v); if (n != null) saveSetting(name, n); }
 
 /* ---- views ---- */
@@ -315,8 +318,9 @@ function renderTable(reset) {
     var sku = r[0], q = r[2] || 0, k = escapeHtml(sku), own = inv.mins[fbKey(sku)];
     var whCell = canEdit
       ? '<div style="display:flex; gap:4px; align-items:center;"><select class="wh" onchange="setWarehouse(\'' + k + '\', this.value)"><option value="">Warehouse</option>' + WAREHOUSES.map(function(w) { return '<option' + (warehouseOf(sku) === w ? ' selected' : '') + '>' + w + '</option>'; }).join('') + '</select>' +
-        '<input class="wh" style="width:70px;" placeholder="Shelf" value="' + escapeHtml(shelfOf(sku)) + '" onchange="setShelf(\'' + k + '\', this.value)" title="Shelf, e.g. B1 or F2"></div>'
-      : (locText(sku) ? '<b>' + escapeHtml(locText(sku)) + '</b>' : '<span class="sub2">—</span>');
+        '<input class="wh" style="width:96px;" placeholder="Shelf" value="' + escapeHtml(shelfOf(sku)) + '" onchange="setShelf(\'' + k + '\', this.value)" title="Shelf, e.g. B1 or F2"></div>' +
+        (alsoOf(sku) ? '<div class="sub2" style="margin-top:2px;" title="Also listed here in older warehouse lists — check before picking">also seen: ' + escapeHtml(alsoOf(sku)) + '</div>' : '')
+      : (locText(sku) ? '<b>' + escapeHtml(locText(sku)) + '</b>' + (alsoOf(sku) ? '<div class="sub2">also seen: ' + escapeHtml(alsoOf(sku)) + '</div>' : '') : '<span class="sub2">—</span>');
     var lowCell = canEdit
       ? '<input class="num-input" type="number" min="0" step="1" value="' + (own == null ? '' : own) + '" placeholder="' + inv.defaultMin + '" onchange="setMin(\'' + k + '\', this.value)">'
       : minFor(sku);
