@@ -783,8 +783,9 @@ function toggleTrackingPaused() {
   updateTrackingForRole();
   showToast(isTrackingPaused() ? '📍 Location tracking paused.' : '📍 Location tracking resumed.', isTrackingPaused() ? 'red' : 'green');
 }
+var DRIVER_TRACKING_ENABLED = false;   // flip to true to turn live GPS tracking of drivers back on
 function isTrackableSession() {
-  return !!(session && session.type === 'guest' && !session.isAdmin && session.role === 'Driver');
+  return DRIVER_TRACKING_ENABLED && !!(session && session.type === 'guest' && !session.isAdmin && session.role === 'Driver');
 }
 
 /* ---------- PER-DRIVER ROUTES ---------- */
@@ -960,6 +961,7 @@ function maybeShowStorageWarning() {
   if (el) el.style.display = 'flex';
 }
 function maybeShowGeoPermissionTip() {
+  if (!DRIVER_TRACKING_ENABLED) return;
   if (!navigator.permissions || !navigator.permissions.query) return;
   navigator.permissions.query({ name: 'geolocation' }).then(function(status) {
     if (status.state === 'prompt') {
@@ -2779,6 +2781,7 @@ function fmtTimeFromMs(ms) {
 }
 function checkStaleDrivers() {
   var el = document.getElementById('staleDriverBanner');
+  if (!DRIVER_TRACKING_ENABLED) { if (el) el.style.display = 'none'; return; }
   if (!el || !driverPositions || !currentDay) return;
   var names = Object.keys(driverPositions).map(function(id) { return driverPositions[id].name; }).filter(Boolean);
   var uniqueNames = names.filter(function(n, i) { return names.indexOf(n) === i; });
