@@ -100,6 +100,20 @@ main { max-width: 1000px; margin: 0px auto; padding: 18px 16px 0px; }
 .route-group-count { background: rgba(212,164,65,0.16); border: 1px solid var(--glass-border-gold); color: var(--gold-2); border-radius: 20px; padding: 2px 9px; font-size: 11px; }
 .route-group .stop-card { margin-bottom: 14px; }
 .route-group .stop-card:last-child { margin-bottom: 0; }
+.parts-box { grid-column: 1 / -1; margin-top: 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(212,164,65,0.4); background: rgba(212,164,65,0.08); }
+.parts-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: var(--gold-2); margin-bottom: 8px; }
+.parts-head .from { color: var(--text-soft); font-weight: 700; }
+.part-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 6px 0; border-top: 1px dashed var(--glass-border); }
+.part-row:first-of-type { border-top: none; }
+.part-row .pn { flex: 0 0 18px; color: var(--text-soft); font-weight: 700; font-size: 12px; }
+.part-row .psku { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 800; font-size: 12.5px; color: var(--text); }
+.part-row .pname { flex: 1 1 200px; font-size: 12.5px; color: var(--text); }
+.src { display: inline-block; font-size: 11.5px; font-weight: 800; border-radius: 7px; padding: 4px 9px; white-space: nowrap; border: 1px solid transparent; }
+.src-warehouse { background: rgba(212,164,65,0.18); border-color: rgba(212,164,65,0.55); color: var(--gold-2); }
+.src-supplier { background: rgba(96,165,250,0.16); border-color: rgba(96,165,250,0.5); color: #93c5fd; }
+.src-buy { background: rgba(248,113,113,0.15); border-color: rgba(248,113,113,0.5); color: #fca5a5; }
+.src-stock { background: rgba(52,211,153,0.14); border-color: rgba(52,211,153,0.45); color: #6ee7b7; }
+.src-none { background: rgba(255,255,255,0.06); border-color: var(--glass-border); color: var(--text-soft); }
 .assigned-badge { font-size: 10.5px; font-weight: 700; color: var(--blue); background: rgba(96,165,250,0.14); border: 1px solid rgba(96,165,250,0.3); border-radius: 6px; padding: 3px 7px; white-space: nowrap; }
 .stop-card { background: var(--glass); backdrop-filter: var(--blur); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.35); position: relative; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
 .stop-card:hover { border-color: rgba(255,255,255,0.18); }
@@ -727,6 +741,7 @@ function attachFirebaseListeners() {
     renderAll();
     checkStaleDrivers();
   });
+  if (typeof loadInventory === 'function') loadInventory();
   fbDb.ref('gcap/drivers').on('value', function(snap) {
     driverPositions = snap.val() || {};
     renderLiveMapMarkers();
@@ -1538,7 +1553,7 @@ function renderStopCard(s, i, curId) {
       '<div class="details">' +
         (s.so ? '<div><b>SO#:</b> '+escapeHtml(s.so)+'</div>' : '') +
         (s.mop ? '<div><b>Payment:</b> '+escapeHtml(s.mop)+'</div>' : '') +
-        (s.part ? '<div class="full"><b>Part:</b> '+escapeHtml(cleanPartText(s.part))+'</div>' : '') +
+        (s.part ? partsBlockHtml(s.part) : '') +
         (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+(s.returnResolved ? ' <span style="color:var(--green); font-weight:700;">✅ Shelved</span>' : ' <span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>')+'</div>' : '') +
         (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a></div>' : '') +
       '</div>' +
@@ -2722,23 +2737,40 @@ function printReport() {
     '<table><tr><th>Location</th><th>Type</th><th>Status</th><th>Address</th><th>Notes</th></tr>'+rows+'</table>';
   openPageOverlay('End of Day Report', reportDocShell('End of Day Report', body));
 }
+var SOURCE_COLOR = { warehouse: '#8a6410', stock: '#0f7b53', supplier: '#1d4ed8', buy: '#b91c1c', none: '#5b6a85' };
+function partsBySourceRows(stops) {
+  var rows = [];
+  stops.forEach(function(s) {
+    partItems(s.part).forEach(function(it) {
+      var p = partInfo(it);
+      rows.push({ p: p, stop: s });
+    });
+  });
+  rows.sort(function(a, b) { return a.p.source.label.localeCompare(b.p.source.label) || a.p.text.localeCompare(b.p.text); });
+  var html = '', last = null;
+  rows.forEach(function(r) {
+    var src = r.p.source;
+    if (src.label !== last) {
+      last = src.label;
+      html += '<tr><td colspan="4" style="background:#f4f6fb;font-weight:800;color:' + SOURCE_COLOR[src.kind] + ';">' + SOURCE_ICON[src.kind] + ' ' + escapeHtml(src.label) + '</td></tr>';
+    }
+    html += '<tr><td>' + escapeHtml(r.p.text) + '</td><td>' + escapeHtml(r.stop.loc) + '</td><td>' + (r.stop.so ? escapeHtml(r.stop.so) : '—') + '</td><td>' + STATUS_LABELS[r.stop.status] + '</td></tr>';
+  });
+  return { html: html, count: rows.length };
+}
 function openPartsList() {
   var withParts = currentDay.stops.filter(function(s) { return s.part && s.part.trim() && s.type !== 'pickup'; });
-  var rows = withParts.map(function(s) {
-    return '<tr><td>'+escapeHtml(s.loc)+'</td><td>'+escapeHtml(s.part)+'</td><td>'+(s.so?escapeHtml(s.so):'—')+'</td><td>'+STATUS_LABELS[s.status]+'</td></tr>';
-  }).join('');
-  var body = '<h1>Parts to Pull</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • already in stock, pull from Davie</h2>' +
-    (withParts.length ? '<table><tr><th>Stop</th><th>Part # / Description</th><th>SO#</th><th>Status</th></tr>'+rows+'</table>'
+  var r = partsBySourceRows(withParts);
+  var body = '<h1>Parts to Pull</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • grouped by where each part comes from</h2>' +
+    (r.count ? '<table><tr><th>Part # / Description</th><th>Stop</th><th>SO#</th><th>Status</th></tr>'+r.html+'</table>'
       : '<p style="color:#5b6a85;">No stops have a part number or description yet.</p>');
   openPageOverlay('Parts to Pull', reportDocShell('Parts to Pull', body));
 }
 function openPartsToPurchase() {
   var toBuy = currentDay.stops.filter(function(s) { return s.part && s.part.trim() && s.type === 'pickup'; });
-  var rows = toBuy.map(function(s) {
-    return '<tr><td>'+escapeHtml(s.loc)+'</td><td>'+escapeHtml(s.part)+'</td><td>'+(s.so?escapeHtml(s.so):'—')+'</td><td>'+STATUS_LABELS[s.status]+'</td></tr>';
-  }).join('');
-  var body = '<h1>Parts to Purchase</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • pickups from suppliers, not yet in stock</h2>' +
-    (toBuy.length ? '<table><tr><th>Stop</th><th>Part # / Description</th><th>SO#</th><th>Status</th></tr>'+rows+'</table>'
+  var r = partsBySourceRows(toBuy);
+  var body = '<h1>Parts to Purchase</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • pickups from suppliers, grouped by source</h2>' +
+    (r.count ? '<table><tr><th>Part # / Description</th><th>Stop</th><th>SO#</th><th>Status</th></tr>'+r.html+'</table>'
       : '<p style="color:#5b6a85;">No pickup stops with a part number or description yet.</p>');
   openPageOverlay('Parts to Purchase', reportDocShell('Parts to Purchase', body));
 }
@@ -2881,11 +2913,59 @@ function partItems(part) {
     return m ? (Number(m[1]) > 1 ? m[1] + '× ' : '') + m[2] : x;
   }).filter(Boolean);
 }
-function partsLine(part) {
-  var items = partItems(part);
-  if (!items.length) return '';
-  return items.length === 1 ? '🔧 ' + items[0] : '🔧\n' + items.map(function(x) { return '- ' + x; }).join('\n');
+/* ---------- WHERE THE PARTS COME FROM ---------- */
+var WAREHOUSE_TAG = /^(DAVIE|MIRAMAR|DAWSON|L229)\b|^E[259]\b/i;
+var SUPPLIER_TAG = /PARTS ?MAX|LKQ|AUTOZONE|O'?REILLY|NAPA|CARQUEST|ADVANCE|RECYCL|VENDOR|SUPPLIER/i;
+function prettyWarehouseTag(t) {
+  t = t.trim().replace(/\s+/g, ' ');
+  var first = t.split(' ')[0], rest = t.slice(first.length).replace(/-(?=[A-Za-z]\d)/, ' · ');
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() + rest.toUpperCase();
 }
+function partInfo(item) {
+  var name = item, tag = '', m, re = /\(([^)]*)\)/g;
+  while ((m = re.exec(item))) {
+    var inner = m[1].trim(), afterSkuHyphen = /[A-Za-z0-9]\s*-\s*$/.test(item.slice(0, m.index));
+    if (inner && (WAREHOUSE_TAG.test(inner) || SUPPLIER_TAG.test(inner) || afterSkuHyphen)) {
+      tag = inner;
+      name = item.replace(new RegExp('\\s*-?\\s*\\(' + inner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\)'), '').replace(/\s+/g, ' ').trim();
+      break;
+    }
+  }
+  var skuM = /\b[A-Z]{2}\d{6,7}[A-Z]{0,2}\b/.exec(name), sku = skuM ? skuM[0] : '';
+  var src;
+  if (tag) {
+    src = WAREHOUSE_TAG.test(tag) ? { kind: 'warehouse', label: prettyWarehouseTag(tag) } : { kind: 'supplier', label: tag.toUpperCase() };
+  } else {
+    var loaded = typeof inventoryRows !== 'undefined' && inventoryRows;
+    var row = loaded && sku ? inventoryRows.find(function(r) { return String(r[0]).toUpperCase() === sku; }) : null;
+    var loc = sku && typeof invLocText === 'function' ? invLocText(sku) : '';
+    if (row && row[2] > 0) src = loc ? { kind: 'warehouse', label: loc.split('|').map(function(x) { return x.trim(); }).join('  /  ') } : { kind: 'stock', label: 'In stock — shelf not set' };
+    else if (row) src = { kind: 'buy', label: 'Sold out — buy from a supplier' };
+    else if (loaded && sku) src = { kind: 'none', label: 'Not in the catalog' };
+    else src = { kind: 'none', label: 'Source not listed' };
+  }
+  return { text: name, sku: sku, source: src };
+}
+var SOURCE_ICON = { warehouse: '📍', stock: '📍', supplier: '🏪', buy: '🛒', none: '❔' };
+function partsBlockHtml(part) {
+  var infos = partItems(part).map(partInfo);
+  if (!infos.length) return '';
+  var seen = {}, from = [];
+  infos.forEach(function(p) { if (p.source.kind !== 'none' && !seen[p.source.label]) { seen[p.source.label] = 1; from.push('<span class="src src-' + p.source.kind + '">' + SOURCE_ICON[p.source.kind] + ' ' + escapeHtml(p.source.label) + '</span>'); } });
+  return '<div class="parts-box"><div class="parts-head">🔧 Parts to deliver <span>' + infos.length + '</span>' + (from.length ? '<span class="from">• coming from</span>' + from.join('') : '') + '</div>' +
+    infos.map(function(p, i) {
+      var nm = p.sku ? escapeHtml(p.text).replace(p.sku, '') : escapeHtml(p.text);
+      return '<div class="part-row"><span class="pn">' + (i + 1) + '.</span>' + (p.sku ? '<span class="psku">' + escapeHtml(p.sku) + '</span>' : '') + '<span class="pname">' + nm.trim() + '</span>' +
+        '<span class="src src-' + p.source.kind + '">' + SOURCE_ICON[p.source.kind] + ' ' + escapeHtml(p.source.label) + '</span></div>';
+    }).join('') + '</div>';
+}
+function partsLine(part) {
+  var infos = partItems(part).map(partInfo);
+  if (!infos.length) return '';
+  function line(p) { return p.text + (p.source.kind !== 'none' ? ' — ' + SOURCE_ICON[p.source.kind] + ' ' + p.source.label : ''); }
+  return infos.length === 1 ? '🔧 ' + line(infos[0]) : '🔧\n' + infos.map(function(p) { return '- ' + line(p); }).join('\n');
+}
+function onInventoryLoaded() { if (typeof renderStops === 'function' && currentDay) renderStops(); }
 function listShareText() {
   var stops = visibleStops();
   if (!stops.length) return '';

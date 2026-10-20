@@ -33,7 +33,10 @@ function loadInventory() {
   }).then(function(snap) {
     var s = (snap && snap.val()) || {};
     inventoryLoc = { loc: s.locations || {} };
-  }).catch(function(e) { console.error('inventory load failed', e); }).then(function() { inventoryLoading = null; });
+  }).catch(function(e) { console.error('inventory load failed', e); }).then(function() {
+    inventoryLoading = null;
+    if (typeof onInventoryLoaded === 'function') onInventoryLoaded();
+  });
   return inventoryLoading;
 }
 function searchInventory(text, limit) {
