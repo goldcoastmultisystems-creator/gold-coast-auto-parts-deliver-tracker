@@ -184,7 +184,7 @@ var FIREBASE_ENABLED = true;
 var fbDb = null, session = null, settings = {};
 var PAGE_SIZE = 100, shown = PAGE_SIZE, filter = 'all', whFilter = 'all', view = 'all', canEdit = false;
 var WAREHOUSES = ['E2', 'E5', 'E9', 'Miramar', 'Dawson'];
-var inv = { defaultMin: 1, defaultTarget: 3, mins: {}, targets: {}, watch: {}, warehouses: {}, shelves: {}, locNotes: {} };
+var inv = { defaultMin: 1, defaultTarget: 3, mins: {}, targets: {}, watch: {}, locations: {} };
 var LEVEL_LABEL = { ok: 'In Stock', low: 'Low Stock', out: 'Sold Out' };
 
 function loadSession() { try { return JSON.parse(localStorage.getItem('kgps_session')) || null; } catch (e) { return null; } }
@@ -213,8 +213,8 @@ function startFirebase() {
       var v = snap.val() || {};
       inv.defaultMin = numOrNull(v.defaultMin) == null ? 1 : numOrNull(v.defaultMin);
       inv.defaultTarget = numOrNull(v.defaultTarget) == null ? 3 : numOrNull(v.defaultTarget);
-      inv.mins = v.mins || {}; inv.targets = v.targets || {}; inv.watch = v.watch || {}; inv.warehouses = v.warehouses || {}; inv.shelves = v.shelves || {}; inv.locNotes = v.locNotes || {};
-      inventoryLoc = { wh: inv.warehouses, shelf: inv.shelves };
+      inv.mins = v.mins || {}; inv.targets = v.targets || {}; inv.watch = v.watch || {}; inv.locations = v.locations || {};
+      inventoryLoc = { loc: inv.locations };
       if (inventoryRows) refreshAll(false);
     });
     loadInventory().then(function() { refreshAll(true); });
@@ -228,10 +228,8 @@ function minFor(sku) { var m = inv.mins[fbKey(sku)]; return m == null ? inv.defa
 function targetFor(sku) { var t = inv.targets[fbKey(sku)]; return t == null ? inv.defaultTarget : t; }
 function levelOf(r) { var q = r[2] || 0; return q <= 0 ? 'out' : (q <= minFor(r[0]) ? 'low' : 'ok'); }
 function isWatched(sku) { return !!inv.watch[fbKey(sku)]; }
-function warehouseOf(sku) { return inv.warehouses[fbKey(sku)] || ''; }
-function shelfOf(sku) { return inv.shelves[fbKey(sku)] || ''; }
-function alsoOf(sku) { return inv.locNotes[fbKey(sku)] || ''; }
-function locText(sku) { var w = warehouseOf(sku), s = shelfOf(sku); return [w, s && 'Shelf ' + s].filter(Boolean).join(' · '); }
+function locLines(sku) { return (inv.locations[fbKey(sku)] || '').split('|').map(function(x) { return x.trim(); }).filter(Boolean); }
+function locText(sku) { return locLines(sku).join(' | '); }
 function reorderItems() {
   if (!inventoryRows) return [];
   return inventoryRows.filter(function(r) { return isWatched(r[0]) && levelOf(r) !== 'ok'; }).map(function(r) {
@@ -247,8 +245,11 @@ function saveSetting(path, value) {
 function toggleWatch(sku) { saveSetting('watch/' + fbKey(sku), isWatched(sku) ? null : true); }
 function setMin(sku, v) { saveSetting('mins/' + fbKey(sku), numOrNull(v)); }
 function setTarget(sku, v) { saveSetting('targets/' + fbKey(sku), numOrNull(v)); }
-function setWarehouse(sku, code) { saveSetting('warehouses/' + fbKey(sku), code || null); if (alsoOf(sku)) saveSetting('locNotes/' + fbKey(sku), null); }
-function setShelf(sku, v) { v = String(v || '').trim().toUpperCase().slice(0, 40); saveSetting('shelves/' + fbKey(sku), v || null); if (alsoOf(sku)) saveSetting('locNotes/' + fbKey(sku), null); }
+function editLocation(sku) {
+  var v = prompt('Where is ' + sku + ' kept?\nSeparate several places with | (example: E9 · Shelf G2 | E2 · Shelf A3).\nLeave blank to clear.', locText(sku));
+  if (v === null) return;
+  saveSetting('locations/' + fbKey(sku), v.trim().slice(0, 200) || null);
+}
 function setDefault(name, v) { var n = numOrNull(v); if (n != null) saveSetting(name, n); }
 
 /* ---- views ---- */
@@ -295,7 +296,7 @@ function renderStats() {
     '<div class="stat"><div class="num">' + units + '</div><div class="lbl">Units on hand</div></div>';
 }
 function matches(r, tokens) {
-  var hay = (String(r[0]) + ' ' + String(r[1] || '') + ' ' + String(r[6] || '') + ' ' + warehouseOf(r[0]) + ' ' + shelfOf(r[0])).toLowerCase();
+  var hay = (String(r[0]) + ' ' + String(r[1] || '') + ' ' + String(r[6] || '') + ' ' + locText(r[0])).toLowerCase();
   return tokens.every(function(t) { return hay.indexOf(t) !== -1; });
 }
 function pill(level) { return '<span class="pill ' + level + '">' + LEVEL_LABEL[level] + '</span>'; }
@@ -308,25 +309,23 @@ function renderTable(reset) {
     var lv = levelOf(r);
     if (filter === 'watch') { if (!isWatched(r[0])) return false; }
     else if (filter !== 'all' && lv !== filter) return false;
-    var wh = warehouseOf(r[0]);
-    if (whFilter === 'none' ? !!wh : (whFilter !== 'all' && wh !== whFilter)) return false;
+    var lines = locLines(r[0]);
+    if (whFilter === 'none' ? lines.length > 0 : (whFilter !== 'all' && !lines.some(function(l) { return l.indexOf(whFilter) === 0; }))) return false;
     return !tokens.length || matches(r, tokens);
   });
   if (!tokens.length) list.sort(function(a, b) { return String(a[0]).localeCompare(String(b[0])); });
   document.getElementById('meta').textContent = list.length + ' part' + (list.length === 1 ? '' : 's') + (inventoryMeta && inventoryMeta.syncedAt ? ' • synced ' + inventoryMeta.syncedAt.slice(0, 10) : '') + (canEdit ? '' : ' • view only');
   body.innerHTML = list.slice(0, shown).map(function(r) {
     var sku = r[0], q = r[2] || 0, k = escapeHtml(sku), own = inv.mins[fbKey(sku)];
-    var whCell = canEdit
-      ? '<div style="display:flex; gap:4px; align-items:center;"><select class="wh" onchange="setWarehouse(\'' + k + '\', this.value)"><option value="">Warehouse</option>' + WAREHOUSES.map(function(w) { return '<option' + (warehouseOf(sku) === w ? ' selected' : '') + '>' + w + '</option>'; }).join('') + '</select>' +
-        '<input class="wh" style="width:96px;" placeholder="Shelf" value="' + escapeHtml(shelfOf(sku)) + '" onchange="setShelf(\'' + k + '\', this.value)" title="Shelf, e.g. B1 or F2"></div>' +
-        (alsoOf(sku) ? '<div class="sub2" style="margin-top:2px;" title="Also listed here in older warehouse lists — check before picking">also seen: ' + escapeHtml(alsoOf(sku)) + '</div>' : '')
-      : (locText(sku) ? '<b>' + escapeHtml(locText(sku)) + '</b>' + (alsoOf(sku) ? '<div class="sub2">also seen: ' + escapeHtml(alsoOf(sku)) + '</div>' : '') : '<span class="sub2">—</span>');
+    var lines = locLines(sku);
+    var whCell = (lines.length ? lines.map(function(l) { return '<div><b>' + escapeHtml(l) + '</b></div>'; }).join('') : '<span class="sub2">—</span>') +
+      (canEdit ? '<button class="star" style="font-size:13px;" title="Edit location" onclick="editLocation(\'' + k + '\')">✎</button>' : '');
     var lowCell = canEdit
       ? '<input class="num-input" type="number" min="0" step="1" value="' + (own == null ? '' : own) + '" placeholder="' + inv.defaultMin + '" onchange="setMin(\'' + k + '\', this.value)">'
       : minFor(sku);
     return '<tr><td><button class="star' + (isWatched(sku) ? ' on' : '') + '"' + (canEdit ? '' : ' disabled') + ' onclick="toggleWatch(\'' + k + '\')" title="Watch for reorder alerts">' + (isWatched(sku) ? '★' : '☆') + '</button></td>' +
       '<td class="sku">' + k + '</td><td>' + escapeHtml(r[6]) + (r[7] ? ' <span class="sub2">grade ' + escapeHtml(r[7]) + '</span>' : '') +
-        (locText(sku) ? '<div class="show-sm sub2" style="color:var(--gold-2);">📍 ' + escapeHtml(locText(sku)) + '</div>' : '') + '</td>' +
+        (lines.length ? lines.map(function(l) { return '<div class="show-sm sub2" style="color:var(--gold-2);">📍 ' + escapeHtml(l) + '</div>'; }).join('') : '') + '</td>' +
       '<td class="hide-sm sub2">' + escapeHtml(r[1] || '—') + '</td><td class="hide-sm">' + whCell + '</td>' +
       '<td>' + pill(levelOf(r)) + '</td><td class="num">' + q + '</td><td class="num hide-sm">' + lowCell + '</td>' +
       '<td class="num">' + (r[4] != null ? '$' + Number(r[4]).toFixed(2) : '—') + '</td></tr>';
