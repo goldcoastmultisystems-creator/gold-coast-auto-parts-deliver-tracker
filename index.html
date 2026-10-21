@@ -100,6 +100,33 @@ main { max-width: 1000px; margin: 0px auto; padding: 18px 16px 0px; }
 .route-group-count { background: rgba(212,164,65,0.16); border: 1px solid var(--glass-border-gold); color: var(--gold-2); border-radius: 20px; padding: 2px 9px; font-size: 11px; }
 .route-group .stop-card { margin-bottom: 14px; }
 .route-group .stop-card:last-child { margin-bottom: 0; }
+#pageOverlay { z-index: 210; }
+.pp-wrap { max-width: 1150px; margin: 0 auto; padding: 16px; }
+.pp-title { font-size: 20px; font-weight: 800; margin: 0 0 2px; color: var(--text); }
+.pp-sub { font-size: 12.5px; color: var(--text-soft); margin-bottom: 14px; }
+.pp-sub2 { font-size: 11px; color: var(--text-soft); }
+.pp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.pp-stat { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px; text-align: center; }
+.pp-stat .n { font-size: 22px; font-weight: 800; color: var(--text); }
+.pp-stat .l { font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
+.pp-stat.good .n { color: var(--green); } .pp-stat.warn .n { color: var(--amber); } .pp-stat.bad .n { color: var(--red); }
+.pp-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.pp-controls input { flex: 1 1 260px; border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px 12px; font-size: 14px; background: rgba(255,255,255,0.06); color: var(--text); }
+.pp-seg { display: flex; flex-wrap: wrap; border: 1px solid var(--glass-border); border-radius: 10px; overflow: hidden; }
+.pp-seg button { background: transparent; border: none; color: var(--text-soft); padding: 9px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.pp-seg button.active { background: rgba(212,164,65,0.22); color: var(--gold-2); }
+.pp-meta { font-size: 12px; color: var(--text-soft); margin-bottom: 8px; }
+.pp-table { width: 100%; border-collapse: collapse; font-size: 13px; color: var(--text); }
+.pp-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-soft); padding: 8px; border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; background: #0d0b08; }
+.pp-table td { padding: 9px 8px; border-bottom: 1px solid var(--glass-border); vertical-align: top; }
+.pp-table td.num, .pp-table th.num { text-align: right; white-space: nowrap; }
+.pp-sku { font-weight: 700; color: var(--gold-2); white-space: nowrap; }
+.pp-pill { display: inline-block; border-radius: 99px; padding: 2px 9px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.pp-pill.ok { background: rgba(52,211,153,0.15); color: var(--green); }
+.pp-pill.low { background: rgba(251,191,36,0.15); color: var(--amber); }
+.pp-pill.out { background: rgba(248,113,113,0.15); color: var(--red); }
+.pp-pill.none { background: rgba(255,255,255,0.06); color: var(--text-soft); }
+@media (max-width: 640px) { .pp-hide { display: none; } .pp-table td, .pp-table th { padding: 7px 4px; } }
 .parts-box { grid-column: 1 / -1; margin-top: 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(212,164,65,0.4); background: rgba(212,164,65,0.08); }
 .parts-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: var(--gold-2); margin-bottom: 8px; }
 .parts-head .from { color: var(--text-soft); font-weight: 700; }
@@ -2788,43 +2815,112 @@ function printReport() {
     '<table><tr><th>Location</th><th>Type</th><th>Status</th><th>Address</th><th>Notes</th></tr>'+rows+'</table>';
   openPageOverlay('End of Day Report', reportDocShell('End of Day Report', body));
 }
-var SOURCE_COLOR = { warehouse: '#8a6410', stock: '#0f7b53', supplier: '#1d4ed8', buy: '#b91c1c', none: '#5b6a85' };
-function partsBySourceRows(stops) {
+/* ---------- PARTS TO PULL / PURCHASE (same table style as Inventory Management) ---------- */
+var ppState = { mode: 'pull', q: '', where: 'all', stock: 'all' };
+var PP_WHERE = [['all', 'All sources'], ['E2', 'E2'], ['E5', 'E5'], ['E9', 'E9'], ['Miramar', 'Miramar'], ['Dawson', 'Dawson'], ['supplier', 'Suppliers'], ['unknown', 'Unknown']];
+var PP_STOCK = [['all', 'All'], ['ok', 'In stock'], ['low', 'Low stock'], ['out', 'Sold out']];
+var PP_LEVEL_LABEL = { ok: 'In Stock', low: 'Low Stock', out: 'Sold Out', none: 'Not in catalog' };
+function ppAllRows() {
+  var stops = currentDay.stops.filter(function(s) { return s.part && s.part.trim() && (ppState.mode === 'buy' ? s.type === 'pickup' : s.type !== 'pickup'); });
   var rows = [];
   stops.forEach(function(s) {
     partItems(s.part).forEach(function(it) {
-      var p = partInfo(it);
-      rows.push({ p: p, stop: s });
+      var p = partInfo(it), q = /^(\d+)×\s/.exec(it);
+      var name = p.text.replace(/^\d+×\s*/, '');
+      if (p.sku) name = name.replace(p.sku, '').replace(/\s+/g, ' ').trim();
+      var inv = (typeof inventoryRows !== 'undefined' && inventoryRows && p.sku) ? inventoryRows.find(function(r) { return String(r[0]).toUpperCase() === p.sku; }) : null;
+      var lines = p.source.kind === 'warehouse' ? p.source.label.split('/').map(function(x) { return x.trim(); }).filter(Boolean)
+        : (p.source.kind === 'supplier' ? ['🏪 ' + p.source.label] : (p.source.kind === 'buy' ? ['🛒 Buy from a supplier'] : (p.source.kind === 'stock' ? ['Shelf not set'] : ['—'])));
+      rows.push({ sku: p.sku, name: name, need: q ? Number(q[1]) : 1, kind: p.source.kind, lines: lines,
+        level: inv ? (inv[2] <= 0 ? 'out' : (inv[2] <= 1 ? 'low' : 'ok')) : 'none', onHand: inv ? inv[2] : null, stop: s });
     });
   });
-  rows.sort(function(a, b) { return a.p.source.label.localeCompare(b.p.source.label) || a.p.text.localeCompare(b.p.text); });
-  var html = '', last = null;
-  rows.forEach(function(r) {
-    var src = r.p.source;
-    if (src.label !== last) {
-      last = src.label;
-      html += '<tr><td colspan="4" style="background:#f4f6fb;font-weight:800;color:' + SOURCE_COLOR[src.kind] + ';">' + SOURCE_ICON[src.kind] + ' ' + escapeHtml(src.label) + '</td></tr>';
-    }
-    html += '<tr><td>' + escapeHtml(r.p.text) + '</td><td>' + escapeHtml(r.stop.loc) + '</td><td>' + (r.stop.so ? escapeHtml(r.stop.so) : '—') + '</td><td>' + STATUS_LABELS[r.stop.status] + '</td></tr>';
+  function sortKey(r) { return r.kind === 'none' || r.kind === 'stock' ? '~' + r.lines[0] : r.lines[0]; }
+  rows.sort(function(a, b) { return sortKey(a).localeCompare(sortKey(b)) || a.sku.localeCompare(b.sku); });
+  return rows;
+}
+function ppMatchesWhere(r, w) {
+  if (w === 'all') return true;
+  if (w === 'supplier') return r.kind === 'supplier' || r.kind === 'buy';
+  if (w === 'unknown') return r.kind === 'none' || r.kind === 'stock';
+  if (r.kind !== 'warehouse') return false;
+  var text = r.lines.join(' | ');
+  return /^E\d$/.test(w) ? new RegExp('\\b' + w + '\\b').test(text) : text.toLowerCase().indexOf(w.toLowerCase()) !== -1;
+}
+function ppFilteredRows() {
+  var q = ppState.q.toLowerCase().split(/\s+/).filter(Boolean);
+  return ppAllRows().filter(function(r) {
+    if (!ppMatchesWhere(r, ppState.where)) return false;
+    if (ppState.stock !== 'all' && r.level !== ppState.stock) return false;
+    var hay = (r.sku + ' ' + r.name + ' ' + r.lines.join(' ') + ' ' + (r.stop.loc || '') + ' ' + (r.stop.so || '')).toLowerCase();
+    return q.every(function(t) { return hay.indexOf(t) !== -1; });
   });
-  return { html: html, count: rows.length };
 }
-function openPartsList() {
-  var withParts = currentDay.stops.filter(function(s) { return s.part && s.part.trim() && s.type !== 'pickup'; });
-  var r = partsBySourceRows(withParts);
-  var body = '<h1>Parts to Pull</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • grouped by where each part comes from</h2>' +
-    (r.count ? '<table><tr><th>Part # / Description</th><th>Stop</th><th>SO#</th><th>Status</th></tr>'+r.html+'</table>'
-      : '<p style="color:#5b6a85;">No stops have a part number or description yet.</p>');
-  openPageOverlay('Parts to Pull', reportDocShell('Parts to Pull', body));
+function ensurePartsOverlay() {
+  if (document.getElementById('partsOverlay')) return;
+  var div = document.createElement('div');
+  div.className = 'page-overlay';
+  div.id = 'partsOverlay';
+  div.innerHTML = '<div class="page-overlay-toolbar"><button onclick="closePartsOverlay()">← Back</button><span class="page-overlay-title" id="partsOverlayTitle"></span>' +
+    '<span style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;"><button onclick="ppShare()">↗ Share</button><button onclick="ppWhatsApp()">💬 WhatsApp</button><button onclick="ppPrint()">🖨 Printable</button></span></div>' +
+    '<div style="flex:1; overflow-y:auto;"><div class="pp-wrap" id="partsOverlayBody"></div></div>';
+  document.body.appendChild(div);
 }
-function openPartsToPurchase() {
-  var toBuy = currentDay.stops.filter(function(s) { return s.part && s.part.trim() && s.type === 'pickup'; });
-  var r = partsBySourceRows(toBuy);
-  var body = '<h1>Parts to Purchase</h1><h2>'+(settings.companyName||'')+' • '+fmtDateDisplay(todayKey())+' • pickups from suppliers, grouped by source</h2>' +
-    (r.count ? '<table><tr><th>Part # / Description</th><th>Stop</th><th>SO#</th><th>Status</th></tr>'+r.html+'</table>'
-      : '<p style="color:#5b6a85;">No pickup stops with a part number or description yet.</p>');
-  openPageOverlay('Parts to Purchase', reportDocShell('Parts to Purchase', body));
+function openPartsOverlay(mode) {
+  ensurePartsOverlay();
+  ppState = { mode: mode, q: '', where: 'all', stock: 'all' };
+  document.getElementById('partsOverlayTitle').textContent = mode === 'buy' ? 'Parts to Purchase' : 'Parts to Pull';
+  document.getElementById('partsOverlay').classList.add('open');
+  if (typeof loadInventory === 'function') loadInventory();
+  renderPartsOverlay();
 }
+function closePartsOverlay() { var o = document.getElementById('partsOverlay'); if (o) o.classList.remove('open'); }
+function ppSet(key, val) { ppState[key] = val; renderPartsOverlay(); var i = document.getElementById('ppSearch'); if (i && key === 'q') { i.focus(); i.setSelectionRange(val.length, val.length); } }
+function renderPartsOverlay() {
+  var body = document.getElementById('partsOverlayBody');
+  if (!body || !document.getElementById('partsOverlay').classList.contains('open')) return;
+  var all = ppAllRows(), rows = ppFilteredRows(), buy = ppState.mode === 'buy';
+  var counts = { ok: 0, low: 0, out: 0 }, units = 0, stopIds = {};
+  all.forEach(function(r) { if (counts[r.level] != null) counts[r.level]++; units += r.need; stopIds[r.stop.id] = true; });
+  var seg = function(opts, key) { return '<div class="pp-seg">' + opts.map(function(o) { return '<button class="' + (ppState[key] === o[0] ? 'active' : '') + '" onclick="ppSet(\'' + key + '\',\'' + o[0] + '\')">' + o[1] + '</button>'; }).join('') + '</div>'; };
+  body.innerHTML =
+    '<h2 class="pp-title">' + (buy ? 'Parts to Purchase' : 'Parts to Pull') + '</h2>' +
+    '<div class="pp-sub">' + escapeHtml(settings.companyName || 'Gold Coast Auto Parts') + ' • ' + fmtDateDisplay(todayKey()) + ' • ' + (buy ? 'pickups from suppliers' : 'grouped by where each part is kept') + '</div>' +
+    '<div class="pp-stats"><div class="pp-stat"><div class="n">' + all.length + '</div><div class="l">Parts</div></div><div class="pp-stat"><div class="n">' + units + '</div><div class="l">Units needed</div></div>' +
+      '<div class="pp-stat good"><div class="n">' + counts.ok + '</div><div class="l">In stock</div></div><div class="pp-stat warn"><div class="n">' + counts.low + '</div><div class="l">Low stock</div></div>' +
+      '<div class="pp-stat bad"><div class="n">' + counts.out + '</div><div class="l">Sold out</div></div><div class="pp-stat"><div class="n">' + Object.keys(stopIds).length + '</div><div class="l">Stops</div></div></div>' +
+    '<div class="pp-controls"><input id="ppSearch" type="search" placeholder="Search SKU, part, customer, SO#, shelf…" value="' + escapeHtml(ppState.q) + '" oninput="ppSet(\'q\', this.value)" autocomplete="off"></div>' +
+    '<div class="pp-controls">' + seg(PP_STOCK, 'stock') + seg(PP_WHERE, 'where') + '</div>' +
+    '<div class="pp-meta">' + rows.length + ' part' + (rows.length === 1 ? '' : 's') + '</div>' +
+    '<table class="pp-table"><thead><tr><th>SKU</th><th>Part</th><th class="num">Need</th><th>Warehouse / Shelf</th><th>Status</th><th class="num pp-hide">On hand</th><th>Deliver to</th><th class="pp-hide">Stop status</th></tr></thead><tbody>' +
+    (rows.length ? rows.map(function(r) {
+      return '<tr><td class="pp-sku">' + escapeHtml(r.sku || '—') + '</td><td>' + escapeHtml(r.name) + '</td><td class="num"><b>' + r.need + '</b></td>' +
+        '<td>' + r.lines.map(function(l) { return '<div><b>' + escapeHtml(l) + '</b></div>'; }).join('') + '</td>' +
+        '<td><span class="pp-pill ' + r.level + '">' + PP_LEVEL_LABEL[r.level] + '</span></td><td class="num pp-hide">' + (r.onHand == null ? '—' : r.onHand) + '</td>' +
+        '<td>' + escapeHtml(r.stop.loc || '') + (r.stop.so ? '<div class="pp-sub2">' + escapeHtml(r.stop.so) + '</div>' : '') + '</td><td class="pp-hide">' + STATUS_LABELS[r.stop.status] + '</td></tr>';
+    }).join('') : '<tr><td colspan="8" class="pp-sub2" style="padding:18px;">' + (all.length ? 'No parts match these filters.' : 'No stops have a part number or description yet.') + '</td></tr>') +
+    '</tbody></table>';
+}
+function ppText() {
+  var rows = ppFilteredRows();
+  if (!rows.length) return '';
+  var buy = ppState.mode === 'buy';
+  return '🔧 ' + (buy ? 'Parts to purchase' : 'Parts to pull') + ' — ' + fmtDateDisplay(todayKey()) + '\n\n' + rows.map(function(r) {
+    return '• ' + (r.sku ? r.sku + ' — ' : '') + r.name + (r.need > 1 ? ' ×' + r.need : '') + '\n   📍 ' + r.lines.join(' / ') + '\n   🏢 ' + (r.stop.loc || '') + (r.stop.so ? ' (' + r.stop.so + ')' : '');
+  }).join('\n\n') + shareFooter();
+}
+function ppShare() { var t = ppText(); if (!t) { showToast('Nothing to share with these filters.', ''); return; } shareText(ppState.mode === 'buy' ? 'Parts to Purchase' : 'Parts to Pull', t); }
+function ppWhatsApp() { var t = ppText(); if (!t) { showToast('Nothing to share with these filters.', ''); return; } window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank'); }
+function ppPrint() {
+  var rows = ppFilteredRows(), buy = ppState.mode === 'buy', title = buy ? 'Parts to Purchase' : 'Parts to Pull';
+  var html = '<h1>' + title + '</h1><h2>' + escapeHtml(settings.companyName || '') + ' • ' + fmtDateDisplay(todayKey()) + '</h2>' +
+    (rows.length ? '<table><tr><th>SKU</th><th>Part</th><th>Need</th><th>Warehouse / Shelf</th><th>Deliver to</th><th>SO#</th></tr>' + rows.map(function(r) {
+      return '<tr><td><b>' + escapeHtml(r.sku || '—') + '</b></td><td>' + escapeHtml(r.name) + '</td><td>' + r.need + '</td><td>' + r.lines.map(escapeHtml).join('<br>') + '</td><td>' + escapeHtml(r.stop.loc || '') + '</td><td>' + escapeHtml(r.stop.so || '—') + '</td></tr>';
+    }).join('') + '</table>' : '<p style="color:#5b6a85;">Nothing to show.</p>');
+  openPageOverlay(title, reportDocShell(title, html));
+}
+function openPartsList() { openPartsOverlay('pull'); }
+function openPartsToPurchase() { openPartsOverlay('buy'); }
 function currentUserLabel() {
   var who = (session && session.name) || settings.driverName || 'Someone';
   var role = session ? (session.type === 'owner' ? 'Owner' : (session.role || '')) : (settings.driverRole || '');
@@ -3016,7 +3112,10 @@ function partsLine(part) {
   function line(p) { return p.text + (p.source.kind !== 'none' ? ' — ' + SOURCE_ICON[p.source.kind] + ' ' + p.source.label : ''); }
   return infos.length === 1 ? '🔧 ' + line(infos[0]) : '🔧\n' + infos.map(function(p) { return '- ' + line(p); }).join('\n');
 }
-function onInventoryLoaded() { if (typeof renderStops === 'function' && currentDay) renderStops(); }
+function onInventoryLoaded() {
+  if (typeof renderStops === 'function' && currentDay) renderStops();
+  if (typeof renderPartsOverlay === 'function' && currentDay) renderPartsOverlay();
+}
 function listShareText() {
   var stops = visibleStops();
   if (!stops.length) return '';
