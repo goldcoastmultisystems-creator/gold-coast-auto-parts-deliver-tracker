@@ -80,6 +80,21 @@ function zohoSetStatus(v) { zohoState.statuses = v; zohoState.loaded = false; fe
 function zohoSetQuery(v) { zohoState.q = v.toLowerCase(); renderZohoList(); }
 function zohoToggleOpen(id) { zohoState.open[id] = !zohoState.open[id]; renderZohoList(); }
 function zohoToggleSelect(id) { zohoState.selected[id] = !zohoState.selected[id]; renderZohoActions(); }
+/* Click a part in an order: on the Inventory page it fills the search box; elsewhere it opens Inventory already searched. */
+function zohoSearchPart(term) {
+  var box = document.getElementById('q');
+  if (box && typeof renderTable === 'function') {
+    if (typeof setView === 'function') setView('all');
+    if (typeof setFilter === 'function') setFilter('all');
+    if (typeof setWarehouseFilter === 'function') setWarehouseFilter('all');
+    box.value = term;
+    renderTable(true);
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    box.focus();
+    return;
+  }
+  location.href = 'inventory.html?search=' + encodeURIComponent(term);
+}
 
 function zohoStockTag(line) {
   if (!line.sku || typeof inventoryRows === 'undefined' || !inventoryRows) return '';
@@ -161,7 +176,9 @@ function zohoDetailHtml(o) {
   var cell = 'padding:6px 8px; border-bottom:1px solid var(--glass-border); vertical-align:top;';
   var rows = o.lines.map(function(l) {
     var progress = [l.packed != null ? l.packed + ' packed' : '', l.invoiced != null ? l.invoiced + ' invoiced' : '', l.shipped ? l.shipped + ' shipped' : '', l.backordered ? l.backordered + ' backordered' : ''].filter(Boolean).join(' • ');
-    return '<tr><td style="' + cell + '"><b>' + escapeHtml(l.name) + '</b>' + (l.sku ? '<div style="font-size:11px; color:var(--gold-2);">SKU: ' + escapeHtml(l.sku) + '</div>' : '') +
+    var term = l.sku || l.name;
+    return '<tr><td style="' + cell + '"><div style="cursor:pointer;" title="Click to find this part in Inventory" onclick="zohoSearchPart(\'' + escapeHtml(String(term).replace(/['\\]/g, '')) + '\')">' +
+      '<b style="border-bottom:1px dashed var(--gold-2);">' + escapeHtml(l.name) + '</b> <span style="font-size:11px; color:var(--gold-2); white-space:nowrap;">🔍 find</span>' + (l.sku ? '<div style="font-size:11px; color:var(--gold-2);">SKU: ' + escapeHtml(l.sku) + '</div>' : '') + '</div>' +
       (l.description && l.description !== l.name ? '<div style="font-size:11px; color:var(--text-soft);">' + escapeHtml(l.description) + '</div>' : '') + '<div style="font-size:11px;">' + zohoStockTag(l).trim() + '</div></td>' +
       '<td style="' + cell + ' text-align:right; white-space:nowrap;">' + escapeHtml(String(l.qty)) + (l.unit ? ' <span style="color:var(--text-soft); font-size:11px;">' + escapeHtml(l.unit) + '</span>' : '') + '</td>' +
       '<td style="' + cell + ' font-size:11.5px;">' + escapeHtml(l.location || '') + '</td>' +

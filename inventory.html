@@ -217,7 +217,11 @@ function startFirebase() {
       inventoryLoc = { loc: inv.locations };
       if (inventoryRows) refreshAll(false);
     });
-    loadInventory().then(function() { refreshAll(true); });
+    loadInventory().then(function() {
+      refreshAll(true);
+      var wanted = new URLSearchParams(location.search).get('search');
+      if (wanted) { document.getElementById('q').value = wanted; renderTable(true); document.getElementById('q').scrollIntoView({ block: 'center' }); }
+    });
   });
   firebase.auth().signInAnonymously().catch(function() { showNotice('Could not connect. Check your internet and refresh.'); });
 }
