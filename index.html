@@ -292,7 +292,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 .leaflet-bar a:hover { background: rgba(212,164,65,0.2) !important; }
 .leaflet-control-attribution { background: rgba(10,10,10,0.7) !important; color: var(--text-soft) !important; }
 .leaflet-control-attribution a { color: var(--gold-2) !important; }
-@media (max-width: 700px) { .driver-list-wrap { display: none; } }
+@media (max-width: 700px) { .map-body { flex-direction: column; } .driver-list-wrap { width: 100%; max-height: 40vh; border-left: none; border-top: 1px solid var(--glass-border-gold); } }
 @media (max-width: 520px) { .details { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -614,12 +614,12 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 <div class="page-overlay" id="mapOverlay">
   <div class="page-overlay-toolbar">
     <button onclick="closeLiveMap()">← Back</button>
-    <span class="page-overlay-title">Live Driver Map</span>
+    <span class="page-overlay-title" id="mapTitle">Route Map</span>
   </div>
-  <div style="flex:1; display:flex; min-height:0;">
-    <div id="liveMapEl" style="flex:1;"></div>
+  <div class="map-body" style="flex:1; display:flex; min-height:0;">
+    <div id="liveMapEl" style="flex:1; min-height:200px;"></div>
     <div id="driverListWrap" class="driver-list-wrap">
-      <div class="section-title" style="margin:0 0 8px;"><h2 style="font-size:12.5px;">Drivers</h2></div>
+      <div class="section-title" style="margin:0 0 4px;"><h2 style="font-size:12.5px;">Routes &amp; suggestions</h2></div>
       <div id="driverListPanel"></div>
     </div>
   </div>
@@ -874,43 +874,67 @@ function openLiveMap() {
     leafletMap = L.map('liveMapEl', { zoomControl: true }).setView([27.6648, -81.5158], 7); // Florida
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(leafletMap);
   }
+  document.getElementById('mapTitle').textContent = DRIVER_TRACKING_ENABLED ? 'Live Driver Map' : 'Route Map';
+  mapNeedsFit = true;
   geocodeAllStops();
-  setTimeout(function() { leafletMap.invalidateSize(); renderLiveMapMarkers(); }, 120);
+  setTimeout(function() { leafletMap.invalidateSize(); renderLiveMapMarkers(); renderDriverListPanel(); }, 120);
 }
 function closeLiveMap() { document.getElementById('mapOverlay').classList.remove('open'); }
+var ROUTE_COLORS = ['#d4a441', '#60a5fa', '#f472b6', '#34d399', '#a78bfa', '#fb923c', '#22d3ee'];
+var mapLayerGroup = null, mapPreview = null, mapNeedsFit = true;
+function mapRouteKeys() {
+  var seen = {}, keys = [];
+  (currentDay.stops || []).forEach(function(s) { var k = s.assignedTo || '__unassigned__'; if (!seen[k]) { seen[k] = true; keys.push(k); } });
+  keys.sort(function(a, b) { return a === '__unassigned__' ? 1 : (b === '__unassigned__' ? -1 : a.localeCompare(b)); });
+  return keys;
+}
+function mapRouteColor(key) { var i = mapRouteKeys().indexOf(key); return key === '__unassigned__' ? '#9a94a8' : ROUTE_COLORS[(i < 0 ? 0 : i) % ROUTE_COLORS.length]; }
+function mapRouteLabel(key) { return key === '__unassigned__' ? 'Unassigned' : key + "'s route"; }
+function mapPreviewRoute(key, mode) { mapPreview = { key: key, mode: mode }; mapNeedsFit = true; renderLiveMapMarkers(); renderDriverListPanel(); }
+function mapClearPreview() { mapPreview = null; renderLiveMapMarkers(); renderDriverListPanel(); }
+function mapApplyPreview() {
+  if (!mapPreview) return;
+  routeUI.key = mapPreview.key; routeUI.mode = mapPreview.mode;
+  mapPreview = null;
+  applyRouteSuggestion();
+  renderDriverListPanel();
+}
 function renderLiveMapMarkers() {
   if (!leafletMap) return;
-  var bounds = [];
+  if (!mapLayerGroup) mapLayerGroup = L.layerGroup().addTo(leafletMap);
+  mapLayerGroup.clearLayers();
+  var bounds = [[DEPOT.lat, DEPOT.lng]];
+  L.marker([DEPOT.lat, DEPOT.lng], { icon: L.divIcon({ className: 'stop-pin-wrap', html: '<div class="stop-pin" style="background:#1a1713; border:2px solid #d4a441; width:30px; height:30px; font-size:15px;">🏭</div>', iconSize: [30, 30], iconAnchor: [15, 15] }) })
+    .addTo(mapLayerGroup).bindPopup('<b>Davie warehouse</b><br>Routes are measured from here' + (DRIVER_TRACKING_ENABLED ? ' unless a driver\'s live location is available' : ''));
 
-  /* today's planned stops, in route order, colored by status */
-  var stopIds = [];
-  var routePts = [];
-  (currentDay.stops || []).forEach(function(s, i) {
-    if (typeof s.lat !== 'number' || typeof s.lng !== 'number') return;
-    stopIds.push(s.id);
-    routePts.push([s.lat, s.lng]);
-    var color = STOP_MARKER_COLOR[s.status] || STOP_MARKER_COLOR.pending;
-    var html = '<div class="stop-pin" style="background:' + color + ';">' + (i + 1) + '</div>';
-    var icon = L.divIcon({ className: 'stop-pin-wrap', html: html, iconSize: [26,26], iconAnchor: [13,13] });
-    if (!stopMarkers[s.id]) {
-      stopMarkers[s.id] = L.marker([s.lat, s.lng], { icon: icon }).addTo(leafletMap);
-    } else {
-      stopMarkers[s.id].setLatLng([s.lat, s.lng]);
-      stopMarkers[s.id].setIcon(icon);
+  /* each route gets its own color, line and 1..n numbering (matching the board) */
+  mapRouteKeys().forEach(function(key) {
+    var color = mapRouteColor(key);
+    var list = (currentDay.stops || []).filter(function(s) { return (s.assignedTo || '__unassigned__') === key; });
+    var previewing = mapPreview && mapPreview.key === key;
+    var order = {}, start = routeStart(key);
+    if (previewing) routeOrder(routeGroupStops(key), start, mapPreview.mode).forEach(function(s, i) { order[s.id] = i + 1; });
+    var pts = [];
+    list.forEach(function(s, i) {
+      if (typeof s.lat !== 'number' || typeof s.lng !== 'number') return;
+      var num = previewing && order[s.id] ? order[s.id] : i + 1;
+      var fill = previewing && order[s.id] ? '#22c55e' : (STOP_MARKER_COLOR[s.status] || STOP_MARKER_COLOR.pending);
+      var html = '<div class="stop-pin" style="background:' + fill + '; box-shadow:0 0 0 3px ' + color + ';' + (previewing && order[s.id] ? 'color:#04210f;' : '') + '">' + num + '</div>';
+      L.marker([s.lat, s.lng], { icon: L.divIcon({ className: 'stop-pin-wrap', html: html, iconSize: [26, 26], iconAnchor: [13, 13] }) })
+        .addTo(mapLayerGroup).bindPopup('<b>' + num + '. ' + escapeHtml(s.loc || 'Stop') + '</b><br>' + escapeHtml(s.addr || '') + '<br>' + STATUS_LABELS[s.status] + '<br><span style="color:' + color + ';">' + escapeHtml(mapRouteLabel(key)) + '</span>');
+      pts.push([s.lat, s.lng]);
+      bounds.push([s.lat, s.lng]);
+    });
+    if (previewing) {
+      var path = [[start.lat, start.lng]].concat(routeOrder(routeGroupStops(key), start, mapPreview.mode).filter(stopHasCoords).map(function(s) { return [s.lat, s.lng]; }));
+      if (path.length > 1) L.polyline(path, { color: '#22c55e', weight: 4, opacity: 0.9 }).addTo(mapLayerGroup);
+    } else if (pts.length > 1) {
+      L.polyline(pts, { color: color, weight: 2.5, opacity: 0.6, dashArray: '6,8' }).addTo(mapLayerGroup);
     }
-    stopMarkers[s.id].bindPopup('<b>' + (i + 1) + '. ' + escapeHtml(s.loc || 'Stop') + '</b><br>' + escapeHtml(s.addr || '') + '<br>' + STATUS_LABELS[s.status]);
-    bounds.push([s.lat, s.lng]);
   });
-  Object.keys(stopMarkers).forEach(function(id) {
-    if (stopIds.indexOf(id) === -1) { leafletMap.removeLayer(stopMarkers[id]); delete stopMarkers[id]; }
-  });
-  if (routeLine) { leafletMap.removeLayer(routeLine); routeLine = null; }
-  if (routePts.length > 1) {
-    routeLine = L.polyline(routePts, { color: '#d4a441', weight: 2, opacity: 0.55, dashArray: '6,8' }).addTo(leafletMap);
-  }
 
-  /* live driver positions */
-  var ids = Object.keys(driverPositions || {});
+  /* live driver positions (only while driver tracking is enabled) */
+  var ids = DRIVER_TRACKING_ENABLED ? Object.keys(driverPositions || {}) : [];
   ids.forEach(function(id) {
     var d = driverPositions[id];
     if (typeof d.lat !== 'number' || typeof d.lng !== 'number') return;
@@ -930,20 +954,43 @@ function renderLiveMapMarkers() {
     if (ids.indexOf(id) === -1) { leafletMap.removeLayer(driverMarkers[id]); delete driverMarkers[id]; }
   });
 
-  if (bounds.length) leafletMap.fitBounds(bounds, { maxZoom: 14, padding: [40,40] });
+  var mapSize = leafletMap.getSize();
+  if (mapNeedsFit && bounds.length > 1 && mapSize.x > 50 && mapSize.y > 50) { leafletMap.fitBounds(bounds, { maxZoom: 14, padding: [40, 40] }); mapNeedsFit = false; }
 }
 function renderDriverListPanel() {
   var el = document.getElementById('driverListPanel');
-  if (!el) return;
-  var ids = Object.keys(driverPositions || {});
-  if (!ids.length) { el.innerHTML = '<div class="hist-empty">No drivers currently sharing their location.</div>'; return; }
-  el.innerHTML = ids.map(function(id) {
-    var d = driverPositions[id];
-    var stale = (Date.now() - (d.updatedAt || 0)) > 5 * 60 * 1000;
-    return '<div class="hist-date-row" onclick="leafletMap && leafletMap.setView([' + d.lat + ',' + d.lng + '], 15)">' +
-      '<span class="d">' + (stale ? '⚪' : '🟢') + ' ' + escapeHtml(d.name || 'Driver') + '</span>' +
-      '<span class="c">' + timeAgo(d.updatedAt || 0) + '</span></div>';
-  }).join('');
+  if (!el || !currentDay) return;
+  var keys = mapRouteKeys();
+  var html = '';
+  if (!keys.length) html = '<div class="hist-empty">No stops on the board yet.</div>';
+  keys.forEach(function(key) {
+    var color = mapRouteColor(key), all = currentDay.stops.filter(function(s) { return (s.assignedTo || '__unassigned__') === key; });
+    var open = routeGroupStops(key), start = routeStart(key);
+    var head = '<div style="display:flex; align-items:center; gap:7px; font-weight:800; font-size:12.5px;"><span style="width:11px; height:11px; border-radius:50%; background:' + color + '; flex-shrink:0;"></span>' + escapeHtml(mapRouteLabel(key)) +
+      '<span style="margin-left:auto; color:var(--text-soft); font-weight:700;">' + open.length + ' open / ' + all.length + '</span></div>';
+    var body = '';
+    if (open.length > 1) {
+      var cur = routeLength(open, start), near = routeLength(routeOrder(open, start, 'nearest'), start), far = routeLength(routeOrder(open, start, 'furthest'), start);
+      var save = cur - near, active = mapPreview && mapPreview.key === key ? mapPreview.mode : null;
+      body += '<div style="font-size:11.5px; color:var(--text-soft); margin:4px 0 6px;">Now <b style="color:var(--text);">' + cur.toFixed(1) + ' mi</b> • nearest first ' + near.toFixed(1) + ' mi • furthest first ' + far.toFixed(1) + ' mi' +
+        (save >= 0.5 && save >= cur * 0.05 ? '<br><span style="color:var(--green); font-weight:700;">💡 Nearest first saves ~' + save.toFixed(1) + ' mi</span>' : '') + '</div>' +
+        '<div style="display:flex; gap:6px; flex-wrap:wrap;">' +
+          '<button class="btn btn-sm ' + (active === 'nearest' ? 'btn-gold' : 'btn-ghost') + '" onclick="mapPreviewRoute(\'' + escapeHtml(key) + '\',\'nearest\')">Nearest first</button>' +
+          '<button class="btn btn-sm ' + (active === 'furthest' ? 'btn-gold' : 'btn-ghost') + '" onclick="mapPreviewRoute(\'' + escapeHtml(key) + '\',\'furthest\')">Furthest first</button></div>';
+      if (active) body += '<div style="font-size:11px; color:var(--green); margin-top:6px;">Green numbers on the map show this suggested order.</div>' +
+        '<div style="display:flex; gap:6px; margin-top:6px;">' + (canReorderGroup(key) ? '<button class="btn btn-sm btn-gold" onclick="mapApplyPreview()">Apply order</button>' : '') + '<button class="btn btn-sm btn-ghost" onclick="mapClearPreview()">Clear</button></div>';
+    }
+    html += '<div style="padding:10px 0; border-bottom:1px solid var(--glass-border);">' + head + body + '</div>';
+  });
+  if (DRIVER_TRACKING_ENABLED) {
+    var ids = Object.keys(driverPositions || {});
+    html += '<div class="section-title" style="margin:14px 0 6px;"><h2 style="font-size:12.5px;">Drivers sharing location</h2></div>' + (!ids.length ? '<div class="hist-empty">None right now.</div>' : ids.map(function(id) {
+      var d = driverPositions[id], stale = (Date.now() - (d.updatedAt || 0)) > 5 * 60 * 1000;
+      return '<div class="hist-date-row" onclick="leafletMap && leafletMap.setView([' + d.lat + ',' + d.lng + '], 15)"><span class="d">' + (stale ? '⚪' : '🟢') + ' ' + escapeHtml(d.name || 'Driver') + '</span><span class="c">' + timeAgo(d.updatedAt || 0) + '</span></div>';
+    }).join(''));
+  }
+  html += '<div style="font-size:11px; color:var(--text-soft); margin-top:10px;">🏭 Davie warehouse is the start point. Distances are straight-line. Each route has its own color and is numbered the same way as on the board.</div>';
+  el.innerHTML = html;
 }
 
 var STATUS_LABELS = { pending:'Pending', onway:'En Route', arrived:'At Location', completed:'Completed', postponed:'Postponed', returned:'Returned Part' };
@@ -1418,7 +1465,7 @@ function addActivity(tag, text) {
 /* ---------- RENDER ---------- */
 function renderAll() {
   renderSummary(); renderFeed(); renderStops(); renderNextBanner(); renderEndReport(); updateChecksBadge();
-  if (leafletMap) renderLiveMapMarkers();
+  if (leafletMap) { renderLiveMapMarkers(); renderDriverListPanel(); }
 }
 function renderSummary() {
   var stops = visibleStops();
@@ -2435,7 +2482,7 @@ function openRouteModal(key) {
   document.getElementById('routeModal').classList.add('open');
   renderRouteModal();
 }
-function closeRouteModal() { document.getElementById('routeModal').classList.remove('open'); }
+function closeRouteModal() { var m = document.getElementById('routeModal'); if (m) m.classList.remove('open'); }
 function setRouteMode(m) { routeUI.mode = m; renderRouteModal(); }
 function renderRouteModal() {
   var key = routeUI.key, stops = routeGroupStops(key), start = routeStart(key);
