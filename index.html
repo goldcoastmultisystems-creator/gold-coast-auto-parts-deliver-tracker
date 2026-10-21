@@ -114,6 +114,8 @@ main { max-width: 1000px; margin: 0px auto; padding: 18px 16px 0px; }
 .src-buy { background: rgba(248,113,113,0.15); border-color: rgba(248,113,113,0.5); color: #fca5a5; }
 .src-stock { background: rgba(52,211,153,0.14); border-color: rgba(52,211,153,0.45); color: #6ee7b7; }
 .src-none { background: rgba(255,255,255,0.06); border-color: var(--glass-border); color: var(--text-soft); }
+.leaflet-tooltip.depot-tip { background: rgba(20,17,12,0.92); color: var(--gold-2); border: 1px solid rgba(212,164,65,0.6); border-radius: 8px; font-size: 11.5px; line-height: 1.35; padding: 5px 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
+.leaflet-tooltip-right.depot-tip::before { border-right-color: rgba(212,164,65,0.6); }
 .assigned-badge { font-size: 10.5px; font-weight: 700; color: var(--blue); background: rgba(96,165,250,0.14); border: 1px solid rgba(96,165,250,0.3); border-radius: 6px; padding: 3px 7px; white-space: nowrap; }
 .stop-card { background: var(--glass); backdrop-filter: var(--blur); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.35); position: relative; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
 .stop-card:hover { border-color: rgba(255,255,255,0.18); }
@@ -905,7 +907,9 @@ function renderLiveMapMarkers() {
   mapLayerGroup.clearLayers();
   var bounds = [[DEPOT.lat, DEPOT.lng]];
   L.marker([DEPOT.lat, DEPOT.lng], { icon: L.divIcon({ className: 'stop-pin-wrap', html: '<div class="stop-pin" style="background:#1a1713; border:2px solid #d4a441; width:30px; height:30px; font-size:15px;">🏭</div>', iconSize: [30, 30], iconAnchor: [15, 15] }) })
-    .addTo(mapLayerGroup).bindPopup('<b>Davie warehouse</b><br>Routes are measured from here' + (DRIVER_TRACKING_ENABLED ? ' unless a driver\'s live location is available' : ''));
+    .addTo(mapLayerGroup)
+    .bindTooltip('<b>🏭 ' + escapeHtml(DEPOT.name) + '</b><br>' + escapeHtml(DEPOT.address), { permanent: true, direction: 'right', offset: [16, 0], className: 'depot-tip' })
+    .bindPopup('<b>' + escapeHtml(DEPOT.name) + '</b><br>' + escapeHtml(DEPOT.address) + '<br><a href="https://maps.apple.com/?q=' + encodeURIComponent(DEPOT.address) + '" target="_blank" rel="noopener">Open in Maps →</a><br>Routes are measured from here' + (DRIVER_TRACKING_ENABLED ? ' unless a driver\'s live location is available' : ''));
 
   /* each route gets its own color, line and 1..n numbering (matching the board) */
   mapRouteKeys().forEach(function(key) {
@@ -989,7 +993,7 @@ function renderDriverListPanel() {
       return '<div class="hist-date-row" onclick="leafletMap && leafletMap.setView([' + d.lat + ',' + d.lng + '], 15)"><span class="d">' + (stale ? '⚪' : '🟢') + ' ' + escapeHtml(d.name || 'Driver') + '</span><span class="c">' + timeAgo(d.updatedAt || 0) + '</span></div>';
     }).join(''));
   }
-  html += '<div style="font-size:11px; color:var(--text-soft); margin-top:10px;">🏭 Davie warehouse is the start point. Distances are straight-line. Each route has its own color and is numbered the same way as on the board.</div>';
+  html += '<div style="font-size:11px; color:var(--text-soft); margin-top:10px;"><b style="color:var(--gold-2);">🏭 ' + escapeHtml(DEPOT.name) + '</b><br>' + escapeHtml(DEPOT.address) + '<br>This is the start point. Distances are straight-line. Each route has its own color and is numbered the same way as on the board.</div>';
   el.innerHTML = html;
 }
 
@@ -2411,7 +2415,7 @@ function setupDragAndDrop() {
 }
 
 /* ---------- ROUTE SUGGESTION (nearest-first / furthest-first by straight-line distance) ---------- */
-var DEPOT = { lat: 26.078564, lng: -80.204977, label: 'the Davie warehouse' };
+var DEPOT = { lat: 26.078564, lng: -80.204977, label: 'the Davie warehouse', name: 'Davie Warehouse', address: '3401 S State Rd 7, Davie, FL 33314, USA' };
 var ROUTE_OPEN_STATUSES = ['pending', 'onway', 'arrived', 'postponed'];
 var routeUI = { key: null, mode: 'nearest' };
 function stopHasCoords(s) { return typeof s.lat === 'number' && typeof s.lng === 'number'; }
