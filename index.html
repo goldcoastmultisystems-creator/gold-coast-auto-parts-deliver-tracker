@@ -1583,7 +1583,7 @@ function renderStops() {
   }).join('');
 }
 function stopKind(s) {
-  var isReturn = s.status === 'returned' || !!s.returnReason || ((s.type === 'pickup' || s.type === 'stop') && /return/i.test((s.loc || '') + ' ' + (s.notes || '') + ' ' + (s.part || '')));
+  var isReturn = !!s.isReturn || s.status === 'returned' || !!s.returnReason || ((s.type === 'pickup' || s.type === 'stop') && /return/i.test((s.loc || '') + ' ' + (s.notes || '') + ' ' + (s.part || '')));
   if (isReturn) return 'return';
   return TYPE_LABELS[s.type] ? s.type : 'stop';
 }
@@ -1708,6 +1708,7 @@ function renderEditForm(s) {
         ['','Cash','Check','Charge Account'].map(function(v) { return '<option value="'+v+'"'+(s.mop===v?' selected':'')+'>'+(v||'—')+'</option>'; }).join('') +
       '</select></div>' +
     '</div>' +
+    '<label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--red); margin:4px 0;"><input type="checkbox" style="width:auto;" id="e_return_'+s.id+'"'+(s.isReturn?' checked':'')+'> ↩ This is a return — pick the part up</label>' +
     '<div><label class="edit-label">Assign to Driver</label><select class="edit-input" id="e_assigned_'+s.id+'">'+assignedDriverOptionsHtml(s.assignedTo||'')+'</select></div>' +
     '<div><label class="edit-label">Notes</label><input class="edit-input" id="e_notes_'+s.id+'" value="'+escapeHtml(s.notes||'')+'"></div>' +
     '<div class="edit-actions">' +
@@ -1806,6 +1807,8 @@ function saveEditStop(id) {
   if (newAddr !== s.addr) { s.lat = null; s.lng = null; }
   s.addr = newAddr;
   s.type = document.getElementById('e_type_'+id).value;
+  s.isReturn = document.getElementById('e_return_'+id).checked;
+  if (s.isReturn && s.type === 'delivery') s.type = 'pickup';
   s.so = document.getElementById('e_so_'+id).value.trim();
   s.part = document.getElementById('e_part_'+id).value.trim();
   s.mop = document.getElementById('e_mop_'+id).value;
@@ -2365,15 +2368,15 @@ function deleteCheckEntry(dateKey, stopId, checkId) {
 
 /* ---------- ZOHO ORDERS -> deliveries (dashboard lives in zoho-orders-ui.js) ---------- */
 function zohoCanImport() { return !!session && !isDriverSession() && (session.type === 'owner' || !!session.isAdmin || session.role === 'Dispatcher'); }
-function zohoIsImported(o) {
-  return Object.keys(days).some(function(k) { return (days[k].stops || []).some(function(s) { return s.zohoId === o.id; }); });
+function zohoIsImported(o, asReturn) {
+  return Object.keys(days).some(function(k) { return (days[k].stops || []).some(function(s) { return s.zohoId === o.id && !!s.isReturn === !!asReturn; }); });
 }
-function zohoImportOrders(orders, assignedTo) {
+function zohoImportOrders(orders, assignedTo, asReturn) {
   var added = [];
   orders.forEach(function(o) {
-    if (zohoIsImported(o)) return;
+    if (zohoIsImported(o, asReturn)) return;
     var stop = {
-      id: uid(), loc: o.customer || 'Zoho order', addr: o.address || '', type: 'delivery', assignedTo: assignedTo || '',
+      id: uid(), loc: o.customer || 'Zoho order', addr: o.address || '', type: asReturn ? 'pickup' : 'delivery', isReturn: !!asReturn, assignedTo: assignedTo || '',
       so: o.number || '', part: o.lines.map(function(l) { return l.qty + '× ' + l.name + (l.sku && String(l.name).indexOf(l.sku) === -1 ? ' (' + l.sku + ')' : ''); }).join('; '),
       mop: o.terms || '', notes: [o.reference ? 'Ref ' + o.reference : '', (o.customFields || []).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; }).filter(Boolean).join(' • '), o.method ? 'Delivery: ' + o.method : '', o.notes || ''].filter(Boolean).join(' • '), status: 'pending', photos: [], chat: [], createdAt: nowTimeStr(), zohoId: o.id
     };
@@ -2381,7 +2384,7 @@ function zohoImportOrders(orders, assignedTo) {
     added.push(stop);
   });
   if (added.length) {
-    addActivity('Zoho Import', added.length + ' order(s) added from Zoho' + (assignedTo ? ' as ' + assignedTo + "'s route" : ''));
+    addActivity('Zoho Import', added.length + (asReturn ? ' return pickup(s)' : ' order(s)') + ' added from Zoho' + (assignedTo ? ' as ' + assignedTo + "'s route" : ''));
     saveDays(days);
     added.forEach(geocodeStop);
     renderAll();

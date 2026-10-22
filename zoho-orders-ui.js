@@ -224,7 +224,9 @@ function renderZohoList() {
   if (!list.length) { el.innerHTML = '<div class="hist-empty">No orders with this status.</div>'; return; }
   var canImport = typeof zohoCanImport === 'function' && zohoCanImport();
   el.innerHTML = list.map(function(o) {
-    var done = canImport && typeof zohoIsImported === 'function' && zohoIsImported(o);
+    var hasImport = canImport && typeof zohoIsImported === 'function';
+    var delivered = hasImport && zohoIsImported(o, false), returning = hasImport && zohoIsImported(o, true);
+    var done = delivered && returning;
     var chips = [o.method, o.shipped && 'shipment ' + o.shipped, o.paid && o.paid, o.location].filter(Boolean).map(escapeHtml).join(' • ');
     var open = !!zohoState.open[o.id];
     return '<div class="team-row" style="align-items:flex-start;">' +
@@ -232,7 +234,8 @@ function renderZohoList() {
       '<div style="flex:1 1 260px; min-width:220px;">' +
         '<div style="cursor:pointer;" onclick="zohoToggleOpen(\'' + escapeHtml(o.id) + '\')">' +
           '<div style="display:flex; gap:8px; align-items:baseline;"><span class="tname">' + escapeHtml(o.customer) + '</span> <span style="font-size:12px; color:var(--gold-2);">' + escapeHtml(o.number) + '</span>' +
-          (done ? ' <span style="font-size:11px; color:var(--green); font-weight:700;">✓ On delivery board</span>' : '') +
+          (delivered ? ' <span style="font-size:11px; color:var(--green); font-weight:700;">✓ On delivery board</span>' : '') +
+          (returning ? ' <span style="font-size:11px; color:var(--red); font-weight:700;">↩ Return on board</span>' : '') +
           (o.backordered ? ' <span style="font-size:11px; color:var(--amber); font-weight:700;">⚠ Backorder</span>' : '') +
           '<span style="margin-left:auto; font-weight:700;">' + zohoMoney(o.money, o.money && o.money.total) + '</span></div>' +
           '<div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">' + escapeHtml(o.date) + (o.deliveryDate ? ' • deliver ' + escapeHtml(o.deliveryDate) : '') + (chips ? ' • ' + chips : '') + '</div>' +
@@ -253,14 +256,15 @@ function renderZohoActions() {
   var n = Object.keys(zohoState.selected).filter(function(k) { return zohoState.selected[k]; }).length;
   var cur = document.getElementById('zohoDriver') ? document.getElementById('zohoDriver').value : '';
   el.innerHTML = '<select class="edit-input" id="zohoDriver" style="width:auto;">' + (typeof assignedDriverOptionsHtml === 'function' ? assignedDriverOptionsHtml(cur) : '') + '</select>' +
-    '<button class="btn btn-navy btn-sm" onclick="zohoAddSelected()"' + (n ? '' : ' disabled style="opacity:.5;"') + '>➕ Add ' + (n || '') + ' to deliveries</button>';
+    '<button class="btn btn-navy btn-sm" onclick="zohoAddSelected()"' + (n ? '' : ' disabled style="opacity:.5;"') + '>➕ Add ' + (n || '') + ' to deliveries</button>' +
+    '<button class="btn btn-sm" style="background:rgba(248,113,113,0.14); border:1px solid rgba(248,113,113,0.55); color:var(--red);' + (n ? '' : ' opacity:.5;') + '" onclick="zohoAddSelected(true)"' + (n ? '' : ' disabled') + ' title="Add as a return — the driver picks the part up from the customer">↩ Add ' + (n || '') + ' as return</button>';
 }
-function zohoAddSelected() {
+function zohoAddSelected(asReturn) {
   var picked = zohoState.orders.filter(function(o) { return zohoState.selected[o.id]; });
   if (!picked.length) return;
-  var added = zohoImportOrders(picked, document.getElementById('zohoDriver').value);
+  var added = zohoImportOrders(picked, document.getElementById('zohoDriver').value, !!asReturn);
   zohoState.selected = {};
-  if (typeof showToast === 'function') showToast(added + ' order' + (added === 1 ? '' : 's') + ' added to today\'s deliveries.', 'green');
+  if (typeof showToast === 'function') showToast(added ? added + (asReturn ? ' return pickup' : ' order') + (added === 1 ? '' : 's') + ' added to today\'s ' + (asReturn ? 'stops.' : 'deliveries.') : 'Already on the board.', added ? 'green' : '');
   renderZohoOrders();
 }
 
