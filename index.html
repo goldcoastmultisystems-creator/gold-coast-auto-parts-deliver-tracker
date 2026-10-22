@@ -149,6 +149,13 @@ main { max-width: 1000px; margin: 0px auto; padding: 18px 16px 0px; }
 .stop-card.current { border: 1px solid var(--glass-border-gold); box-shadow: 0 0 0 1px rgba(212,164,65,0.3), 0 0 34px rgba(212,164,65,0.25), 0 10px 30px rgba(0,0,0,0.4); }
 .current-ribbon { position: absolute; top: 0px; right: 0px; background: linear-gradient(135deg, var(--gold), var(--gold-2)); color: var(--gold-ink); font-size: 10px; font-weight: 800; letter-spacing: 0.4px; padding: 4px 10px; border-radius: 0px 0px 0px 10px; }
 .stop-card.completed-card { opacity: 0.55; }
+.stop-banner { text-align: center; font-size: 13px; font-weight: 800; letter-spacing: 0.3px; padding: 9px 90px 9px 16px; color: #fff; }
+.stop-banner.kind-delivery { background: linear-gradient(135deg, #0f8a5f, #14b37d); }
+.stop-banner.kind-return { background: linear-gradient(135deg, #b3261e, #d64537); }
+.stop-banner.kind-pickup { background: linear-gradient(135deg, #1d4ed8, #3b82f6); }
+.stop-banner.kind-deposit { background: linear-gradient(135deg, #a16207, #d99a1e); }
+.stop-banner.kind-stop { background: linear-gradient(135deg, #3f3a52, #5b5570); }
+.stop-card.current .current-ribbon { z-index: 2; }
 .stop-head { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px 10px; }
 .stop-num { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid var(--glass-border); color: var(--text); font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .stop-num.done { background: linear-gradient(135deg, var(--green), #10b981); border-color: transparent; color: #052e1f; }
@@ -1575,6 +1582,22 @@ function renderStops() {
     '</div>';
   }).join('');
 }
+function stopKind(s) {
+  var isReturn = s.status === 'returned' || !!s.returnReason || ((s.type === 'pickup' || s.type === 'stop') && /return/i.test((s.loc || '') + ' ' + (s.notes || '') + ' ' + (s.part || '')));
+  if (isReturn) return 'return';
+  return TYPE_LABELS[s.type] ? s.type : 'stop';
+}
+var STOP_BANNERS = {
+  delivery: '🚚 DELIVERY on this trip - drop it off',
+  'return': '↩ RETURN PART on this trip - pick it up',
+  pickup: '📦 PICKUP on this trip - collect the parts',
+  deposit: '🏦 BANK DEPOSIT on this trip - take it to the bank',
+  stop: '📍 STOP on this trip'
+};
+function stopBannerHtml(s) {
+  var k = stopKind(s);
+  return '<div class="stop-banner kind-' + k + '">' + STOP_BANNERS[k] + '</div>';
+}
 function renderStopCard(s, i, curId) {
   var isCurrent = s.id === curId;
   var isDone = s.status === 'completed';
@@ -1611,6 +1634,7 @@ function renderStopCard(s, i, curId) {
 
   return '<div class="'+cls+'" data-id="'+s.id+'">' +
     (isCurrent ? '<div class="current-ribbon">CURRENT STOP</div>' : '') +
+    stopBannerHtml(s) +
     '<div class="stop-head">' +
       '<div class="drag-handle" data-id="'+s.id+'">⠿</div>' +
       '<div class="'+numCls+'">'+(i+1)+'</div>' +
