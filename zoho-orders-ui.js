@@ -179,7 +179,8 @@ function zohoDetailHtml(o) {
     var term = l.sku || l.name;
     return '<tr><td style="' + cell + '"><div style="cursor:pointer;" title="Click to find this part in Inventory" onclick="zohoSearchPart(\'' + escapeHtml(String(term).replace(/['\\]/g, '')) + '\')">' +
       '<b style="border-bottom:1px dashed var(--gold-2);">' + escapeHtml(l.name) + '</b> <span style="font-size:11px; color:var(--gold-2); white-space:nowrap;">🔍 find</span>' + (l.sku ? '<div style="font-size:11px; color:var(--gold-2);">SKU: ' + escapeHtml(l.sku) + '</div>' : '') + '</div>' +
-      (l.description && l.description !== l.name ? '<div style="font-size:11px; color:var(--text-soft);">' + escapeHtml(l.description) + '</div>' : '') + '<div style="font-size:11px;">' + zohoStockTag(l).trim() + '</div></td>' +
+      (l.description && l.description !== l.name ? '<div style="font-size:11px; color:var(--text-soft);">' + escapeHtml(l.description) + '</div>' : '') + '<div style="font-size:11px;">' + zohoStockTag(l).trim() + '</div>' +
+      (typeof partStatusHtml === 'function' ? '<div style="margin-top:5px; margin-left:-4px;">' + partStatusHtml(o.number, l.sku || l.name) + '</div>' : '') + '</td>' +
       '<td style="' + cell + ' text-align:right; white-space:nowrap;">' + escapeHtml(String(l.qty)) + (l.unit ? ' <span style="color:var(--text-soft); font-size:11px;">' + escapeHtml(l.unit) + '</span>' : '') + '</td>' +
       '<td style="' + cell + ' font-size:11.5px;">' + escapeHtml(l.location || '') + '</td>' +
       '<td style="' + cell + ' font-size:11.5px; color:var(--text-soft);">' + escapeHtml(progress) + '</td>' +

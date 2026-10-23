@@ -35,9 +35,53 @@ function loadInventory() {
     inventoryLoc = { loc: s.locations || {} };
   }).catch(function(e) { console.error('inventory load failed', e); }).then(function() {
     inventoryLoading = null;
+    attachPartStatus();
     if (typeof onInventoryLoaded === 'function') onInventoryLoaded();
   });
   return inventoryLoading;
+}
+/* ---------- FOUND / LOADED per part (shared by the Delivery board, Parts to Pull and the Zoho order lines) ----------
+   Stored apart from the day's stops at gcap/partStatus/{key}, so one tap never touches the stop list. */
+var partStatus = {}, partStatusRef = null;
+function partStatusKey(ref, item) {
+  function clean(x) { return String(x || '').toUpperCase().replace(/[^A-Z0-9-]+/g, '_').slice(0, 40); }
+  return clean(ref) + '__' + clean(item);
+}
+function attachPartStatus() {
+  if (partStatusRef || typeof FIREBASE_ENABLED === 'undefined' || !FIREBASE_ENABLED || !window.fbDb) return;
+  partStatusRef = fbDb.ref('gcap/partStatus');
+  partStatusRef.on('value', function(snap) { partStatus = snap.val() || {}; refreshPartStatusDom(); },
+    function(e) { console.error('part status listener failed', e); partStatusRef = null; });
+}
+function partStatusInner(key) {
+  var st = partStatus[key] || {};
+  function btn(field, label, on, color) {
+    var who = st[field] && st[field].by ? st[field].by + (st[field].at ? ' • ' + new Date(st[field].at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '') : '';
+    return '<button type="button" onclick="event.stopPropagation(); togglePartStatus(\'' + key + '\',\'' + field + '\')" title="' + escapeHtml(on ? who + ' — tap to undo' : 'Tap to mark ' + field) + '" style="cursor:pointer; font:inherit; font-size:11.5px; font-weight:800; padding:3px 9px; border-radius:7px; margin-left:4px; white-space:nowrap; ' +
+      (on ? 'background:' + color + '; border:1px solid ' + color + '; color:#0b0b10;' : 'background:transparent; border:1px solid var(--glass-border); color:var(--text-soft);') + '">' + (on ? '✓ ' : '') + label + '</button>';
+  }
+  return btn('found', 'Found', !!st.found, '#34d399') + btn('loaded', '🚚 Loaded', !!st.loaded, '#fbbf24');
+}
+function partStatusHtml(ref, item) {
+  attachPartStatus();
+  var key = partStatusKey(ref, item);
+  return '<span class="pstat" data-pkey="' + key + '" style="display:inline-flex; align-items:center; flex-wrap:nowrap;">' + partStatusInner(key) + '</span>';
+}
+function refreshPartStatusDom() {
+  Array.prototype.forEach.call(document.querySelectorAll('.pstat[data-pkey]'), function(el) { el.innerHTML = partStatusInner(el.getAttribute('data-pkey')); });
+}
+function togglePartStatus(key, field) {
+  if (!partStatusRef) { if (typeof showToast === 'function') showToast("Couldn't reach the database — try again in a moment.", 'red'); return; }
+  var who = (typeof session !== 'undefined' && session && session.name) || (typeof settings !== 'undefined' && settings && settings.driverName) || 'Someone';
+  var cur = partStatus[key] || {}, next = { found: cur.found || null, loaded: cur.loaded || null }, mark = { by: who, at: Date.now() };
+  if (cur[field]) { next[field] = null; if (field === 'found') next.loaded = null; }
+  else { next[field] = mark; if (field === 'loaded' && !next.found) next.found = mark; }
+  partStatus[key] = next; refreshPartStatusDom();
+  var write = (next.found || next.loaded) ? partStatusRef.child(key).set({ found: next.found || null, loaded: next.loaded || null }) : partStatusRef.child(key).remove();
+  write.catch(function(e) {
+    console.error('part status save failed', e);
+    if (typeof showToast === 'function') showToast("Couldn't save that — check your connection.", 'red');
+  });
 }
 function searchInventory(text, limit) {
   if (!inventoryRows) return [];

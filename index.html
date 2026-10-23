@@ -1655,7 +1655,7 @@ function renderStopCard(s, i, curId) {
       '<div class="details">' +
         (s.so ? '<div><b>SO#:</b> '+escapeHtml(s.so)+'</div>' : '') +
         (s.mop ? '<div><b>Payment:</b> '+escapeHtml(s.mop)+'</div>' : '') +
-        (s.part ? partsBlockHtml(s.part) : '') +
+        (s.part ? partsBlockHtml(s.part, s) : '') +
         (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+(s.returnResolved ? ' <span style="color:var(--green); font-weight:700;">✅ Shelved</span>' : ' <span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>')+'</div>' : '') +
         (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a></div>' : '') +
       '</div>' +
@@ -2919,13 +2919,13 @@ function renderPartsOverlay() {
     '<div class="pp-controls"><input id="ppSearch" type="search" placeholder="Search SKU, part, customer, SO#, shelf…" value="' + escapeHtml(ppState.q) + '" oninput="ppSet(\'q\', this.value)" autocomplete="off"></div>' +
     '<div class="pp-controls">' + seg(PP_STOCK, 'stock') + seg(PP_WHERE, 'where') + '</div>' +
     '<div class="pp-meta">' + rows.length + ' part' + (rows.length === 1 ? '' : 's') + '</div>' +
-    '<table class="pp-table"><thead><tr><th>SKU</th><th>Part</th><th class="num">Need</th><th>Warehouse / Shelf</th><th>Status</th><th class="num pp-hide">On hand</th><th>Deliver to</th><th class="pp-hide">Stop status</th></tr></thead><tbody>' +
+    '<table class="pp-table"><thead><tr><th>SKU</th><th>Part</th><th class="num">Need</th><th>Warehouse / Shelf</th><th>Status</th><th>Found / Loaded</th><th class="num pp-hide">On hand</th><th>Deliver to</th><th class="pp-hide">Stop status</th></tr></thead><tbody>' +
     (rows.length ? rows.map(function(r) {
       return '<tr><td class="pp-sku">' + escapeHtml(r.sku || '—') + '</td><td>' + escapeHtml(r.name) + '</td><td class="num"><b>' + r.need + '</b></td>' +
         '<td>' + r.lines.map(function(l) { return '<div><b>' + escapeHtml(l) + '</b></div>'; }).join('') + '</td>' +
-        '<td><span class="pp-pill ' + r.level + '">' + PP_LEVEL_LABEL[r.level] + '</span></td><td class="num pp-hide">' + (r.onHand == null ? '—' : r.onHand) + '</td>' +
+        '<td><span class="pp-pill ' + r.level + '">' + PP_LEVEL_LABEL[r.level] + '</span></td><td style="white-space:nowrap;">' + (typeof partStatusHtml === 'function' ? partStatusHtml(stopPartRef(r.stop), r.sku || r.name) : '') + '</td><td class="num pp-hide">' + (r.onHand == null ? '—' : r.onHand) + '</td>' +
         '<td>' + escapeHtml(r.stop.loc || '') + (r.stop.so ? '<div class="pp-sub2">' + escapeHtml(r.stop.so) + '</div>' : '') + '</td><td class="pp-hide">' + STATUS_LABELS[r.stop.status] + '</td></tr>';
-    }).join('') : '<tr><td colspan="8" class="pp-sub2" style="padding:18px;">' + (all.length ? 'No parts match these filters.' : 'No stops have a part number or description yet.') + '</td></tr>') +
+    }).join('') : '<tr><td colspan="9" class="pp-sub2" style="padding:18px;">' + (all.length ? 'No parts match these filters.' : 'No stops have a part number or description yet.') + '</td></tr>') +
     '</tbody></table>';
 }
 function ppText() {
@@ -3121,7 +3121,9 @@ function partInfo(item) {
   return { text: name, sku: sku, source: src };
 }
 var SOURCE_ICON = { warehouse: '📍', stock: '📍', supplier: '🏪', buy: '🛒', none: '❔' };
-function partsBlockHtml(part) {
+function stopPartRef(s) { return s.so || ('STOP' + s.id); }
+function partItemId(p) { return p.sku || p.text.replace(/^\d+×\s*/, ''); }
+function partsBlockHtml(part, stop) {
   var infos = partItems(part).map(partInfo);
   if (!infos.length) return '';
   var seen = {}, from = [];
@@ -3130,7 +3132,8 @@ function partsBlockHtml(part) {
     infos.map(function(p, i) {
       var nm = p.sku ? escapeHtml(p.text).replace(p.sku, '') : escapeHtml(p.text);
       return '<div class="part-row"><span class="pn">' + (i + 1) + '.</span>' + (p.sku ? '<span class="psku">' + escapeHtml(p.sku) + '</span>' : '') + '<span class="pname">' + nm.trim() + '</span>' +
-        '<span class="src src-' + p.source.kind + '">' + SOURCE_ICON[p.source.kind] + ' ' + escapeHtml(p.source.label) + '</span></div>';
+        '<span class="src src-' + p.source.kind + '">' + SOURCE_ICON[p.source.kind] + ' ' + escapeHtml(p.source.label) + '</span>' +
+        (stop && typeof partStatusHtml === 'function' ? '<span style="margin-left:auto;">' + partStatusHtml(stopPartRef(stop), partItemId(p)) + '</span>' : '') + '</div>';
     }).join('') + '</div>';
 }
 function partsLine(part) {
