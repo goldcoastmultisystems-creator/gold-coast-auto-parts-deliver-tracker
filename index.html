@@ -1573,9 +1573,12 @@ function renderStops() {
     var groupStops = groups[key];
     var openCount = groupStops.filter(function(s) { return ROUTE_OPEN_STATUSES.indexOf(s.status) !== -1; }).length;
     var saving = routeHint(key);
-    var routeBtn = openCount > 1
-      ? '<button class="btn btn-ghost btn-sm" style="margin-left:auto; text-transform:none; letter-spacing:0;" onclick="openRouteModal(\'' + escapeHtml(key) + '\')">🧭 Suggest route' + (saving ? ' · 💡 saves ~' + saving.toFixed(1) + ' mi' : '') + '</button>'
+    var mapsBtn = openCount > 0
+      ? '<button class="btn btn-ghost btn-sm" style="' + (openCount > 1 ? '' : 'margin-left:auto; ') + 'text-transform:none; letter-spacing:0;" onclick="openRouteInGoogleMaps(\'' + escapeHtml(key) + '\')" title="Open this route\'s open stops, in the order shown, in Google Maps">🗺 Google Maps</button>'
       : '';
+    var routeBtn = (openCount > 1
+      ? '<button class="btn btn-ghost btn-sm" style="margin-left:auto; text-transform:none; letter-spacing:0;" onclick="openRouteModal(\'' + escapeHtml(key) + '\')">🧭 Suggest route' + (saving ? ' · 💡 saves ~' + saving.toFixed(1) + ' mi' : '') + '</button>'
+      : '') + mapsBtn;
     return '<div class="route-group">' +
       '<div class="route-group-head" style="display:flex; align-items:center; gap:8px;">' + escapeHtml(label) + '<span class="route-group-count">' + groupStops.length + '</span>' + routeBtn + '</div>' +
       groupStops.map(function(s, gi) { return renderStopCard(s, gi, curId); }).join('') +
@@ -1657,7 +1660,7 @@ function renderStopCard(s, i, curId) {
         (s.mop ? '<div><b>Payment:</b> '+escapeHtml(s.mop)+'</div>' : '') +
         (s.part ? partsBlockHtml(s.part, s) : '') +
         (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+(s.returnResolved ? ' <span style="color:var(--green); font-weight:700;">✅ Shelved</span>' : ' <span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>')+'</div>' : '') +
-        (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a></div>' : '') +
+        (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a> &nbsp; <a class="maps-link" href="https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+encodeURIComponent(stopHasCoords(s) ? s.lat+','+s.lng : s.addr)+'" target="_blank" rel="noopener">Google Maps →</a></div>' : '') +
       '</div>' +
       (noteText ? '<div class="note-flag">📝 '+escapeHtml(noteText)+'</div>' : '') +
       '<div class="photo-row" style="margin-top:10px;">' + photosHtml + videosHtml +
@@ -2432,8 +2435,6 @@ function setupDragAndDrop() {
     if (!handle) return;
     var card = handle.closest('.stop-card');
     if (!card) return;
-    var stop = currentDay.stops.find(function(x) { return x.id === card.getAttribute('data-id'); });
-    if (isDriverSession() && stop && stop.assignedTo && stop.assignedTo !== session.name) return;
     dragEl = card;
     container = card.parentNode;
     card.classList.add('dragging');
@@ -2509,9 +2510,51 @@ function routeLength(list, start) {
   list.filter(stopHasCoords).forEach(function(s) { total += milesBetween(cur, s); cur = s; });
   return total;
 }
-function canReorderGroup(key) {
-  if (!isDriverSession()) return true;
-  return key === '__unassigned__' || key === session.name;
+/* Anyone (dispatcher or driver) can reorder any route, before or after a suggestion was applied. */
+function canReorderGroup(key) { return true; }
+
+/* ---------- GOOGLE MAPS LINKS (multi-stop directions in the current order) ---------- */
+var GMAPS_MAX_STOPS = 10; // Google's directions link takes an origin, up to 9 waypoints and a destination
+function gmapsPlace(s) { return stopHasCoords(s) ? Number(s.lat.toFixed(6)) + ',' + Number(s.lng.toFixed(6)) : String(s.addr || s.loc || '').trim(); }
+function gmapsLinks(stops, start) {
+  var list = stops.filter(function(s) { return gmapsPlace(s); }), links = [];
+  for (var i = 0; i < list.length; i += GMAPS_MAX_STOPS) {
+    var chunk = list.slice(i, i + GMAPS_MAX_STOPS), dest = chunk[chunk.length - 1], mids = chunk.slice(0, -1);
+    var origin = i === 0 ? start : list[i - 1];
+    var url = 'https://www.google.com/maps/dir/?api=1&travelmode=driving' +
+      (origin ? '&origin=' + encodeURIComponent(gmapsPlace(origin)) : '') +
+      '&destination=' + encodeURIComponent(gmapsPlace(dest)) +
+      (mids.length ? '&waypoints=' + mids.map(function(s) { return encodeURIComponent(gmapsPlace(s)); }).join('%7C') : '');
+    links.push({ url: url, from: i + 1, to: i + chunk.length });
+  }
+  return links;
+}
+function gmapsStartFor(key) {
+  // a driver's phone starts from wherever they are; a dispatcher starts from the warehouse (or the driver's live spot)
+  return isDriverSession() ? null : routeStart(key);
+}
+function openGoogleMaps(stops, startPoint, title) {
+  var links = gmapsLinks(stops, startPoint);
+  if (!links.length) { showToast('No addresses to map yet.', 'red'); return; }
+  if (links.length === 1) { window.open(links[0].url, '_blank', 'noopener'); return; }
+  var m = document.getElementById('gmapsModal');
+  if (!m) {
+    m = document.createElement('div'); m.className = 'modal-backdrop'; m.id = 'gmapsModal';
+    m.innerHTML = '<div class="modal"><h3>🗺 Google Maps</h3><p class="modal-sub" id="gmapsSub"></p><div id="gmapsLinks"></div><div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById(\'gmapsModal\').classList.remove(\'open\')">Close</button></div></div>';
+    document.body.appendChild(m);
+  }
+  document.getElementById('gmapsSub').textContent = (title || 'Route') + ' has ' + stops.length + ' stops — Google Maps takes ' + GMAPS_MAX_STOPS + ' per trip, so it\'s split into parts. Do them in order.';
+  document.getElementById('gmapsLinks').innerHTML = links.map(function(l, i) {
+    return '<a class="btn btn-gold" style="display:block; text-align:center; text-decoration:none; margin-bottom:8px;" href="' + escapeHtml(l.url) + '" target="_blank" rel="noopener">Part ' + (i + 1) + ' — stops ' + l.from + '–' + l.to + ' →</a>';
+  }).join('');
+  m.classList.add('open');
+}
+function openRouteInGoogleMaps(key) {
+  openGoogleMaps(routeGroupStops(key), gmapsStartFor(key), key === '__unassigned__' ? 'Unassigned stops' : key + "'s route");
+}
+function openSuggestionInGoogleMaps() {
+  var key = routeUI.key, stops = routeGroupStops(key);
+  openGoogleMaps(routeOrder(stops, routeStart(key), routeUI.mode), gmapsStartFor(key), (routeUI.mode === 'furthest' ? 'Furthest-first' : 'Nearest-first') + ' order');
 }
 function routeHint(key) {
   var stops = routeGroupStops(key);
@@ -2530,7 +2573,8 @@ function ensureRouteModal() {
     '<div id="routeModes" style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;"></div>' +
     '<div id="routeSummary" style="font-size:12.5px; margin-bottom:8px;"></div>' +
     '<div id="routeList" style="max-height:46vh; overflow-y:auto;"></div>' +
-    '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeRouteModal()">Cancel</button><button class="btn btn-gold" id="routeApplyBtn" onclick="applyRouteSuggestion()">Apply this order</button></div></div>';
+    '<p class="modal-sub" style="margin:8px 0 0;">You can still drag any stop to a different spot afterwards — nothing is locked.</p>' +
+    '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeRouteModal()">Cancel</button><button class="btn btn-ghost" onclick="openSuggestionInGoogleMaps()">🗺 Preview in Google Maps</button><button class="btn btn-gold" id="routeApplyBtn" onclick="applyRouteSuggestion()">Apply this order</button></div></div>';
   document.body.appendChild(div);
 }
 function openRouteModal(key) {
