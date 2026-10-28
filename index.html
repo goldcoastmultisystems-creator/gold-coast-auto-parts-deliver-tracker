@@ -568,6 +568,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
     <div id="returnsList"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeReturnsModal()">Close</button>
+      <button class="btn btn-ghost" onclick="openRecordsModal('returns')">📚 All saved returns</button>
       <button class="btn btn-navy" onclick="shareTodaysReturns()">📤 Share Today's Returns</button>
     </div>
   </div>
@@ -580,6 +581,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
     <div id="checksList"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeChecksModal()">Close</button>
+      <button class="btn btn-navy" onclick="openRecordsModal('checks')">📚 All saved checks</button>
     </div>
   </div>
 </div>
@@ -776,6 +778,7 @@ function attachFirebaseListeners() {
     carryOverUnfinished();
     renderAll();
     checkStaleDrivers();
+    setTimeout(backfillRecords, 3000);
   });
   if (typeof loadInventory === 'function') loadInventory();
   fbDb.ref('gcap/drivers').on('value', function(snap) {
@@ -1867,6 +1870,7 @@ function confirmReturn() {
   s.updatedAt = nowTimeStr();
   s.updatedAtMs = Date.now();
   saveDays(days);
+  saveReturnRecord(todayKey(), s);
   addActivity('Returned Part', s.loc + ' — not accepted (' + reason + ') by ' + s.updatedBy);
   showToast(s.loc + ' → Returned Part', 'red');
   closeReturnModal();
@@ -1931,6 +1935,7 @@ function resolveReturn(dateKey, stopId) {
   var when = nowTimeStr();
   if (s) { s.returnResolved = true; s.returnResolvedBy = who; s.returnResolvedAt = when; }
   updateReturnStopRemote(dateKey, stopId, { returnResolved: true, returnResolvedBy: who, returnResolvedAt: when });
+  saveReturnRecord(dateKey, s);
   if (dateKey === todayKey()) {
     localStorage.setItem('kgps_days', JSON.stringify(days));
     addActivity('Return Resolved', (s ? s.loc : 'Stop') + ' — placed back on shelf by ' + who);
@@ -1945,6 +1950,7 @@ function deleteReturnEntry(dateKey, stopId) {
   var s = day && day.stops.find(function(x) { return x.id === stopId; });
   if (day) day.stops = day.stops.filter(function(x) { return x.id !== stopId; });
   removeReturnStopRemote(dateKey, stopId);
+  saveRecord('returns', stopId, { deleted: true });
   if (dateKey === todayKey()) {
     localStorage.setItem('kgps_days', JSON.stringify(days));
     addActivity('Removed', (s ? s.loc : 'Return entry') + ' return was deleted');
@@ -2203,6 +2209,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         s.checks.push(entry);
         saveDays(days);
+        saveCheckRecord(todayKey(), s, entry, true);
         addActivity('Check Received', s.loc + ' — photo captured, reading details…');
         renderAll();
         readCheck(stopId, entry.id, dataUrl);
@@ -2236,13 +2243,14 @@ function readCheck(stopId, checkId, dataUrl) {
       }
       c.status = 'pending';
       saveDays(days);
+      saveCheckRecord(todayKey(), s, c);
       renderAll();
     })
     .catch(function(e) {
       console.error('readCheck failed', e);
       var s = currentDay.stops.find(function(x) { return x.id === stopId; });
       var c = s && (s.checks || []).find(function(x) { return x.id === checkId; });
-      if (c) { c.status = 'pending'; c.needsReview = true; saveDays(days); renderAll(); }
+      if (c) { c.status = 'pending'; c.needsReview = true; saveDays(days); saveCheckRecord(todayKey(), s, c); renderAll(); }
     });
 }
 function collectOpenChecks() {
@@ -2331,6 +2339,7 @@ function saveCheckEdit(dateKey, stopId, checkId) {
     c.needsReview = !(c.amount && c.checkNumber);
   }
   delete editingCheckIds[checkId];
+  saveCheckRecord(dateKey, s, c);
   if (dateKey === todayKey()) { saveDays(days); renderAll(); }
   else if (s) updateReturnStopRemote(dateKey, stopId, { checks: s.checks });
   showToast('Check details updated.', 'green');
@@ -2344,6 +2353,7 @@ function depositCheck(dateKey, stopId, checkId) {
   var s = day && day.stops.find(function(x) { return x.id === stopId; });
   var c = s && (s.checks || []).find(function(x) { return x.id === checkId; });
   if (c) { c.status = 'deposited'; c.depositedBy = who; c.depositedAt = when; }
+  saveCheckRecord(dateKey, s, c);
   if (dateKey === todayKey()) {
     saveDays(days);
     addActivity('Check Deposited', (s ? s.loc : 'Stop') + ' — ' + (c && c.amount ? '$'+c.amount : 'check') + ' deposited by ' + who);
@@ -2359,6 +2369,7 @@ function deleteCheckEntry(dateKey, stopId, checkId) {
   var day = days[dateKey];
   var s = day && day.stops.find(function(x) { return x.id === stopId; });
   if (s) s.checks = (s.checks || []).filter(function(x) { return x.id !== checkId; });
+  saveRecord('checks', checkId, { deleted: true });
   if (dateKey === todayKey()) {
     saveDays(days);
     renderAll();
@@ -2367,6 +2378,144 @@ function deleteCheckEntry(dateKey, stopId, checkId) {
   }
   showToast('Check entry deleted.', '');
   renderChecksList();
+}
+
+/* ---------- PERMANENT RECORDS: every check and return is also saved on its own at gcap/records/...
+   so it survives stops being deleted, days being archived, or the board being restarted.
+   Deleted entries are only flagged (deleted:true), never erased. Check photos live in gcap/records/checkPhotos. ---------- */
+function recordsDb() { return (typeof FIREBASE_ENABLED !== 'undefined' && FIREBASE_ENABLED && typeof fbDb !== 'undefined' && fbDb) ? fbDb : null; }
+function cleanRecord(o) { var out = {}; Object.keys(o).forEach(function(k) { if (o[k] !== undefined) out[k] = o[k] === undefined ? null : o[k]; }); return out; }
+function saveRecord(kind, id, data) {
+  var db = recordsDb();
+  if (!db || !id) return Promise.resolve();
+  data.updatedAtMs = Date.now();
+  data.updatedBy = (session && session.name) || (settings && settings.driverName) || null;
+  return db.ref('gcap/records/' + kind + '/' + id).update(cleanRecord(data)).catch(function(e) { console.error('record save failed', kind, e); });
+}
+function checkRecordData(dateKey, s, c) {
+  return { id: c.id, dateKey: dateKey, stopId: s.id, loc: s.loc || null, addr: s.addr || null, so: s.so || null, assignedTo: s.assignedTo || null,
+    amount: c.amount || null, checkNumber: c.checkNumber || null, payerName: c.payerName || null, bankName: c.bankName || null, checkDate: c.checkDate || null,
+    status: c.status === 'deposited' ? 'deposited' : 'pending', needsReview: !!c.needsReview,
+    capturedBy: c.capturedBy || null, capturedAt: c.capturedAt || null, depositedBy: c.depositedBy || null, depositedAt: c.depositedAt || null };
+}
+function saveCheckRecord(dateKey, s, c, withPhoto) {
+  if (!s || !c || c.status === 'processing' && !withPhoto) return;
+  var data = checkRecordData(dateKey, s, c);
+  if (!c.createdAtMs) c.createdAtMs = Date.now();
+  data.createdAtMs = c.createdAtMs;
+  saveRecord('checks', c.id, data);
+  var db = recordsDb();
+  if (withPhoto && db && c.photo) db.ref('gcap/records/checkPhotos/' + c.id).set(c.photo).catch(function(e) { console.error('check photo save failed', e); });
+}
+function returnRecordData(dateKey, s) {
+  return { id: s.id, dateKey: dateKey, loc: s.loc || null, addr: s.addr || null, so: s.so || null, part: s.part || null, assignedTo: s.assignedTo || null,
+    returnReason: s.returnReason || null, returnNotes: s.returnNotes || null, markedBy: s.updatedBy || null, markedAt: s.updatedAt || null,
+    resolved: !!s.returnResolved, resolvedBy: s.returnResolvedBy || null, resolvedAt: s.returnResolvedAt || null };
+}
+function saveReturnRecord(dateKey, s) { if (s && s.returnReason) saveRecord('returns', s.id, returnRecordData(dateKey, s)); }
+var recordsBackfilled = false;
+/* One-time fill-in for checks/returns that existed before this feature — only adds ones not already saved. */
+function backfillRecords() {
+  var db = recordsDb();
+  if (recordsBackfilled || !db || !days || !session) return;
+  recordsBackfilled = true;
+  Promise.all([db.ref('gcap/records/checks').once('value'), db.ref('gcap/records/returns').once('value')]).then(function(r) {
+    var haveC = {}, haveR = {};
+    r[0].forEach(function(x) { haveC[x.key] = true; });
+    r[1].forEach(function(x) { haveR[x.key] = true; });
+    var n = 0;
+    Object.keys(days).forEach(function(dateKey) {
+      (days[dateKey].stops || []).forEach(function(s) {
+        (s.checks || []).forEach(function(c) { if (!haveC[c.id] && c.status !== 'processing') { saveCheckRecord(dateKey, s, c, true); n++; } });
+        if (s.returnReason && !haveR[s.id]) { saveReturnRecord(dateKey, s); n++; }
+      });
+    });
+    if (n) console.log('Saved ' + n + ' earlier check/return record(s).');
+  }).catch(function(e) { console.error('records backfill failed', e); });
+}
+
+/* ---------- Saved records viewer (Checks / Returns history, with CSV) ---------- */
+var recView = { kind: 'checks', rows: [], filter: 'all', q: '', loading: false };
+function openRecordsModal(kind) {
+  recView = { kind: kind, rows: [], filter: 'all', q: '', loading: true };
+  var m = document.getElementById('recordsModal');
+  if (!m) {
+    m = document.createElement('div'); m.className = 'modal-backdrop'; m.id = 'recordsModal';
+    m.innerHTML = '<div class="modal wide"><h3 id="recTitle"></h3><p class="modal-sub" id="recSub"></p><div id="recControls"></div><div id="recList" style="max-height:52vh; overflow-y:auto;"></div>' +
+      '<div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById(\'recordsModal\').classList.remove(\'open\')">Close</button><button class="btn btn-navy" onclick="downloadRecordsCsv()">⬇ Download CSV</button></div></div>';
+    document.body.appendChild(m);
+  }
+  m.classList.add('open');
+  renderRecordsModal();
+  var db = recordsDb();
+  if (!db) { recView.loading = false; renderRecordsModal(); return; }
+  db.ref('gcap/records/' + kind).once('value').then(function(snap) {
+    var rows = []; snap.forEach(function(x) { rows.push(x.val()); });
+    rows.sort(function(a, b) { return (b.dateKey || '').localeCompare(a.dateKey || '') || (b.createdAtMs || b.updatedAtMs || 0) - (a.createdAtMs || a.updatedAtMs || 0); });
+    recView.rows = rows; recView.loading = false; renderRecordsModal();
+  }).catch(function() { recView.loading = false; recView.error = true; renderRecordsModal(); });
+}
+function recMoney(v) { var n = parseFloat(String(v || '').replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
+function recVisible() {
+  var q = recView.q.toLowerCase();
+  return recView.rows.filter(function(r) {
+    if (r.deleted && recView.filter !== 'deleted') return false;
+    if (recView.filter === 'deleted' && !r.deleted) return false;
+    if (recView.filter === 'open' && (recView.kind === 'checks' ? r.status === 'deposited' : r.resolved)) return false;
+    if (recView.filter === 'done' && !(recView.kind === 'checks' ? r.status === 'deposited' : r.resolved)) return false;
+    return !q || JSON.stringify(r).toLowerCase().indexOf(q) !== -1;
+  });
+}
+function setRecFilter(f) { recView.filter = f; renderRecordsModal(); }
+function setRecQuery(v) { recView.q = v; renderRecordsModal(); var i = document.getElementById('recSearch'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } }
+function renderRecordsModal() {
+  var isCk = recView.kind === 'checks';
+  document.getElementById('recTitle').textContent = isCk ? '📚 All saved checks' : '📚 All saved returns';
+  document.getElementById('recSub').textContent = isCk ? 'Every check ever captured, kept permanently — even after it is deposited or the day is over.' : 'Every returned part ever recorded, kept permanently — even after it is shelved or the day is over.';
+  var seg = (isCk ? [['all', 'All'], ['open', 'Not deposited'], ['done', 'Deposited']] : [['all', 'All'], ['open', 'Needs shelving'], ['done', 'Shelved']]).concat([['deleted', 'Deleted']]);
+  document.getElementById('recControls').innerHTML = '<input class="edit-input" id="recSearch" type="search" placeholder="Search name, check #, SO#, part, date…" value="' + escapeHtml(recView.q) + '" oninput="setRecQuery(this.value)" style="margin-bottom:8px;">' +
+    '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">' + seg.map(function(o) { return '<button class="btn btn-sm ' + (recView.filter === o[0] ? 'btn-gold' : 'btn-ghost') + '" onclick="setRecFilter(\'' + o[0] + '\')">' + o[1] + '</button>'; }).join('') + '</div>';
+  var el = document.getElementById('recList');
+  if (recView.loading) { el.innerHTML = '<div class="hist-empty">Loading saved records…</div>'; return; }
+  if (!recordsDb() || recView.error) { el.innerHTML = '<div class="hist-empty">Couldn\'t reach the database.</div>'; return; }
+  var rows = recVisible();
+  if (!rows.length) { el.innerHTML = '<div class="hist-empty">Nothing saved here yet.</div>'; return; }
+  var total = isCk ? rows.reduce(function(a, r) { return a + recMoney(r.amount); }, 0) : 0;
+  el.innerHTML = '<div style="font-size:12px; color:var(--text-soft); margin-bottom:6px;">' + rows.length + (isCk ? ' check' : ' return') + (rows.length === 1 ? '' : 's') + (isCk ? ' • total $' + total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '') + '</div>' +
+    rows.map(function(r) {
+      if (isCk) {
+        return '<div class="team-row"><div style="flex:1 1 240px;"><span class="tname">' + escapeHtml(r.payerName || r.loc || 'Check') + '</span> <b>' + (r.amount ? '$' + escapeHtml(r.amount) : '—') + '</b>' +
+          '<div style="font-size:11.5px; color:var(--text-soft);">' + fmtDateDisplay(r.dateKey) + ' • ' + escapeHtml(r.loc || '') + (r.checkNumber ? ' • Check #' + escapeHtml(r.checkNumber) : '') + (r.bankName ? ' • ' + escapeHtml(r.bankName) : '') + (r.so ? ' • SO# ' + escapeHtml(r.so) : '') + ' • captured by ' + escapeHtml(r.capturedBy || '—') + '</div></div>' +
+          '<div style="text-align:right; font-size:12px;">' + (r.status === 'deposited' ? '<span style="color:var(--green); font-weight:700;">✅ Deposited</span><div style="color:var(--text-soft);">' + escapeHtml(r.depositedBy || '') + ' ' + escapeHtml(r.depositedAt || '') + '</div>' : '<span style="color:var(--amber); font-weight:700;">⏳ Not deposited</span>') + (r.deleted ? '<div style="color:var(--red);">deleted</div>' : '') +
+          '<div><a href="#" onclick="viewCheckPhoto(\'' + escapeHtml(r.id) + '\'); return false;">View photo</a></div></div></div>';
+      }
+      return '<div class="team-row"><div style="flex:1 1 240px;"><span class="tname">' + escapeHtml(r.loc || 'Return') + '</span>' +
+        '<div style="font-size:11.5px; color:var(--text-soft);">' + fmtDateDisplay(r.dateKey) + (r.so ? ' • SO# ' + escapeHtml(r.so) : '') + ' • ' + escapeHtml(r.part || '—') + '</div>' +
+        '<div style="font-size:12px; margin-top:3px;"><b>Reason:</b> ' + escapeHtml(r.returnReason || '—') + (r.returnNotes ? ' — ' + escapeHtml(r.returnNotes) : '') + '</div></div>' +
+        '<div style="text-align:right; font-size:12px;">' + (r.resolved ? '<span style="color:var(--green); font-weight:700;">✅ Shelved</span><div style="color:var(--text-soft);">' + escapeHtml(r.resolvedBy || '') + ' ' + escapeHtml(r.resolvedAt || '') + '</div>' : '<span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>') + (r.deleted ? '<div style="color:var(--red);">deleted</div>' : '') +
+        '<div style="color:var(--text-soft);">marked by ' + escapeHtml(r.markedBy || '—') + '</div></div></div>';
+    }).join('');
+}
+function viewCheckPhoto(id) {
+  var db = recordsDb();
+  if (!db) return;
+  var w = window.open('', '_blank');
+  db.ref('gcap/records/checkPhotos/' + id).once('value').then(function(snap) {
+    var p = snap.val();
+    if (!p) { if (w) w.close(); showToast('No photo saved for this check.', ''); return; }
+    if (w) { w.document.write('<title>Check photo</title><body style="margin:0;background:#111;"><img src="' + p + '" style="max-width:100%;display:block;margin:auto;">'); w.document.close(); }
+  });
+}
+function downloadRecordsCsv() {
+  var isCk = recView.kind === 'checks', rows = recVisible();
+  var cols = isCk ? [['dateKey', 'Date'], ['loc', 'Stop'], ['payerName', 'From'], ['amount', 'Amount'], ['checkNumber', 'Check #'], ['bankName', 'Bank'], ['checkDate', 'Check date'], ['so', 'SO#'], ['status', 'Status'], ['capturedBy', 'Captured by'], ['capturedAt', 'Captured at'], ['depositedBy', 'Deposited by'], ['depositedAt', 'Deposited at']]
+    : [['dateKey', 'Date'], ['loc', 'Stop'], ['so', 'SO#'], ['part', 'Part'], ['returnReason', 'Reason'], ['returnNotes', 'Notes'], ['markedBy', 'Marked by'], ['markedAt', 'Marked at'], ['resolved', 'Shelved'], ['resolvedBy', 'Shelved by'], ['resolvedAt', 'Shelved at']];
+  function cell(v) { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  var csv = [cols.map(function(c) { return c[1]; }).join(',')].concat(rows.map(function(r) { return cols.map(function(c) { return cell(r[c[0]]); }).join(','); })).join('\r\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
+  a.download = 'gcap-' + recView.kind + '-' + todayKey() + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
 }
 
 /* ---------- ZOHO ORDERS -> deliveries (dashboard lives in zoho-orders-ui.js) ---------- */
