@@ -57,8 +57,10 @@ function partStatusInner(key) {
   var st = partStatus[key] || {};
   function btn(field, label, on, color) {
     var who = st[field] && st[field].by ? st[field].by + (st[field].at ? ' • ' + new Date(st[field].at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '') : '';
-    return '<button type="button" onclick="event.stopPropagation(); togglePartStatus(\'' + key + '\',\'' + field + '\')" title="' + escapeHtml(on ? who + ' — tap to undo' : 'Tap to mark ' + field) + '" style="cursor:pointer; font:inherit; font-size:11.5px; font-weight:800; padding:3px 9px; border-radius:7px; margin-left:4px; white-space:nowrap; ' +
-      (on ? 'background:' + color + '; border:1px solid ' + color + '; color:#0b0b10;' : 'background:transparent; border:1px solid var(--glass-border); color:var(--text-soft);') + '">' + (on ? '✓ ' : '') + label + '</button>';
+    var proofN = field === 'found' && st.found ? (st.found.p || 0) + (st.found.v || 0) : 0;
+    var tip = field === 'found' ? (on ? who + ' — tap to see the proof or undo' : 'Add a photo or video, then mark it found') : (on ? who + ' — tap to undo' : (st.found ? 'Tap to mark loaded' : 'Mark it Found first'));
+    return '<button type="button" onclick="event.stopPropagation(); togglePartStatus(\'' + key + '\',\'' + field + '\')" title="' + escapeHtml(tip) + '" style="cursor:pointer; font:inherit; font-size:11.5px; font-weight:800; padding:3px 9px; border-radius:7px; margin-left:4px; white-space:nowrap; ' +
+      (on ? 'background:' + color + '; border:1px solid ' + color + '; color:#0b0b10;' : 'background:transparent; border:1px solid var(--glass-border); color:var(--text-soft);' + (field === 'loaded' && !st.found ? ' opacity:.5;' : '')) + '">' + (on ? '✓ ' : (field === 'found' ? '📷 ' : '')) + label + (proofN ? ' · ' + proofN : '') + '</button>';
   }
   return btn('found', 'Found', !!st.found, '#34d399') + btn('loaded', '🚚 Loaded', !!st.loaded, '#fbbf24');
 }
@@ -70,18 +72,120 @@ function partStatusHtml(ref, item) {
 function refreshPartStatusDom() {
   Array.prototype.forEach.call(document.querySelectorAll('.pstat[data-pkey]'), function(el) { el.innerHTML = partStatusInner(el.getAttribute('data-pkey')); });
 }
-function togglePartStatus(key, field) {
-  if (!partStatusRef) { if (typeof showToast === 'function') showToast("Couldn't reach the database — try again in a moment.", 'red'); return; }
-  var who = (typeof session !== 'undefined' && session && session.name) || (typeof settings !== 'undefined' && settings && settings.driverName) || 'Someone';
-  var cur = partStatus[key] || {}, next = { found: cur.found || null, loaded: cur.loaded || null }, mark = { by: who, at: Date.now() };
-  if (cur[field]) { next[field] = null; if (field === 'found') next.loaded = null; }
-  else { next[field] = mark; if (field === 'loaded' && !next.found) next.found = mark; }
+function partWho() { return (typeof session !== 'undefined' && session && session.name) || (typeof settings !== 'undefined' && settings && settings.driverName) || 'Someone'; }
+function partToast(msg, kind) { if (typeof showToast === 'function') showToast(msg, kind || ''); else alert(msg); }
+function writePartStatus(key, next) {
   partStatus[key] = next; refreshPartStatusDom();
   var write = (next.found || next.loaded) ? partStatusRef.child(key).set({ found: next.found || null, loaded: next.loaded || null }) : partStatusRef.child(key).remove();
-  write.catch(function(e) {
-    console.error('part status save failed', e);
-    if (typeof showToast === 'function') showToast("Couldn't save that — check your connection.", 'red');
-  });
+  return write.catch(function(e) { console.error('part status save failed', e); partToast("Couldn't save that — check your connection.", 'red'); });
+}
+function togglePartStatus(key, field) {
+  if (!partStatusRef) { partToast("Couldn't reach the database — try again in a moment.", 'red'); return; }
+  var cur = partStatus[key] || {};
+  if (field === 'found') { if (cur.found) viewPartProof(key); else openFoundProof(key); return; }
+  if (!cur.found) { partToast('Mark it Found first — with a photo or video.', 'red'); return; }
+  writePartStatus(key, { found: cur.found, loaded: cur.loaded ? null : { by: partWho(), at: Date.now() } });
+}
+
+/* ---------- PROOF: a photo or video is required before a part can be marked Found ----------
+   Photos are saved small in gcap/partProof/{key}; videos go to Firebase Storage. Status only keeps the counts. */
+var proofDraft = null;
+var PROOF_MAX_PHOTOS = 6, PROOF_VIDEO_MAX = 300 * 1024 * 1024;
+function proofLabel(key) { return String(key).replace('__', ' — ').replace(/_/g, ' '); }
+function ensureProofModal() {
+  if (document.getElementById('proofModal')) return;
+  var div = document.createElement('div');
+  div.className = 'modal-backdrop'; div.id = 'proofModal'; div.style.zIndex = '1200';
+  div.innerHTML = '<div class="modal wide"><h3 id="proofTitle">📸 Proof</h3><p class="modal-sub" id="proofSub"></p>' +
+    '<div id="proofMedia" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;"></div>' +
+    '<div id="proofAdd" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;">' +
+      '<button class="btn btn-navy btn-sm" onclick="document.getElementById(\'proofPhotoInput\').click()">📷 Add photo</button>' +
+      '<button class="btn btn-navy btn-sm" onclick="document.getElementById(\'proofVideoInput\').click()">🎥 Add video</button></div>' +
+    '<input type="file" id="proofPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="proofFileChosen(this, \'photo\')">' +
+    '<input type="file" id="proofVideoInput" accept="video/*" capture="environment" style="display:none" onchange="proofFileChosen(this, \'video\')">' +
+    '<div id="proofMsg" style="font-size:12px; margin:6px 0; color:var(--text-soft);"></div>' +
+    '<div class="modal-actions" id="proofActions"></div></div>';
+  document.body.appendChild(div);
+}
+function closeProofModal() { var m = document.getElementById('proofModal'); if (m) m.classList.remove('open'); proofDraft = null; }
+function openFoundProof(key) {
+  ensureProofModal();
+  proofDraft = { key: key, mode: 'add', photos: [], videos: [], uploading: 0 };
+  document.getElementById('proofModal').classList.add('open');
+  renderProofModal();
+}
+function renderProofModal() {
+  var d = proofDraft; if (!d) return;
+  var adding = d.mode === 'add';
+  document.getElementById('proofTitle').textContent = adding ? '📸 Show it before marking Found' : '✓ Found — proof';
+  document.getElementById('proofSub').textContent = proofLabel(d.key) + (adding ? ' — take at least one photo or video of the part.' : '');
+  document.getElementById('proofAdd').style.display = adding ? 'flex' : 'none';
+  var media = d.photos.map(function(p, i) { return '<img src="' + p + '" style="width:92px; height:92px; object-fit:cover; border-radius:10px; border:1px solid var(--glass-border); cursor:pointer;" onclick="window.open(this.src)">' + ''; }).concat(
+    d.videos.map(function(u) { return '<video src="' + escapeHtml(u) + '" controls preload="metadata" style="width:160px; max-height:120px; border-radius:10px; border:1px solid var(--glass-border); background:#000;"></video>'; }));
+  if (d.uploading) media.push('<div style="align-self:center; font-size:12px; color:var(--text-soft);">⏳ Uploading video…</div>');
+  document.getElementById('proofMedia').innerHTML = media.join('') || (d.loading ? '<div class="hist-empty">Loading…</div>' : '<div class="hist-empty">' + (adding ? 'Nothing added yet.' : 'No photo or video was saved for this part (it was marked found before proof was required).') + '</div>');
+  var st = partStatus[d.key] && partStatus[d.key].found;
+  document.getElementById('proofMsg').textContent = adding ? '' : (st ? 'Marked found by ' + (st.by || '—') + (st.at ? ' at ' + new Date(st.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '') : '');
+  var ready = d.photos.length + d.videos.length > 0 && !d.uploading;
+  document.getElementById('proofActions').innerHTML = adding
+    ? '<button class="btn btn-ghost" onclick="closeProofModal()">Cancel</button><button class="btn btn-gold" id="proofConfirmBtn" onclick="confirmFoundProof()"' + (ready ? '' : ' disabled style="opacity:.45; cursor:not-allowed;"') + '>✓ Mark as Found</button>'
+    : '<button class="btn btn-ghost" onclick="closeProofModal()">Close</button><button class="btn btn-ghost" style="color:var(--red);" onclick="undoFound(\'' + d.key + '\')">↩ Undo Found</button>';
+}
+function proofFileChosen(input, kind) {
+  var file = input.files && input.files[0]; input.value = '';
+  var d = proofDraft; if (!file || !d) return;
+  if (kind === 'photo') {
+    if (d.photos.length >= PROOF_MAX_PHOTOS) { partToast('Up to ' + PROOF_MAX_PHOTOS + ' photos.', 'red'); return; }
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var img = new Image();
+      img.onload = function() {
+        var scale = Math.min(1, 800 / img.width), c = document.createElement('canvas');
+        c.width = img.width * scale; c.height = img.height * scale;
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        if (proofDraft === d) { d.photos.push(c.toDataURL('image/jpeg', 0.75)); renderProofModal(); }
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
+  if (typeof fbStorage === 'undefined' || !fbStorage) { partToast('Video upload is not available on this page — add a photo instead.', 'red'); return; }
+  if (file.size > PROOF_VIDEO_MAX) { partToast('That video is too large (max 300MB).', 'red'); return; }
+  d.uploading++; renderProofModal();
+  fbStorage.ref('gcap/videos/found_' + d.key + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_')).put(file)
+    .then(function(snap) { return snap.ref.getDownloadURL(); })
+    .then(function(url) { d.uploading--; d.videos.push(url); if (proofDraft === d) renderProofModal(); })
+    .catch(function(e) { console.error('proof video upload failed', e); d.uploading--; partToast('Video upload failed — try again or add a photo.', 'red'); if (proofDraft === d) renderProofModal(); });
+}
+function confirmFoundProof() {
+  var d = proofDraft;
+  if (!d || d.uploading || d.photos.length + d.videos.length === 0) return;
+  var key = d.key, cur = partStatus[key] || {};
+  var btn = document.getElementById('proofConfirmBtn'); if (btn) btn.disabled = true;
+  fbDb.ref('gcap/partProof/' + key).set({ photos: d.photos, videos: d.videos, by: partWho(), at: Date.now() })
+    .then(function() {
+      writePartStatus(key, { found: { by: partWho(), at: Date.now(), p: d.photos.length, v: d.videos.length }, loaded: cur.loaded || null });
+      closeProofModal();
+      partToast('Marked as found ✓', 'green');
+    }).catch(function(e) { console.error('proof save failed', e); partToast("Couldn't save the proof — check your connection.", 'red'); if (btn) btn.disabled = false; });
+}
+function viewPartProof(key) {
+  ensureProofModal();
+  proofDraft = { key: key, mode: 'view', photos: [], videos: [], uploading: 0, loading: true };
+  document.getElementById('proofModal').classList.add('open');
+  renderProofModal();
+  var d = proofDraft;
+  fbDb.ref('gcap/partProof/' + key).once('value').then(function(snap) {
+    var v = snap.val() || {};
+    d.photos = v.photos || []; d.videos = v.videos || []; d.loading = false;
+    if (proofDraft === d) renderProofModal();
+  }).catch(function() { d.loading = false; if (proofDraft === d) renderProofModal(); });
+}
+function undoFound(key) {
+  if (!confirm('Undo Found for this part? (This also clears Loaded. The saved photos are kept.)')) return;
+  writePartStatus(key, { found: null, loaded: null });
+  closeProofModal();
 }
 function searchInventory(text, limit) {
   if (!inventoryRows) return [];

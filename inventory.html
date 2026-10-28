@@ -172,6 +172,7 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
 <script>
 var FIREBASE_CONFIG = {
   apiKey: "AIzaSyBQiE4TlMIcO6iyCob2G1js3eEVcmmjNmI",
@@ -182,7 +183,7 @@ var FIREBASE_CONFIG = {
   messagingSenderId: "610239286841"
 };
 var FIREBASE_ENABLED = true;
-var fbDb = null, session = null, settings = {};
+var fbDb = null, fbStorage = null, session = null, settings = {};
 var PAGE_SIZE = 100, shown = PAGE_SIZE, filter = 'all', whFilter = 'all', view = 'all', canEdit = false;
 var WAREHOUSES = ['E2', 'E5', 'E9', 'Miramar', 'Dawson'];
 var inv = { defaultMin: 1, defaultTarget: 3, mins: {}, targets: {}, watch: {}, locations: {} };
@@ -208,6 +209,7 @@ if (!session) {
 function startFirebase() {
   firebase.initializeApp(FIREBASE_CONFIG);
   fbDb = firebase.database();
+  try { fbStorage = firebase.storage(); } catch (e) { console.error('storage unavailable', e); }
   firebase.auth().onAuthStateChanged(function(user) {
     if (!user) return;
     fbDb.ref('gcap/inventory/settings').on('value', function(snap) {
