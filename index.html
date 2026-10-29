@@ -565,7 +565,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 <div class="modal-backdrop" id="returnsModal">
   <div class="modal wide">
     <h3>Returns</h3>
-    <p class="modal-sub">Parts not accepted by the body shop. Each one stays here until you mark it shelved or delete it — regardless of what day it happened.</p>
+    <p class="modal-sub">Parts not accepted by the body shop. Each one stays here until it is shelved or disposed (needs a condition, a photo and a video) or deleted — regardless of what day it happened.</p>
     <div id="returnsList"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeReturnsModal()">Close</button>
@@ -1663,7 +1663,7 @@ function renderStopCard(s, i, curId) {
         (s.so ? '<div><b>SO#:</b> '+escapeHtml(s.so)+'</div>' : '') +
         (s.mop ? '<div><b>Payment:</b> '+escapeHtml(s.mop)+'</div>' : '') +
         (s.part ? partsBlockHtml(s.part, s) : '') +
-        (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+(s.returnResolved ? ' <span style="color:var(--green); font-weight:700;">✅ Shelved</span>' : ' <span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>')+'</div>' : '') +
+        (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+(s.returnResolved ? (s.returnOutcome === 'disposed' ? ' <span style="color:var(--red); font-weight:700;">🗑 Disposed (damaged)</span>' : ' <span style="color:var(--green); font-weight:700;">✅ Shelved' + (s.returnCondition ? ' — ' + escapeHtml(returnConditionLabel(s.returnCondition).toLowerCase()) : '') + '</span>') : ' <span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>')+'</div>' : '') +
         (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a> &nbsp; <a class="maps-link" href="https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+encodeURIComponent(stopHasCoords(s) ? s.lat+','+s.lng : s.addr)+'" target="_blank" rel="noopener">Google Maps →</a></div>' : '') +
       '</div>' +
       (noteText ? '<div class="note-flag">📝 '+escapeHtml(noteText)+'</div>' : '') +
@@ -1922,28 +1922,103 @@ function renderReturnsList() {
         '<div style="font-size:12px; margin-top:4px;"><b>Reason:</b> ' + escapeHtml(s.returnReason || '—') + (s.returnNotes ? ' — ' + escapeHtml(s.returnNotes) : '') + '</div>' +
       '</div>' +
       '<div class="team-row-actions">' +
-        '<button class="btn btn-gold btn-sm" onclick="resolveReturn(\'' + item.dateKey + '\',\'' + s.id + '\')">✅ Shelved</button>' +
+        '<button class="btn btn-gold btn-sm" onclick="openProcessReturn(\'' + item.dateKey + '\',\'' + s.id + '\')">📸 Shelve / Dispose</button>' +
         '<button class="stop-delete-btn" style="width:34px;height:34px;font-size:14px;" onclick="deleteReturnEntry(\'' + item.dateKey + '\',\'' + s.id + '\')" title="Delete">🗑</button>' +
       '</div>' +
     '</div>';
   }).join('');
 }
-function resolveReturn(dateKey, stopId) {
-  if (!confirm('Confirm this part has been placed back on the correct shelf?')) return;
-  var day = days[dateKey];
-  var s = day && day.stops.find(function(x) { return x.id === stopId; });
+/* ---------- PROCESS A RETURN: condition + photo AND video are required before it is shelved or disposed ---------- */
+var RETURN_CONDITIONS = [
+  { id: 'good', icon: '✅', label: 'Good condition', hint: 'Goes back on the shelf', outcome: 'shelved' },
+  { id: 'slight', icon: '🎨', label: 'Slightly damaged / painted', hint: 'Goes back on the shelf, flagged as touched-up', outcome: 'shelved' },
+  { id: 'damaged', icon: '🗑', label: 'Damaged', hint: 'Cannot be shelved — it must be disposed', outcome: 'disposed' }
+];
+var rp = null;
+function returnConditionLabel(id) { var c = RETURN_CONDITIONS.find(function(x) { return x.id === id; }); return c ? c.label : ''; }
+function ensureProcessReturnModal() {
+  if (document.getElementById('processReturnModal')) return;
+  var div = document.createElement('div');
+  div.className = 'modal-backdrop'; div.id = 'processReturnModal'; div.style.zIndex = '1200';
+  div.innerHTML = '<div class="modal wide"><h3>📸 Process return</h3><p class="modal-sub" id="rpSub"></p>' +
+    '<div class="edit-label" style="margin-bottom:6px;">1. What condition is the part in?</div><div id="rpConds" style="display:grid; gap:8px; margin-bottom:12px;"></div>' +
+    '<div class="edit-label" style="margin-bottom:6px;">2. Show it — a photo <b>and</b> a video are both required</div>' +
+    '<div id="rpMedia" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;"></div>' +
+    '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;"><button class="btn btn-navy btn-sm" onclick="document.getElementById(\'rpPhotoInput\').click()">📷 Add photo</button><button class="btn btn-navy btn-sm" onclick="document.getElementById(\'rpVideoInput\').click()">🎥 Add video</button></div>' +
+    '<input type="file" id="rpPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="rpFileChosen(this, \'photo\')">' +
+    '<input type="file" id="rpVideoInput" accept="video/*" capture="environment" style="display:none" onchange="rpFileChosen(this, \'video\')">' +
+    '<div class="field" style="margin-top:8px;"><label>Notes (optional)</label><input class="edit-input" id="rpNotes" placeholder="e.g. scratch on the lower edge"></div>' +
+    '<div id="rpMsg" style="font-size:12px; margin:6px 0; color:var(--amber);"></div>' +
+    '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeProcessReturn()">Cancel</button><button class="btn btn-gold" id="rpConfirm" onclick="confirmProcessReturn()">Confirm</button></div></div>';
+  document.body.appendChild(div);
+}
+function openProcessReturn(dateKey, stopId) {
+  var s = days[dateKey] && days[dateKey].stops.find(function(x) { return x.id === stopId; });
+  if (!s) return;
+  ensureProcessReturnModal();
+  rp = { dateKey: dateKey, stopId: stopId, condition: null, photos: [], videos: [], uploading: 0 };
+  document.getElementById('rpNotes').value = '';
+  document.getElementById('rpSub').textContent = (s.loc || 'Return') + (s.so ? ' • SO# ' + s.so : '') + ' • ' + (s.part || '');
+  document.getElementById('processReturnModal').classList.add('open');
+  renderProcessReturn();
+}
+function closeProcessReturn() { var m = document.getElementById('processReturnModal'); if (m) m.classList.remove('open'); rp = null; }
+function rpSetCondition(id) { if (rp) { rp.condition = id; renderProcessReturn(); } }
+function rpFileChosen(input, kind) {
+  var file = input.files && input.files[0]; input.value = '';
+  var d = rp; if (!file || !d) return;
+  addProofMedia(d, file, kind, function() { if (rp === d) renderProcessReturn(); }, 'return_' + d.stopId);
+}
+function rpMissing() {
+  if (!rp) return [];
+  var miss = [];
+  if (!rp.condition) miss.push('pick the condition');
+  if (!rp.photos.length) miss.push('add a photo');
+  if (!rp.videos.length) miss.push('add a video');
+  if (rp.uploading) miss.push('wait for the video to finish uploading');
+  return miss;
+}
+function renderProcessReturn() {
+  if (!rp) return;
+  document.getElementById('rpConds').innerHTML = RETURN_CONDITIONS.map(function(c) {
+    var on = rp.condition === c.id, bad = c.id === 'damaged';
+    return '<button type="button" onclick="rpSetCondition(\'' + c.id + '\')" style="text-align:left; cursor:pointer; font:inherit; padding:10px 12px; border-radius:10px; color:var(--text); background:' + (on ? (bad ? 'rgba(248,113,113,0.18)' : 'rgba(52,211,153,0.16)') : 'transparent') + '; border:1.5px solid ' + (on ? (bad ? 'var(--red)' : 'var(--green)') : 'var(--glass-border)') + ';">' +
+      '<b>' + c.icon + ' ' + c.label + '</b><div style="font-size:11.5px; color:var(--text-soft);">' + c.hint + '</div></button>';
+  }).join('');
+  document.getElementById('rpMedia').innerHTML = proofMediaHtml(rp) || '<div class="hist-empty">No photo or video yet.</div>';
+  var miss = rpMissing(), dmg = rp.condition === 'damaged';
+  document.getElementById('rpMsg').textContent = miss.length ? 'To continue: ' + miss.join(', ') + '.' : '';
+  var btn = document.getElementById('rpConfirm');
+  btn.textContent = dmg ? '🗑 Confirm — dispose of this part' : '✓ Confirm — shelve this part';
+  btn.disabled = miss.length > 0;
+  btn.style.opacity = miss.length ? '.45' : ''; btn.style.cursor = miss.length ? 'not-allowed' : '';
+}
+function confirmProcessReturn() {
+  var d = rp;
+  if (!d || rpMissing().length) return;
+  var s = days[d.dateKey] && days[d.dateKey].stops.find(function(x) { return x.id === d.stopId; });
+  if (!s) return;
+  var outcome = d.condition === 'damaged' ? 'disposed' : 'shelved';
+  var notes = document.getElementById('rpNotes').value.trim();
   var who = (session && session.name) || settings.driverName || 'Someone';
   var when = nowTimeStr();
-  if (s) { s.returnResolved = true; s.returnResolvedBy = who; s.returnResolvedAt = when; }
-  updateReturnStopRemote(dateKey, stopId, { returnResolved: true, returnResolvedBy: who, returnResolvedAt: when });
-  saveReturnRecord(dateKey, s);
-  if (dateKey === todayKey()) {
-    localStorage.setItem('kgps_days', JSON.stringify(days));
-    addActivity('Return Resolved', (s ? s.loc : 'Stop') + ' — placed back on shelf by ' + who);
-    renderAll();
-  }
-  showToast('Marked as shelved ✓', 'green');
-  renderReturnsList();
+  var btn = document.getElementById('rpConfirm'); btn.disabled = true;
+  var db = recordsDb();
+  var saveProof = db ? db.ref('gcap/records/returnProof/' + s.id).set({ photos: d.photos, videos: d.videos, condition: d.condition, outcome: outcome, notes: notes || null, by: who, at: Date.now() }) : Promise.resolve();
+  saveProof.then(function() {
+    var changes = { returnResolved: true, returnResolvedBy: who, returnResolvedAt: when, returnCondition: d.condition, returnOutcome: outcome, returnProcessNotes: notes || null, returnPhotoCount: d.photos.length, returnVideoCount: d.videos.length };
+    Object.keys(changes).forEach(function(k) { s[k] = changes[k]; });
+    updateReturnStopRemote(d.dateKey, d.stopId, changes);
+    saveReturnRecord(d.dateKey, s);
+    if (d.dateKey === todayKey()) {
+      localStorage.setItem('kgps_days', JSON.stringify(days));
+      addActivity('Return Resolved', (s.loc || 'Stop') + ' — ' + (outcome === 'disposed' ? 'disposed (damaged)' : 'shelved (' + returnConditionLabel(d.condition).toLowerCase() + ')') + ' by ' + who);
+      renderAll();
+    }
+    closeProcessReturn();
+    showToast(outcome === 'disposed' ? 'Marked as disposed ✓' : 'Marked as shelved ✓', 'green');
+    renderReturnsList();
+  }).catch(function(e) { console.error('process return failed', e); showToast("Couldn't save — check your connection and try again.", 'red'); btn.disabled = false; });
 }
 function deleteReturnEntry(dateKey, stopId) {
   if (!confirm('Delete this return entry? This cannot be undone.')) return;
@@ -2411,7 +2486,8 @@ function saveCheckRecord(dateKey, s, c, withPhoto) {
 function returnRecordData(dateKey, s) {
   return { id: s.id, dateKey: dateKey, loc: s.loc || null, addr: s.addr || null, so: s.so || null, part: s.part || null, assignedTo: s.assignedTo || null,
     returnReason: s.returnReason || null, returnNotes: s.returnNotes || null, markedBy: s.updatedBy || null, markedAt: s.updatedAt || null,
-    resolved: !!s.returnResolved, resolvedBy: s.returnResolvedBy || null, resolvedAt: s.returnResolvedAt || null };
+    resolved: !!s.returnResolved, resolvedBy: s.returnResolvedBy || null, resolvedAt: s.returnResolvedAt || null,
+    condition: s.returnCondition || null, outcome: s.returnResolved ? (s.returnOutcome || 'shelved') : null, processNotes: s.returnProcessNotes || null };
 }
 function saveReturnRecord(dateKey, s) { if (s && s.returnReason) saveRecord('returns', s.id, returnRecordData(dateKey, s)); }
 var recordsBackfilled = false;
@@ -2473,7 +2549,7 @@ function renderRecordsModal() {
   var isCk = recView.kind === 'checks';
   document.getElementById('recTitle').textContent = isCk ? '📚 All saved checks' : '📚 All saved returns';
   document.getElementById('recSub').textContent = isCk ? 'Every check ever captured, kept permanently — even after it is deposited or the day is over.' : 'Every returned part ever recorded, kept permanently — even after it is shelved or the day is over.';
-  var seg = (isCk ? [['all', 'All'], ['open', 'Not deposited'], ['done', 'Deposited']] : [['all', 'All'], ['open', 'Needs shelving'], ['done', 'Shelved']]).concat([['deleted', 'Deleted']]);
+  var seg = (isCk ? [['all', 'All'], ['open', 'Not deposited'], ['done', 'Deposited']] : [['all', 'All'], ['open', 'Needs shelving'], ['done', 'Shelved / disposed']]).concat([['deleted', 'Deleted']]);
   document.getElementById('recControls').innerHTML = '<input class="edit-input" id="recSearch" type="search" placeholder="Search name, check #, SO#, part, date…" value="' + escapeHtml(recView.q) + '" oninput="setRecQuery(this.value)" style="margin-bottom:8px;">' +
     '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">' + seg.map(function(o) { return '<button class="btn btn-sm ' + (recView.filter === o[0] ? 'btn-gold' : 'btn-ghost') + '" onclick="setRecFilter(\'' + o[0] + '\')">' + o[1] + '</button>'; }).join('') + '</div>';
   var el = document.getElementById('recList');
@@ -2493,8 +2569,8 @@ function renderRecordsModal() {
       return '<div class="team-row"><div style="flex:1 1 240px;"><span class="tname">' + escapeHtml(r.loc || 'Return') + '</span>' +
         '<div style="font-size:11.5px; color:var(--text-soft);">' + fmtDateDisplay(r.dateKey) + (r.so ? ' • SO# ' + escapeHtml(r.so) : '') + ' • ' + escapeHtml(r.part || '—') + '</div>' +
         '<div style="font-size:12px; margin-top:3px;"><b>Reason:</b> ' + escapeHtml(r.returnReason || '—') + (r.returnNotes ? ' — ' + escapeHtml(r.returnNotes) : '') + '</div></div>' +
-        '<div style="text-align:right; font-size:12px;">' + (r.resolved ? '<span style="color:var(--green); font-weight:700;">✅ Shelved</span><div style="color:var(--text-soft);">' + escapeHtml(r.resolvedBy || '') + ' ' + escapeHtml(r.resolvedAt || '') + '</div>' : '<span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>') + (r.deleted ? '<div style="color:var(--red);">deleted</div>' : '') +
-        '<div style="color:var(--text-soft);">marked by ' + escapeHtml(r.markedBy || '—') + '</div></div></div>';
+        '<div style="text-align:right; font-size:12px;">' + (r.resolved ? (r.outcome === 'disposed' ? '<span style="color:var(--red); font-weight:700;">🗑 Disposed</span>' : '<span style="color:var(--green); font-weight:700;">✅ Shelved</span>') + (r.condition ? '<div>' + escapeHtml(returnConditionLabel(r.condition)) + '</div>' : '') + '<div style="color:var(--text-soft);">' + escapeHtml(r.resolvedBy || '') + ' ' + escapeHtml(r.resolvedAt || '') + '</div>' : '<span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>') + (r.deleted ? '<div style="color:var(--red);">deleted</div>' : '') +
+        '<div style="color:var(--text-soft);">marked by ' + escapeHtml(r.markedBy || '—') + '</div>' + (r.resolved && r.condition ? '<div><a href="#" onclick="viewReturnProof(\'' + escapeHtml(r.id) + '\'); return false;">View photo &amp; video</a></div>' : '') + '</div></div>';
     }).join('');
 }
 function viewCheckPhoto(id) {
@@ -2507,10 +2583,23 @@ function viewCheckPhoto(id) {
     if (w) { w.document.write('<title>Check photo</title><body style="margin:0;background:#111;"><img src="' + p + '" style="max-width:100%;display:block;margin:auto;">'); w.document.close(); }
   });
 }
+function viewReturnProof(id) {
+  var db = recordsDb();
+  if (!db) return;
+  var w = window.open('', '_blank');
+  db.ref('gcap/records/returnProof/' + id).once('value').then(function(snap) {
+    var p = snap.val();
+    if (!p) { if (w) w.close(); showToast('No photo or video saved for this return.', ''); return; }
+    var html = '<title>Return proof</title><body style="margin:12px;background:#111;color:#eee;font-family:sans-serif;"><h3>' + escapeHtml(returnConditionLabel(p.condition)) + ' — ' + escapeHtml(p.outcome || '') + '</h3><p>' + escapeHtml(p.by || '') + (p.notes ? ' — ' + escapeHtml(p.notes) : '') + '</p>' +
+      (p.photos || []).map(function(u) { return '<img src="' + u + '" style="max-width:100%;display:block;margin:8px 0;">'; }).join('') +
+      (p.videos || []).map(function(u) { return '<video src="' + escapeHtml(u) + '" controls style="max-width:100%;display:block;margin:8px 0;"></video>'; }).join('');
+    if (w) { w.document.write(html); w.document.close(); }
+  });
+}
 function downloadRecordsCsv() {
   var isCk = recView.kind === 'checks', rows = recVisible();
   var cols = isCk ? [['dateKey', 'Date'], ['loc', 'Stop'], ['payerName', 'From'], ['amount', 'Amount'], ['checkNumber', 'Check #'], ['bankName', 'Bank'], ['checkDate', 'Check date'], ['so', 'SO#'], ['status', 'Status'], ['capturedBy', 'Captured by'], ['capturedAt', 'Captured at'], ['depositedBy', 'Deposited by'], ['depositedAt', 'Deposited at']]
-    : [['dateKey', 'Date'], ['loc', 'Stop'], ['so', 'SO#'], ['part', 'Part'], ['returnReason', 'Reason'], ['returnNotes', 'Notes'], ['markedBy', 'Marked by'], ['markedAt', 'Marked at'], ['resolved', 'Shelved'], ['resolvedBy', 'Shelved by'], ['resolvedAt', 'Shelved at']];
+    : [['dateKey', 'Date'], ['loc', 'Stop'], ['so', 'SO#'], ['part', 'Part'], ['returnReason', 'Reason'], ['returnNotes', 'Notes'], ['markedBy', 'Marked by'], ['markedAt', 'Marked at'], ['condition', 'Condition'], ['outcome', 'Outcome'], ['resolved', 'Processed'], ['resolvedBy', 'Processed by'], ['resolvedAt', 'Processed at'], ['processNotes', 'Process notes']];
   function cell(v) { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
   var csv = [cols.map(function(c) { return c[1]; }).join(',')].concat(rows.map(function(r) { return cols.map(function(c) { return cell(r[c[0]]); }).join(','); })).join('\r\n');
   var a = document.createElement('a');

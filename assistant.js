@@ -120,10 +120,7 @@ function renderProofModal() {
   document.getElementById('proofTitle').textContent = adding ? '📸 Show it before marking Found' : '✓ Found — proof';
   document.getElementById('proofSub').textContent = proofLabel(d.key) + (adding ? ' — take at least one photo or video of the part.' : '');
   document.getElementById('proofAdd').style.display = adding ? 'flex' : 'none';
-  var media = d.photos.map(function(p, i) { return '<img src="' + p + '" style="width:92px; height:92px; object-fit:cover; border-radius:10px; border:1px solid var(--glass-border); cursor:pointer;" onclick="window.open(this.src)">' + ''; }).concat(
-    d.videos.map(function(u) { return '<video src="' + escapeHtml(u) + '" controls preload="metadata" style="width:160px; max-height:120px; border-radius:10px; border:1px solid var(--glass-border); background:#000;"></video>'; }));
-  if (d.uploading) media.push('<div style="align-self:center; font-size:12px; color:var(--text-soft);">⏳ Uploading video…</div>');
-  document.getElementById('proofMedia').innerHTML = media.join('') || (d.loading ? '<div class="hist-empty">Loading…</div>' : '<div class="hist-empty">' + (adding ? 'Nothing added yet.' : 'No photo or video was saved for this part (it was marked found before proof was required).') + '</div>');
+  document.getElementById('proofMedia').innerHTML = proofMediaHtml(d) || (d.loading ? '<div class="hist-empty">Loading…</div>' : '<div class="hist-empty">' + (adding ? 'Nothing added yet.' : 'No photo or video was saved for this part (it was marked found before proof was required).') + '</div>');
   var st = partStatus[d.key] && partStatus[d.key].found;
   document.getElementById('proofMsg').textContent = adding ? '' : (st ? 'Marked found by ' + (st.by || '—') + (st.at ? ' at ' + new Date(st.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '') : '');
   var ready = d.photos.length + d.videos.length > 0 && !d.uploading;
@@ -131,9 +128,8 @@ function renderProofModal() {
     ? '<button class="btn btn-ghost" onclick="closeProofModal()">Cancel</button><button class="btn btn-gold" id="proofConfirmBtn" onclick="confirmFoundProof()"' + (ready ? '' : ' disabled style="opacity:.45; cursor:not-allowed;"') + '>✓ Mark as Found</button>'
     : '<button class="btn btn-ghost" onclick="closeProofModal()">Close</button><button class="btn btn-ghost" style="color:var(--red);" onclick="undoFound(\'' + d.key + '\')">↩ Undo Found</button>';
 }
-function proofFileChosen(input, kind) {
-  var file = input.files && input.files[0]; input.value = '';
-  var d = proofDraft; if (!file || !d) return;
+/* Adds one photo (shrunk to 800px, kept inline) or video (uploaded to Storage) to a draft {photos:[], videos:[], uploading:0}. */
+function addProofMedia(d, file, kind, rerender, folder) {
   if (kind === 'photo') {
     if (d.photos.length >= PROOF_MAX_PHOTOS) { partToast('Up to ' + PROOF_MAX_PHOTOS + ' photos.', 'red'); return; }
     var reader = new FileReader();
@@ -143,7 +139,7 @@ function proofFileChosen(input, kind) {
         var scale = Math.min(1, 800 / img.width), c = document.createElement('canvas');
         c.width = img.width * scale; c.height = img.height * scale;
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        if (proofDraft === d) { d.photos.push(c.toDataURL('image/jpeg', 0.75)); renderProofModal(); }
+        d.photos.push(c.toDataURL('image/jpeg', 0.75)); rerender();
       };
       img.src = ev.target.result;
     };
@@ -152,11 +148,21 @@ function proofFileChosen(input, kind) {
   }
   if (typeof fbStorage === 'undefined' || !fbStorage) { partToast('Video upload is not available on this page — add a photo instead.', 'red'); return; }
   if (file.size > PROOF_VIDEO_MAX) { partToast('That video is too large (max 300MB).', 'red'); return; }
-  d.uploading++; renderProofModal();
-  fbStorage.ref('gcap/videos/found_' + d.key + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_')).put(file)
+  d.uploading++; rerender();
+  fbStorage.ref('gcap/videos/' + folder + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_')).put(file)
     .then(function(snap) { return snap.ref.getDownloadURL(); })
-    .then(function(url) { d.uploading--; d.videos.push(url); if (proofDraft === d) renderProofModal(); })
-    .catch(function(e) { console.error('proof video upload failed', e); d.uploading--; partToast('Video upload failed — try again or add a photo.', 'red'); if (proofDraft === d) renderProofModal(); });
+    .then(function(url) { d.uploading--; d.videos.push(url); rerender(); })
+    .catch(function(e) { console.error('proof video upload failed', e); d.uploading--; partToast('Video upload failed — try again.', 'red'); rerender(); });
+}
+function proofMediaHtml(d) {
+  return d.photos.map(function(p) { return '<img src="' + p + '" style="width:92px; height:92px; object-fit:cover; border-radius:10px; border:1px solid var(--glass-border); cursor:pointer;" onclick="window.open(this.src)">'; }).concat(
+    d.videos.map(function(u) { return '<video src="' + escapeHtml(u) + '" controls preload="metadata" style="width:160px; max-height:120px; border-radius:10px; border:1px solid var(--glass-border); background:#000;"></video>'; }),
+    d.uploading ? ['<div style="align-self:center; font-size:12px; color:var(--text-soft);">⏳ Uploading video…</div>'] : []).join('');
+}
+function proofFileChosen(input, kind) {
+  var file = input.files && input.files[0]; input.value = '';
+  var d = proofDraft; if (!file || !d) return;
+  addProofMedia(d, file, kind, function() { if (proofDraft === d) renderProofModal(); }, 'found_' + d.key);
 }
 function confirmFoundProof() {
   var d = proofDraft;
