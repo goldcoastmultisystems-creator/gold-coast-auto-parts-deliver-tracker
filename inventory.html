@@ -201,7 +201,7 @@ if (!session) {
 } else {
   document.getElementById('who').textContent = (session.name || '') + (session.role ? ' • ' + session.role : '');
   var isSalesOnly = session.type === 'guest' && !session.isAdmin && session.role === 'Sales Rep';
-  canEdit = session.type === 'owner' || !!session.isAdmin || session.role === 'Dispatcher';
+  canEdit = session.type === 'owner' || !!session.isAdmin || session.role === 'Dispatcher' || session.role === 'Inventory Specialist';
   document.getElementById('backDelivery').style.display = isSalesOnly ? 'none' : '';
   startFirebase();
 }

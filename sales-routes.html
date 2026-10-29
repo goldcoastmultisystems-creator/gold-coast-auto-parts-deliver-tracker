@@ -432,6 +432,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <label>Role</label>
       <select id="driverRole" onchange="onSettingsChange()">
         <option value="Sales Rep">Sales Rep</option>
+              <option value="Inventory Specialist">Inventory Specialist</option>
       </select>
       <span id="driverRoleStatic" class="date-pill" style="display:none; padding:9px 12px;"></span>
     </div>
@@ -541,6 +542,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
               <option value="Driver">Driver</option>
               <option value="Dispatcher">Dispatcher</option>
               <option value="Sales Rep">Sales Rep</option>
+              <option value="Inventory Specialist">Inventory Specialist</option>
             </select>
           </div>
         </div>
@@ -1289,7 +1291,7 @@ function guestLogin() {
   session = { type: 'guest', name: memberObj.name, role: memberObj.role, memberId: memberObj.memberId, isAdmin: memberObj.isAdmin, auth: memberObj.memberId ? { type: 'team', memberId: memberObj.memberId, pin: pin } : null };
   saveSession(session);
   updateSettingsFields({ driverName: memberObj.name });
-  if (session.type === 'guest' && !session.isAdmin && (session.role === 'Dispatcher' || session.role === 'Driver')) {
+  if (session.type === 'guest' && !session.isAdmin && (session.role === 'Dispatcher' || session.role === 'Driver' || session.role === 'Inventory Specialist')) {
     window.location.href = 'choose-dashboard.html';
     return;
   }
