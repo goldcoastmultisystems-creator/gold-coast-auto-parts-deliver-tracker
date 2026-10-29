@@ -1552,11 +1552,30 @@ function currentStopId() {
   var next = myStops().find(function(s) { return s.status !== 'completed'; });
   return next ? next.id : null;
 }
+/* Completed stops leave the live list but stay in the day's data, so End of Day and History still count them. */
+var showCompletedStops = false;
+function toggleCompletedStops() { showCompletedStops = !showCompletedStops; renderStops(); }
+function completedStopsHtml(done) {
+  if (!done.length) return '';
+  return '<div class="route-group" style="margin-top:6px;">' +
+    '<div class="route-group-head" style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="toggleCompletedStops()">✅ Completed today<span class="route-group-count">' + done.length + '</span><span style="margin-left:auto; font-size:12px; text-transform:none; letter-spacing:0;">' + (showCompletedStops ? 'Hide ▴' : 'Show ▾') + '</span></div>' +
+    (showCompletedStops ? done.map(function(s) {
+      return '<div class="team-row" style="opacity:.85;"><div style="flex:1 1 220px;"><span class="tname">' + escapeHtml(s.loc || 'Stop') + '</span>' +
+        '<div style="font-size:11.5px; color:var(--text-soft);">' + escapeHtml(TYPE_LABELS[s.type] || '') + (s.so ? ' • SO# ' + escapeHtml(s.so) : '') + (s.assignedTo ? ' • ' + escapeHtml(s.assignedTo) : '') + (s.updatedBy ? ' • completed by ' + escapeHtml(s.updatedBy) : '') + (s.updatedAt ? ' at ' + escapeHtml(s.updatedAt) : '') + '</div></div>' +
+        '<button class="btn btn-ghost btn-sm" onclick="setStatus(\'' + s.id + '\',\'pending\')" title="Put it back on the list">↩ Reopen</button></div>';
+    }).join('') : '') + '</div>';
+}
 function renderStops() {
   var el = document.getElementById('stopsList');
-  var stops = visibleStops();
-  if (!stops.length) {
+  var allStops = visibleStops();
+  var stops = allStops.filter(function(s) { return s.status !== 'completed'; });
+  var doneStops = allStops.filter(function(s) { return s.status === 'completed'; });
+  if (!allStops.length) {
     el.innerHTML = '<div class="empty-state"><div class="big">No stops yet</div><div class="sm">Paste your dispatcher\'s list up top, or tap <b>+ Add Stop</b> to get started.</div></div>';
+    return;
+  }
+  if (!stops.length) {
+    el.innerHTML = '<div class="empty-state"><div class="big">🎉 All stops completed</div><div class="sm">' + doneStops.length + ' completed stop' + (doneStops.length === 1 ? ' is' : 's are') + ' saved in the End of Day Report and History.</div></div>' + completedStopsHtml(doneStops);
     return;
   }
   var curId = currentStopId();
@@ -1589,7 +1608,7 @@ function renderStops() {
       '<div class="route-group-head" style="display:flex; align-items:center; gap:8px;">' + escapeHtml(label) + '<span class="route-group-count">' + groupStops.length + '</span>' + routeBtn + '</div>' +
       groupStops.map(function(s, gi) { return renderStopCard(s, gi, curId); }).join('') +
     '</div>';
-  }).join('');
+  }).join('') + completedStopsHtml(doneStops);
 }
 function stopKind(s) {
   var isReturn = !!s.isReturn || s.status === 'returned' || !!s.returnReason || ((s.type === 'pickup' || s.type === 'stop') && /return/i.test((s.loc || '') + ' ' + (s.notes || '') + ' ' + (s.part || '')));
@@ -1841,7 +1860,7 @@ function setStatus(id, status) {
   s.updatedAtMs = Date.now();
   saveDays(days);
   addActivity(STATUS_LABELS[status], s.loc + ' marked ' + STATUS_LABELS[status].toLowerCase() + ' by ' + s.updatedBy);
-  showToast(s.loc + ' → ' + STATUS_LABELS[status], status === 'returned' || status === 'postponed' ? 'red' : 'green');
+  showToast(status === 'completed' ? '✅ ' + s.loc + ' completed — saved in End of Day & History' : s.loc + ' → ' + STATUS_LABELS[status], status === 'returned' || status === 'postponed' ? 'red' : 'green');
   renderAll();
 }
 
@@ -3133,7 +3152,7 @@ var PP_WHERE = [['all', 'All sources'], ['E2', 'E2'], ['E5', 'E5'], ['E9', 'E9']
 var PP_STOCK = [['all', 'All'], ['ok', 'In stock'], ['low', 'Low stock'], ['out', 'Sold out']];
 var PP_LEVEL_LABEL = { ok: 'In Stock', low: 'Low Stock', out: 'Sold Out', none: 'Not in catalog' };
 function ppAllRows() {
-  var stops = currentDay.stops.filter(function(s) { return s.part && s.part.trim() && (ppState.mode === 'buy' ? s.type === 'pickup' : s.type !== 'pickup'); });
+  var stops = currentDay.stops.filter(function(s) { return s.status !== 'completed' && s.part && s.part.trim() && (ppState.mode === 'buy' ? s.type === 'pickup' : s.type !== 'pickup'); });
   var rows = [];
   stops.forEach(function(s) {
     partItems(s.part).forEach(function(it) {
