@@ -3209,6 +3209,17 @@ function ppAllRows() {
         level: inv ? (inv[2] <= 0 ? 'out' : (inv[2] <= 1 ? 'low' : 'ok')) : 'none', onHand: inv ? inv[2] : null, stop: s });
     });
   });
+  /* parts added from a Zoho order because they are out of stock (not yet bought) */
+  if (ppState.mode === 'buy' && typeof purchaseList !== 'undefined') {
+    Object.keys(purchaseList).forEach(function(key) {
+      var e = purchaseList[key];
+      if (!e || e.bought) return;
+      var sku = e.sku || '', nm = String(e.name || '').replace(sku, '').replace(/\s+/g, ' ').trim() || e.name || sku;
+      var inv = (typeof inventoryRows !== 'undefined' && inventoryRows && sku) ? inventoryRows.find(function(r) { return String(r[0]).toUpperCase() === sku.toUpperCase(); }) : null;
+      rows.push({ sku: sku, name: nm, need: Number(e.qty) || 1, kind: 'buy', lines: ['🛒 Buy from a supplier'], level: inv ? (inv[2] <= 0 ? 'out' : (inv[2] <= 1 ? 'low' : 'ok')) : 'none', onHand: inv ? inv[2] : null,
+        listKey: key, addedBy: e.addedBy, stop: { id: 'pl_' + key, loc: e.customer || '', so: e.so || '', status: 'pending' } });
+    });
+  }
   function sortKey(r) { return r.kind === 'none' || r.kind === 'stock' ? '~' + r.lines[0] : r.lines[0]; }
   rows.sort(function(a, b) { return sortKey(a).localeCompare(sortKey(b)) || a.sku.localeCompare(b.sku); });
   return rows;
@@ -3270,8 +3281,9 @@ function renderPartsOverlay() {
     (rows.length ? rows.map(function(r) {
       return '<tr><td class="pp-sku">' + escapeHtml(r.sku || '—') + '</td><td>' + escapeHtml(r.name) + '</td><td class="num"><b>' + r.need + '</b></td>' +
         '<td>' + r.lines.map(function(l) { return '<div><b>' + escapeHtml(l) + '</b></div>'; }).join('') + '</td>' +
-        '<td><span class="pp-pill ' + r.level + '">' + PP_LEVEL_LABEL[r.level] + '</span></td><td style="white-space:nowrap;">' + (typeof partStatusHtml === 'function' ? partStatusHtml(stopPartRef(r.stop), r.sku || r.name) : '') + '</td><td class="num pp-hide">' + (r.onHand == null ? '—' : r.onHand) + '</td>' +
-        '<td>' + escapeHtml(r.stop.loc || '') + (r.stop.so ? '<div class="pp-sub2">' + escapeHtml(r.stop.so) + '</div>' : '') + '</td><td class="pp-hide">' + STATUS_LABELS[r.stop.status] + '</td></tr>';
+        '<td><span class="pp-pill ' + r.level + '">' + PP_LEVEL_LABEL[r.level] + '</span></td><td style="white-space:nowrap;">' + (typeof partStatusHtml === 'function' ? partStatusHtml(stopPartRef(r.stop), r.sku || r.name) : '') +
+          (r.listKey ? '<div style="margin-top:4px;"><button type="button" class="btn btn-sm btn-gold" onclick="markPurchaseBought(\'' + r.listKey + '\')" title="Mark this part as bought — it leaves the list">✓ Bought</button> <button type="button" class="btn btn-sm btn-ghost" onclick="removePurchase(\'' + r.listKey + '\')" title="Take it off the list">✕</button></div>' : '') + '</td><td class="num pp-hide">' + (r.onHand == null ? '—' : r.onHand) + '</td>' +
+        '<td>' + escapeHtml(r.stop.loc || '') + (r.stop.so ? '<div class="pp-sub2">' + escapeHtml(r.stop.so) + '</div>' : '') + '</td><td class="pp-hide">' + (r.listKey ? 'To buy' + (r.addedBy ? '<div class="pp-sub2">added by ' + escapeHtml(r.addedBy) + '</div>' : '') : STATUS_LABELS[r.stop.status]) + '</td></tr>';
     }).join('') : '<tr><td colspan="9" class="pp-sub2" style="padding:18px;">' + (all.length ? 'No parts match these filters.' : 'No stops have a part number or description yet.') + '</td></tr>') +
     '</tbody></table>';
 }
@@ -3488,6 +3500,9 @@ function partsLine(part) {
   if (!infos.length) return '';
   function line(p) { return p.text + (p.source.kind !== 'none' ? ' — ' + SOURCE_ICON[p.source.kind] + ' ' + p.source.label : ''); }
   return infos.length === 1 ? '🔧 ' + line(infos[0]) : '🔧\n' + infos.map(function(p) { return '- ' + line(p); }).join('\n');
+}
+function onPurchaseListChanged() {
+  if (typeof renderPartsOverlay === 'function' && currentDay) renderPartsOverlay();
 }
 function onInventoryLoaded() {
   if (typeof renderStops === 'function' && currentDay) renderStops();

@@ -36,6 +36,7 @@ function loadInventory() {
   }).catch(function(e) { console.error('inventory load failed', e); }).then(function() {
     inventoryLoading = null;
     attachPartStatus();
+    attachPurchaseList();
     if (typeof onInventoryLoaded === 'function') onInventoryLoaded();
   });
   return inventoryLoading;
@@ -176,6 +177,54 @@ function confirmFoundProof() {
       partToast('Marked as found ✓', 'green');
     }).catch(function(e) { console.error('proof save failed', e); partToast("Couldn't save the proof — check your connection.", 'red'); if (btn) btn.disabled = false; });
 }
+/* ---------- PURCHASE LIST: a Zoho order line that is out of stock can be put on "Parts to Purchase" ----------
+   Stored at gcap/purchaseList/{key} (same key as Found/Loaded: order number + part). */
+var purchaseList = {}, purchaseRef = null, purchaseDraft = {};
+function attachPurchaseList() {
+  if (purchaseRef || typeof FIREBASE_ENABLED === 'undefined' || !FIREBASE_ENABLED || !window.fbDb) return;
+  purchaseRef = fbDb.ref('gcap/purchaseList');
+  purchaseRef.on('value', function(snap) {
+    purchaseList = snap.val() || {};
+    refreshPurchaseDom();
+    if (typeof onPurchaseListChanged === 'function') onPurchaseListChanged();
+  }, function(e) { console.error('purchase list listener failed', e); purchaseRef = null; });
+}
+function purchaseInner(key, soldOut) {
+  var e = purchaseList[key];
+  var base = 'cursor:pointer; font:inherit; font-size:11.5px; font-weight:800; padding:3px 9px; border-radius:7px; white-space:nowrap; ';
+  if (e && e.bought) return '<span style="font-size:11.5px; font-weight:800; color:var(--green);">✓ Bought' + (e.boughtBy ? ' by ' + escapeHtml(e.boughtBy) : '') + '</span>';
+  if (e) return '<button type="button" onclick="event.stopPropagation(); removePurchase(\'' + key + '\')" title="Tap to take it off the list" style="' + base + 'background:rgba(251,191,36,0.2); border:1px solid #fbbf24; color:var(--amber);">🛒 On Parts to Purchase ✓</button>';
+  return '<button type="button" onclick="event.stopPropagation(); addPurchase(\'' + key + '\')" title="Add this part to the Parts to Purchase list" style="' + base + (soldOut ? 'background:rgba(248,113,113,0.15); border:1px solid var(--red); color:var(--red);' : 'background:transparent; border:1px solid var(--glass-border); color:var(--text-soft);') + '">🛒 ' + (soldOut ? 'Out of stock — add to Parts to Purchase' : 'Add to Parts to Purchase') + '</button>';
+}
+function purchaseHtml(ref, line, customer, soldOut) {
+  attachPurchaseList();
+  var item = line.sku || line.name, key = partStatusKey(ref, item);
+  purchaseDraft[key] = { sku: line.sku || '', name: line.name || '', qty: Number(line.qty) || 1, so: ref || '', customer: customer || '', soldOut: !!soldOut };
+  return '<span class="pbuy" data-pkey="' + key + '" data-sold="' + (soldOut ? 1 : 0) + '">' + purchaseInner(key, soldOut) + '</span>';
+}
+function refreshPurchaseDom() {
+  Array.prototype.forEach.call(document.querySelectorAll('.pbuy[data-pkey]'), function(el) { el.innerHTML = purchaseInner(el.getAttribute('data-pkey'), el.getAttribute('data-sold') === '1'); });
+}
+function addPurchase(key) {
+  var d = purchaseDraft[key];
+  if (!purchaseRef || !d) { partToast("Couldn't reach the database — try again in a moment.", 'red'); return; }
+  var entry = { sku: d.sku, name: d.name, qty: d.qty, so: d.so, customer: d.customer, addedBy: partWho(), addedAt: Date.now() };
+  purchaseList[key] = entry; refreshPurchaseDom();
+  purchaseRef.child(key).set(entry).then(function() { partToast('Added to Parts to Purchase ✓', 'green'); })
+    .catch(function(e) { console.error('purchase add failed', e); delete purchaseList[key]; refreshPurchaseDom(); partToast("Couldn't save that — check your connection.", 'red'); });
+}
+function removePurchase(key) {
+  if (!purchaseRef) return;
+  delete purchaseList[key]; refreshPurchaseDom();
+  purchaseRef.child(key).remove().catch(function(e) { console.error('purchase remove failed', e); partToast("Couldn't remove it — check your connection.", 'red'); });
+}
+function markPurchaseBought(key) {
+  var e = purchaseList[key];
+  if (!purchaseRef || !e) return;
+  e.bought = true; e.boughtBy = partWho(); e.boughtAt = Date.now(); refreshPurchaseDom();
+  purchaseRef.child(key).set(e).then(function() { partToast('Marked as bought ✓', 'green'); }).catch(function(err) { console.error('purchase bought failed', err); partToast("Couldn't save that — check your connection.", 'red'); });
+}
+
 /* Rush mode: mark it found right away. It is recorded as "no proof" so it's visible who skipped it. */
 function confirmFoundNoProof() {
   var d = proofDraft;
