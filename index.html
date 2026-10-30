@@ -1684,7 +1684,7 @@ function renderStopCard(s, i, curId) {
         (s.so ? '<div><b>SO#:</b> '+escapeHtml(s.so)+'</div>' : '') +
         (s.mop ? '<div><b>Payment:</b> '+escapeHtml(s.mop)+'</div>' : '') +
         (s.part ? partsBlockHtml(s.part, s) : '') +
-        (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+(s.returnResolved ? (s.returnOutcome === 'disposed' ? ' <span style="color:var(--red); font-weight:700;">🗑 Disposed (damaged)</span>' : ' <span style="color:var(--green); font-weight:700;">✅ Shelved' + (s.returnCondition ? ' — ' + escapeHtml(returnConditionLabel(s.returnCondition).toLowerCase()) : '') + '</span>') : ' <span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>')+'</div>' : '') +
+        (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+(s.returnResolved ? (s.returnOutcome === 'disposed' ? ' <span style="color:var(--red); font-weight:700;">🗑 Disposed</span> ' : ' <span style="color:var(--green); font-weight:700;">✅ Shelved</span> ') + returnConditionPill(s.returnCondition) :' <span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>')+'</div>' : '') +
         (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a> &nbsp; <a class="maps-link" href="https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+encodeURIComponent(stopHasCoords(s) ? s.lat+','+s.lng : s.addr)+'" target="_blank" rel="noopener">Google Maps →</a></div>' : '') +
       '</div>' +
       (noteText ? '<div class="note-flag">📝 '+escapeHtml(noteText)+'</div>' : '') +
@@ -1951,12 +1951,18 @@ function renderReturnsList() {
 }
 /* ---------- PROCESS A RETURN: condition + photo AND video are required before it is shelved or disposed ---------- */
 var RETURN_CONDITIONS = [
-  { id: 'good', icon: '✅', label: 'Good condition', hint: 'Goes back on the shelf', outcome: 'shelved' },
-  { id: 'slight', icon: '🎨', label: 'Slightly damaged / painted', hint: 'Goes back on the shelf, flagged as touched-up', outcome: 'shelved' },
-  { id: 'damaged', icon: '🗑', label: 'Damaged', hint: 'Cannot be shelved — it must be disposed', outcome: 'disposed' }
+  { id: 'good', icon: '✅', label: 'Good condition', hint: 'Can still be sold — goes back on the shelf at full price', sale: 'Sell — full price', outcome: 'shelved', color: '#34d399' },
+  { id: 'slight', icon: '🎨', label: 'Slightly damaged / painted', hint: 'Can be sold at a discounted price — goes back on the shelf', sale: 'Sell — discounted price', outcome: 'shelved', color: '#fbbf24' },
+  { id: 'damaged', icon: '🗑', label: 'Damaged', hint: 'Really damaged — it cannot be sold and must be disposed', sale: 'Cannot be sold — dispose', outcome: 'disposed', color: '#f87171' }
 ];
 var rp = null;
 function returnConditionLabel(id) { var c = RETURN_CONDITIONS.find(function(x) { return x.id === id; }); return c ? c.label : ''; }
+/* A coloured badge that says both the condition and what it means for selling the part. */
+function returnConditionPill(id) {
+  var c = RETURN_CONDITIONS.find(function(x) { return x.id === id; });
+  if (!c) return '<span style="font-size:11px; color:var(--text-soft);">Condition not recorded</span>';
+  return '<span style="display:inline-block; font-size:11.5px; font-weight:800; padding:2px 9px; border-radius:99px; border:1px solid ' + c.color + '; color:' + c.color + '; background:' + c.color + '22; white-space:nowrap;">' + c.icon + ' ' + escapeHtml(c.label) + ' • ' + escapeHtml(c.sale) + '</span>';
+}
 function ensureProcessReturnModal() {
   if (document.getElementById('processReturnModal')) return;
   var div = document.createElement('div');
@@ -2010,7 +2016,7 @@ function renderProcessReturn() {
   var miss = rpMissing(), dmg = rp.condition === 'damaged';
   document.getElementById('rpMsg').textContent = miss.length ? 'To continue: ' + miss.join(', ') + '.' : '';
   var btn = document.getElementById('rpConfirm');
-  btn.textContent = dmg ? '🗑 Confirm — dispose of this part' : '✓ Confirm — shelve this part';
+  btn.textContent = dmg ? '🗑 Confirm — dispose of this part' : (rp.condition === 'slight' ? '✓ Confirm — shelve it to sell at a discount' : '✓ Confirm — shelve it to sell');
   btn.disabled = miss.length > 0;
   btn.style.opacity = miss.length ? '.45' : ''; btn.style.cursor = miss.length ? 'not-allowed' : '';
 }
@@ -2535,7 +2541,7 @@ function backfillRecords() {
 /* ---------- Saved records viewer (Checks / Returns history, with CSV) ---------- */
 var recView = { kind: 'checks', rows: [], filter: 'all', q: '', loading: false };
 function openRecordsModal(kind) {
-  recView = { kind: kind, rows: [], filter: 'all', q: '', loading: true };
+  recView = { kind: kind, rows: [], filter: 'all', cond: 'all', q: '', loading: true };
   var m = document.getElementById('recordsModal');
   if (!m) {
     m = document.createElement('div'); m.className = 'modal-backdrop'; m.id = 'recordsModal';
@@ -2561,10 +2567,41 @@ function recVisible() {
     if (recView.filter === 'deleted' && !r.deleted) return false;
     if (recView.filter === 'open' && (recView.kind === 'checks' ? r.status === 'deposited' : r.resolved)) return false;
     if (recView.filter === 'done' && !(recView.kind === 'checks' ? r.status === 'deposited' : r.resolved)) return false;
+    if (recView.kind === 'returns' && recView.cond && recView.cond !== 'all' && (recView.cond === 'none' ? !!r.condition : r.condition !== recView.cond)) return false;
     return !q || JSON.stringify(r).toLowerCase().indexOf(q) !== -1;
   });
 }
 function setRecFilter(f) { recView.filter = f; renderRecordsModal(); }
+function setRecCond(c) { recView.cond = c; renderRecordsModal(); }
+/* Older returns were shelved before conditions existed — let someone record the condition afterwards (no photo needed for history). */
+function pickReturnCondition(id) {
+  var m = document.getElementById('condPickModal');
+  if (!m) {
+    m = document.createElement('div'); m.className = 'modal-backdrop'; m.id = 'condPickModal'; m.style.zIndex = '1250';
+    m.innerHTML = '<div class="modal"><h3>Set the condition</h3><p class="modal-sub" id="condPickSub"></p><div id="condPickBtns" style="display:grid; gap:8px;"></div><div class="modal-actions"><button class="btn btn-ghost" onclick="document.getElementById(\'condPickModal\').classList.remove(\'open\')">Cancel</button></div></div>';
+    document.body.appendChild(m);
+  }
+  var r = recView.rows.find(function(x) { return x.id === id; });
+  document.getElementById('condPickSub').textContent = (r ? r.loc + ' • ' + (r.part || '') : '');
+  document.getElementById('condPickBtns').innerHTML = RETURN_CONDITIONS.map(function(c) {
+    return '<button type="button" onclick="saveReturnCondition(\'' + id + '\',\'' + c.id + '\')" style="text-align:left; cursor:pointer; font:inherit; padding:10px 12px; border-radius:10px; color:var(--text); background:transparent; border:1.5px solid ' + c.color + ';"><b>' + c.icon + ' ' + c.label + '</b><div style="font-size:11.5px; color:var(--text-soft);">' + c.hint + '</div></button>';
+  }).join('');
+  m.classList.add('open');
+}
+function saveReturnCondition(id, cond) {
+  var r = recView.rows.find(function(x) { return x.id === id; });
+  var c = RETURN_CONDITIONS.find(function(x) { return x.id === cond; });
+  if (!r || !c) return;
+  r.condition = cond; r.outcome = c.outcome;
+  saveRecord('returns', id, { condition: cond, outcome: c.outcome });
+  var s = days[r.dateKey] && days[r.dateKey].stops.find(function(x) { return x.id === id; });
+  if (s) { s.returnCondition = cond; s.returnOutcome = c.outcome; }
+  updateReturnStopRemote(r.dateKey, id, { returnCondition: cond, returnOutcome: c.outcome });
+  document.getElementById('condPickModal').classList.remove('open');
+  showToast('Condition saved ✓', 'green');
+  renderRecordsModal();
+  if (r.dateKey === todayKey()) renderAll();
+}
 function setRecQuery(v) { recView.q = v; renderRecordsModal(); var i = document.getElementById('recSearch'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } }
 function renderRecordsModal() {
   var isCk = recView.kind === 'checks';
@@ -2572,7 +2609,9 @@ function renderRecordsModal() {
   document.getElementById('recSub').textContent = isCk ? 'Every check ever captured, kept permanently — even after it is deposited or the day is over.' : 'Every returned part ever recorded, kept permanently — even after it is shelved or the day is over.';
   var seg = (isCk ? [['all', 'All'], ['open', 'Not deposited'], ['done', 'Deposited']] : [['all', 'All'], ['open', 'Needs shelving'], ['done', 'Shelved / disposed']]).concat([['deleted', 'Deleted']]);
   document.getElementById('recControls').innerHTML = '<input class="edit-input" id="recSearch" type="search" placeholder="Search name, check #, SO#, part, date…" value="' + escapeHtml(recView.q) + '" oninput="setRecQuery(this.value)" style="margin-bottom:8px;">' +
-    '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">' + seg.map(function(o) { return '<button class="btn btn-sm ' + (recView.filter === o[0] ? 'btn-gold' : 'btn-ghost') + '" onclick="setRecFilter(\'' + o[0] + '\')">' + o[1] + '</button>'; }).join('') + '</div>';
+    '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">' + seg.map(function(o) { return '<button class="btn btn-sm ' + (recView.filter === o[0] ? 'btn-gold' : 'btn-ghost') + '" onclick="setRecFilter(\'' + o[0] + '\')">' + o[1] + '</button>'; }).join('') + '</div>' +
+    (isCk ? '' : '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;"><span style="font-size:11.5px; color:var(--text-soft); align-self:center;">Condition:</span>' +
+      [['all', 'Any'], ['good', '✅ Good — sell'], ['slight', '🎨 Slightly damaged — discount'], ['damaged', '🗑 Damaged'], ['none', 'Not recorded']].map(function(o) { return '<button class="btn btn-sm ' + (recView.cond === o[0] ? 'btn-gold' : 'btn-ghost') + '" onclick="setRecCond(\'' + o[0] + '\')">' + o[1] + '</button>'; }).join('') + '</div>');
   var el = document.getElementById('recList');
   if (recView.loading) { el.innerHTML = '<div class="hist-empty">Loading saved records…</div>'; return; }
   if (!recordsDb() || recView.error) { el.innerHTML = '<div class="hist-empty">Couldn\'t reach the database.</div>'; return; }
@@ -2590,7 +2629,7 @@ function renderRecordsModal() {
       return '<div class="team-row"><div style="flex:1 1 240px;"><span class="tname">' + escapeHtml(r.loc || 'Return') + '</span>' +
         '<div style="font-size:11.5px; color:var(--text-soft);">' + fmtDateDisplay(r.dateKey) + (r.so ? ' • SO# ' + escapeHtml(r.so) : '') + ' • ' + escapeHtml(r.part || '—') + '</div>' +
         '<div style="font-size:12px; margin-top:3px;"><b>Reason:</b> ' + escapeHtml(r.returnReason || '—') + (r.returnNotes ? ' — ' + escapeHtml(r.returnNotes) : '') + '</div></div>' +
-        '<div style="text-align:right; font-size:12px;">' + (r.resolved ? (r.outcome === 'disposed' ? '<span style="color:var(--red); font-weight:700;">🗑 Disposed</span>' : '<span style="color:var(--green); font-weight:700;">✅ Shelved</span>') + (r.condition ? '<div>' + escapeHtml(returnConditionLabel(r.condition)) + '</div>' : '') + '<div style="color:var(--text-soft);">' + escapeHtml(r.resolvedBy || '') + ' ' + escapeHtml(r.resolvedAt || '') + '</div>' : '<span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>') + (r.deleted ? '<div style="color:var(--red);">deleted</div>' : '') +
+        '<div style="text-align:right; font-size:12px;">' + (r.resolved ? (r.outcome === 'disposed' ? '<span style="color:var(--red); font-weight:700;">🗑 Disposed</span>' : '<span style="color:var(--green); font-weight:700;">✅ Shelved</span>') + '<div style="margin:3px 0;">' + returnConditionPill(r.condition) + '</div>' + (r.condition ? '' : '<div><a href="#" onclick="pickReturnCondition(\'' + escapeHtml(r.id) + '\'); return false;">＋ Set condition</a></div>') + '<div style="color:var(--text-soft);">' + escapeHtml(r.resolvedBy || '') + ' ' + escapeHtml(r.resolvedAt || '') + '</div>' :'<span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>') + (r.deleted ? '<div style="color:var(--red);">deleted</div>' : '') +
         '<div style="color:var(--text-soft);">marked by ' + escapeHtml(r.markedBy || '—') + '</div>' + (r.resolved && r.condition ? '<div><a href="#" onclick="viewReturnProof(\'' + escapeHtml(r.id) + '\'); return false;">View photo &amp; video</a></div>' : '') + '</div></div>';
     }).join('');
 }
@@ -2622,6 +2661,10 @@ function downloadRecordsCsv() {
   var cols = isCk ? [['dateKey', 'Date'], ['loc', 'Stop'], ['payerName', 'From'], ['amount', 'Amount'], ['checkNumber', 'Check #'], ['bankName', 'Bank'], ['checkDate', 'Check date'], ['so', 'SO#'], ['status', 'Status'], ['capturedBy', 'Captured by'], ['capturedAt', 'Captured at'], ['depositedBy', 'Deposited by'], ['depositedAt', 'Deposited at']]
     : [['dateKey', 'Date'], ['loc', 'Stop'], ['so', 'SO#'], ['part', 'Part'], ['returnReason', 'Reason'], ['returnNotes', 'Notes'], ['markedBy', 'Marked by'], ['markedAt', 'Marked at'], ['condition', 'Condition'], ['outcome', 'Outcome'], ['resolved', 'Processed'], ['resolvedBy', 'Processed by'], ['resolvedAt', 'Processed at'], ['processNotes', 'Process notes']];
   function cell(v) { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  if (!isCk) {
+    cols.splice(cols.findIndex(function(c) { return c[0] === 'outcome'; }), 0, ['saleStatus', 'Can it be sold?']);
+    rows = rows.map(function(r) { var c = RETURN_CONDITIONS.find(function(x) { return x.id === r.condition; }); return Object.assign({}, r, { condition: c ? c.label : '', saleStatus: c ? c.sale : '' }); });
+  }
   var csv = [cols.map(function(c) { return c[1]; }).join(',')].concat(rows.map(function(r) { return cols.map(function(c) { return cell(r[c[0]]); }).join(','); })).join('\r\n');
   var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
