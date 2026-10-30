@@ -118,14 +118,14 @@ function renderProofModal() {
   var d = proofDraft; if (!d) return;
   var adding = d.mode === 'add';
   document.getElementById('proofTitle').textContent = adding ? '📸 Show it before marking Found' : '✓ Found — proof';
-  document.getElementById('proofSub').textContent = proofLabel(d.key) + (adding ? ' — take at least one photo or video of the part.' : '');
+  document.getElementById('proofSub').textContent = proofLabel(d.key) + (adding ? ' — add a photo or video of the part, or skip it if you\'re in a rush.' : '');
   document.getElementById('proofAdd').style.display = adding ? 'flex' : 'none';
-  document.getElementById('proofMedia').innerHTML = proofMediaHtml(d) || (d.loading ? '<div class="hist-empty">Loading…</div>' : '<div class="hist-empty">' + (adding ? 'Nothing added yet.' : 'No photo or video was saved for this part (it was marked found before proof was required).') + '</div>');
+  document.getElementById('proofMedia').innerHTML = proofMediaHtml(d) || (d.loading ? '<div class="hist-empty">Loading…</div>' : '<div class="hist-empty">' + (adding ? 'Nothing added yet.' : ((partStatus[d.key] && partStatus[d.key].found && partStatus[d.key].found.skip) ? 'Marked found without a photo or video (rush).' : 'No photo or video was saved for this part (it was marked found before proof was required).')) + '</div>');
   var st = partStatus[d.key] && partStatus[d.key].found;
   document.getElementById('proofMsg').textContent = adding ? '' : (st ? 'Marked found by ' + (st.by || '—') + (st.at ? ' at ' + new Date(st.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '') : '');
   var ready = d.photos.length + d.videos.length > 0 && !d.uploading;
   document.getElementById('proofActions').innerHTML = adding
-    ? '<button class="btn btn-ghost" onclick="closeProofModal()">Cancel</button><button class="btn btn-gold" id="proofConfirmBtn" onclick="confirmFoundProof()"' + (ready ? '' : ' disabled style="opacity:.45; cursor:not-allowed;"') + '>✓ Mark as Found</button>'
+    ? '<button class="btn btn-ghost" onclick="closeProofModal()">Cancel</button><button class="btn btn-ghost" onclick="confirmFoundNoProof()" title="In a rush? Mark it found now — no photo or video">⚡ Skip — just mark Found</button><button class="btn btn-gold" id="proofConfirmBtn" onclick="confirmFoundProof()"' + (ready ? '' : ' disabled style="opacity:.45; cursor:not-allowed;"') + '>✓ Mark as Found with proof</button>'
     : '<button class="btn btn-ghost" onclick="closeProofModal()">Close</button><button class="btn btn-ghost" style="color:var(--red);" onclick="undoFound(\'' + d.key + '\')">↩ Undo Found</button>';
 }
 /* Adds one photo (shrunk to 800px, kept inline) or video (uploaded to Storage) to a draft {photos:[], videos:[], uploading:0}. */
@@ -175,6 +175,15 @@ function confirmFoundProof() {
       closeProofModal();
       partToast('Marked as found ✓', 'green');
     }).catch(function(e) { console.error('proof save failed', e); partToast("Couldn't save the proof — check your connection.", 'red'); if (btn) btn.disabled = false; });
+}
+/* Rush mode: mark it found right away. It is recorded as "no proof" so it's visible who skipped it. */
+function confirmFoundNoProof() {
+  var d = proofDraft;
+  if (!d) return;
+  var key = d.key, cur = partStatus[key] || {};
+  writePartStatus(key, { found: { by: partWho(), at: Date.now(), p: 0, v: 0, skip: true }, loaded: cur.loaded || null });
+  closeProofModal();
+  partToast('Marked as found (no proof) ✓', 'green');
 }
 function viewPartProof(key) {
   ensureProofModal();
