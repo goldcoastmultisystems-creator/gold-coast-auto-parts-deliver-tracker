@@ -1682,7 +1682,7 @@ function renderStopCard(s, i, curId) {
     '<div class="stop-body">' +
       '<div class="details">' +
         (s.so ? '<div><b>SO#:</b> '+escapeHtml(s.so)+'</div>' : '') +
-        (s.mop ? '<div><b>Payment:</b> '+escapeHtml(s.mop)+'</div>' : '') +
+        (s.mop ? '<div><b>MOP:</b> '+escapeHtml(s.mop)+'</div>' : '') +
         (s.part ? partsBlockHtml(s.part, s) : '') +
         (s.returnReason ? '<div class="full"><b>Return Reason:</b> '+escapeHtml(s.returnReason)+(s.returnNotes ? ' — '+escapeHtml(s.returnNotes) : '')+(s.returnResolved ? (s.returnOutcome === 'disposed' ? ' <span style="color:var(--red); font-weight:700;">🗑 Disposed</span> ' : ' <span style="color:var(--green); font-weight:700;">✅ Shelved</span> ') + returnConditionPill(s.returnCondition) :' <span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>')+'</div>' : '') +
         (s.addr ? '<div class="full"><a class="maps-link" href="https://maps.apple.com/?q='+encodeURIComponent(s.addr)+'" target="_blank" rel="noopener">Open in Maps →</a> &nbsp; <a class="maps-link" href="https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='+encodeURIComponent(stopHasCoords(s) ? s.lat+','+s.lng : s.addr)+'" target="_blank" rel="noopener">Google Maps →</a></div>' : '') +
@@ -1732,7 +1732,7 @@ function renderEditForm(s) {
     '</div>' +
     '<div class="edit-row-2">' +
       '<div><label class="edit-label">Part # / Description</label><input class="edit-input" id="e_part_'+s.id+'" value="'+escapeHtml(s.part||'')+'"></div>' +
-      '<div><label class="edit-label">Payment</label><select class="edit-input" id="e_mop_'+s.id+'">' +
+      '<div><label class="edit-label">MOP</label><select class="edit-input" id="e_mop_'+s.id+'">' +
         ['','Cash','Check','Charge Account'].map(function(v) { return '<option value="'+v+'"'+(s.mop===v?' selected':'')+'>'+(v||'—')+'</option>'; }).join('') +
       '</select></div>' +
     '</div>' +
@@ -1839,6 +1839,7 @@ function saveEditStop(id) {
   if (s.isReturn && s.type === 'delivery') s.type = 'pickup';
   s.so = document.getElementById('e_so_'+id).value.trim();
   s.part = document.getElementById('e_part_'+id).value.trim();
+  if (s.mop !== document.getElementById('e_mop_'+id).value) s.mopSrc = 'manual';
   s.mop = document.getElementById('e_mop_'+id).value;
   s.notes = document.getElementById('e_notes_'+id).value.trim();
   var assignedEl = document.getElementById('e_assigned_'+id);
@@ -2677,6 +2678,22 @@ function zohoCanImport() { return !!session && !isDriverSession() && (session.ty
 function zohoIsImported(o, asReturn) {
   return Object.keys(days).some(function(k) { return (days[k].stops || []).some(function(s) { return s.zohoId === o.id && !!s.isReturn === !!asReturn; }); });
 }
+/* Keep MOP on imported stops in step with Zoho. Only touches today's stops, and only when the stop has no MOP yet
+   or its MOP last came from Zoho — a MOP someone typed in by hand on the board is never overwritten. */
+function zohoSyncImportedStops(orders) {
+  if (!currentDay || !orders || !orders.length) return;
+  var byId = {}; orders.forEach(function(o) { byId[o.id] = o; });
+  var changed = 0;
+  currentDay.stops.forEach(function(s) {
+    var o = s.zohoId && byId[s.zohoId];
+    if (!o) return;
+    var mop = zohoMop(o);
+    if (!mop || s.mop === mop) return;
+    if (s.mop && s.mopSrc !== 'zoho') return;
+    s.mop = mop; s.mopSrc = 'zoho'; changed++;
+  });
+  if (changed) { saveDays(days); renderAll(); }
+}
 function zohoImportOrders(orders, assignedTo, asReturn) {
   var added = [];
   orders.forEach(function(o) {
@@ -2684,7 +2701,7 @@ function zohoImportOrders(orders, assignedTo, asReturn) {
     var stop = {
       id: uid(), loc: o.customer || 'Zoho order', addr: o.address || '', type: asReturn ? 'pickup' : 'delivery', isReturn: !!asReturn, assignedTo: assignedTo || '',
       so: o.number || '', part: o.lines.map(function(l) { return l.qty + '× ' + l.name + (l.sku && String(l.name).indexOf(l.sku) === -1 ? ' (' + l.sku + ')' : ''); }).join('; '),
-      mop: o.terms || '', notes: [o.reference ? 'Ref ' + o.reference : '', (o.customFields || []).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; }).filter(Boolean).join(' • '), o.method ? 'Delivery: ' + o.method : '', o.notes || ''].filter(Boolean).join(' • '), status: 'pending', photos: [], chat: [], createdAt: nowTimeStr(), zohoId: o.id
+      mop: zohoMop(o) || o.terms || '', mopSrc: zohoMop(o) ? 'zoho' : '', notes: [o.reference ? 'Ref ' + o.reference : '', zohoNonMopFields(o).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; }).filter(Boolean).join(' • '), o.method ? 'Delivery: ' + o.method : '', o.notes || ''].filter(Boolean).join(' • '), status: 'pending', photos: [], chat: [], createdAt: nowTimeStr(), zohoId: o.id
     };
     currentDay.stops.push(stop);
     added.push(stop);
@@ -3398,7 +3415,7 @@ function stopShareText(s) {
     (s.updatedBy ? ' Last updated by ' + s.updatedBy + ' at ' + s.updatedAt + '.' : '');
   var text = '🚚 ' + header + '\n🕒 Update generated: ' + fmtDateDisplay(todayKey()) + ' at ' + nowTimeStr() + '\n👤 Shared by: ' + currentUserLabel() + '\n\n' +
     narrative +
-    (s.so ? '\n🧾 SO# ' + s.so : '') + (partsLine(s.part) ? '\n' + partsLine(s.part) : '') + (s.mop ? '\n💳 Payment: ' + s.mop : '') +
+    (s.so ? '\n🧾 SO# ' + s.so : '') + (partsLine(s.part) ? '\n' + partsLine(s.part) : '') + (s.mop ? '\n💳 MOP: ' + s.mop : '') +
     (s.status === 'returned' && s.returnNotes ? '\n↩️ Return Notes: ' + s.returnNotes : '') +
     (s.notes ? '\n📝 Notes: ' + s.notes : '') +
     (photoCount ? '\n📷 ' + photoCount + ' photo' + (photoCount === 1 ? '' : 's') + ' attached' : '') +

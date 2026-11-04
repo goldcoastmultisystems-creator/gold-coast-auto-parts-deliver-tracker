@@ -71,7 +71,10 @@ function fetchZohoOrders() {
   }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
     .then(function(res) {
       if (!res.ok || !res.d.ok) { zohoState.error = (res.d && res.d.error) || 'Could not load Zoho orders.'; zohoState.orders = []; }
-      else { zohoState.orders = res.d.orders; zohoState.counts = res.d.statusCounts || {}; zohoState.truncated = res.d.truncated; zohoState.selected = {}; }
+      else {
+        zohoState.orders = res.d.orders; zohoState.counts = res.d.statusCounts || {}; zohoState.truncated = res.d.truncated; zohoState.selected = {};
+        if (typeof zohoSyncImportedStops === 'function') { try { zohoSyncImportedStops(res.d.orders); } catch (e) { console.error('zoho stop sync failed', e); } }
+      }
     })
     .catch(function() { zohoState.error = "Couldn't reach Zoho. Check your connection and try again."; zohoState.orders = []; })
     .then(function() { zohoState.loading = false; zohoState.loaded = true; zohoState.lastLoaded = Date.now(); renderZohoOrders(); });
@@ -127,7 +130,8 @@ function zohoOrderText(o) {
   var m = o.money || {};
   var who = (typeof currentUserLabel === 'function') ? currentUserLabel() : ((session && session.name) || '');
   var footer = (typeof shareFooter === 'function') ? shareFooter() : '\n\n— Sent from the Gold Coast Auto Parts web app (goldcoastautoparts.netlify.app).';
-  var extras = [o.reference ? 'Ref ' + o.reference : ''].concat((o.customFields || []).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; })).filter(Boolean).join(' • ');
+  var extras = [o.reference ? 'Ref ' + o.reference : ''].concat(zohoNonMopFields(o).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; })).filter(Boolean).join(' • ');
+  var mop = zohoMop(o);
   var status = [o.orderStatus || o.status, o.paid && 'payment ' + o.paid, o.shipped && 'shipment ' + o.shipped].filter(Boolean).map(function(x) { return String(x).replace(/_/g, ' '); }).join(' • ');
   var lines = (o.lines || []).map(function(l) {
     return '• ' + l.qty + '× ' + l.name + (l.sku && String(l.name).indexOf(l.sku) === -1 ? ' (' + l.sku + ')' : '') + (l.amount != null ? ' — ' + zohoMoney(m, l.amount) : '');
@@ -136,7 +140,7 @@ function zohoOrderText(o) {
     (who ? '\n👤 Shared by: ' + who : '') + '\n' +
     (extras ? '\n🔖 ' + extras : '') +
     '\n📅 Order date: ' + o.date + (o.deliveryDate ? ' • Deliver: ' + o.deliveryDate : '') +
-    (o.method ? '\n🚚 Delivery method: ' + o.method : '') + (o.terms ? '\n💳 Payment terms: ' + o.terms : '') + (o.salesperson ? '\n🧑‍💼 Salesperson: ' + o.salesperson : '') +
+    (o.method ? '\n🚚 Delivery method: ' + o.method : '') + (mop ? '\n💳 MOP: ' + mop : '') + (o.terms ? '\n🧾 Payment terms: ' + o.terms : '') + (o.salesperson ? '\n🧑‍💼 Salesperson: ' + o.salesperson : '') +
     (status ? '\n⏳ Status: ' + status : '') +
     (o.shipTo && o.shipTo.text ? '\n\n📍 Ship to: ' + (o.shipTo.attention ? o.shipTo.attention + ', ' : '') + o.shipTo.text + (o.shipTo.phone ? '\n📞 ' + o.shipTo.phone : '') : '') +
     (lines.length ? '\n\n🔧 Items:\n' + lines.join('\n') : '') +
@@ -168,6 +172,23 @@ function zohoStatusChip(label, value) {
   var color = good ? 'var(--green)' : (bad ? 'var(--amber)' : 'var(--text-soft)');
   return '<span style="font-size:11.5px; margin-right:12px;"><span style="color:var(--text-soft);">' + escapeHtml(label) + '</span> <b style="color:' + color + ';">' + escapeHtml(value) + '</b></span>';
 }
+/* MOP = method of payment. It comes from a Zoho custom field on the sales order whose label is "MOP"
+   (or "Method of Payment" / "Payment Method" / "Mode of Payment"); the value is mapped to the board's Cash / Check / Charge Account. */
+var ZOHO_MOP_LABEL = /\b(mop|method of payment|payment method|mode of payment)\b/i;
+function zohoIsMopField(c) { return ZOHO_MOP_LABEL.test(String(c && c.label || '')); }
+function zohoMopNormalize(v) {
+  v = String(v == null ? '' : v).trim();
+  if (!v) return '';
+  if (/^cash\b/i.test(v)) return 'Cash';
+  if (/^(check|cheque)\b/i.test(v)) return 'Check';
+  if (/charge|account|credit|net\s*\d+/i.test(v)) return 'Charge Account';
+  return v;
+}
+function zohoMop(o) {
+  var f = (o.customFields || []).find(function(c) { return zohoIsMopField(c) && String(c.value || '').trim(); });
+  return f ? zohoMopNormalize(f.value) : '';
+}
+function zohoNonMopFields(o) { return (o.customFields || []).filter(function(c) { return !zohoIsMopField(c); }); }
 function zohoField(label, value) {
   if (!value) return '';
   return '<div style="min-width:150px;"><div style="font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft);">' + escapeHtml(label) + '</div><div style="font-size:12.5px;">' + escapeHtml(String(value)) + '</div></div>';
@@ -200,9 +221,10 @@ function zohoDetailHtml(o) {
     '<div style="margin-bottom:8px;">' + zohoStatusChip('Order', o.orderStatus || o.status) + zohoStatusChip('Invoice', o.invoiced) + zohoStatusChip('Payment', o.paid) + zohoStatusChip('Shipment', o.shipped) + '</div>' +
     '<div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:10px;">' + zohoAddressBlock('Billing address', o.billTo) + zohoAddressBlock('Shipping address', o.shipTo) + '</div>' +
     '<div style="display:flex; gap:14px 24px; flex-wrap:wrap; margin-bottom:10px;">' +
+      (zohoMop(o) ? '<div style="min-width:150px;"><div style="font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft);">MOP (method of payment)</div><div style="font-size:13px; font-weight:800; color:var(--gold-2);">💳 ' + escapeHtml(zohoMop(o)) + '</div></div>' : '') +
       zohoField('Reference #', o.reference) + zohoField('Order date', o.date) + zohoField('Delivery date', o.deliveryDate) + zohoField('Payment terms', o.terms) + zohoField('Delivery method', o.method) +
       zohoField('Salesperson', o.salesperson) + zohoField('Location', o.location) + zohoField('Contact', [o.contact, o.contactEmail].filter(Boolean).join(' • ')) +
-      (o.customFields || []).map(function(c) { return zohoField(c.label, c.value); }).join('') + '</div>' +
+      zohoNonMopFields(o).map(function(c) { return zohoField(c.label, c.value); }).join('') + '</div>' +
     (o.lines.length
       ? '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:12.5px;"><thead><tr>' +
         ['Items &amp; description', 'Ordered', 'Location', 'Status', 'Rate', 'Amount'].map(function(h, i) { return '<th style="text-align:' + (i === 0 || i === 2 || i === 3 ? 'left' : 'right') + '; font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft); padding:6px 8px; border-bottom:1px solid var(--glass-border);">' + h + '</th>'; }).join('') +
@@ -242,6 +264,7 @@ function renderZohoList() {
       '<div style="flex:1 1 260px; min-width:220px;">' +
         '<div style="cursor:pointer;" onclick="zohoToggleOpen(\'' + escapeHtml(o.id) + '\')">' +
           '<div style="display:flex; gap:8px; align-items:baseline;"><span class="tname">' + escapeHtml(o.customer) + '</span> <span style="font-size:12px; color:var(--gold-2);">' + escapeHtml(o.number) + '</span>' +
+          (zohoMop(o) ? ' <span style="font-size:11px; font-weight:800; color:var(--gold-2); border:1px solid var(--glass-border-gold); border-radius:99px; padding:1px 8px;">💳 ' + escapeHtml(zohoMop(o)) + '</span>' : '') +
           (delivered ? ' <span style="font-size:11px; color:var(--green); font-weight:700;">✓ On delivery board</span>' : '') +
           (returning ? ' <span style="font-size:11px; color:var(--red); font-weight:700;">↩ Return on board</span>' : '') +
           (o.backordered ? ' <span style="font-size:11px; color:var(--amber); font-weight:700;">⚠ Backorder</span>' : '') +
