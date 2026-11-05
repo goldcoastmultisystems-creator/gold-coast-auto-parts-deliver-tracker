@@ -2002,7 +2002,7 @@ function rpMissing() {
   var miss = [];
   if (!rp.condition) miss.push('pick the condition');
   if (!rp.photos.length) miss.push('add a photo');
-  if (!rp.videos.length) miss.push('add a video');
+  if (!rp.videos.length && !rp.videoFailed) miss.push('add a video');
   if (rp.uploading) miss.push('wait for the video to finish uploading');
   return miss;
 }
@@ -2015,7 +2015,7 @@ function renderProcessReturn() {
   }).join('');
   document.getElementById('rpMedia').innerHTML = proofMediaHtml(rp) || '<div class="hist-empty">No photo or video yet.</div>';
   var miss = rpMissing(), dmg = rp.condition === 'damaged';
-  document.getElementById('rpMsg').textContent = miss.length ? 'To continue: ' + miss.join(', ') + '.' : '';
+  document.getElementById('rpMsg').textContent = miss.length ? 'To continue: ' + miss.join(', ') + '.' : (rp.videoFailed && !rp.videos.length ? '⚠ Video uploads aren\'t working right now, so you can continue with photos only — this return will be marked "no video".' : '');
   var btn = document.getElementById('rpConfirm');
   btn.textContent = dmg ? '🗑 Confirm — dispose of this part' : (rp.condition === 'slight' ? '✓ Confirm — shelve it to sell at a discount' : '✓ Confirm — shelve it to sell');
   btn.disabled = miss.length > 0;
@@ -2034,7 +2034,7 @@ function confirmProcessReturn() {
   var db = recordsDb();
   var saveProof = db ? db.ref('gcap/records/returnProof/' + s.id).set({ photos: d.photos, videos: d.videos, condition: d.condition, outcome: outcome, notes: notes || null, by: who, at: Date.now() }) : Promise.resolve();
   saveProof.then(function() {
-    var changes = { returnResolved: true, returnResolvedBy: who, returnResolvedAt: when, returnCondition: d.condition, returnOutcome: outcome, returnProcessNotes: notes || null, returnPhotoCount: d.photos.length, returnVideoCount: d.videos.length };
+    var changes = { returnResolved: true, returnResolvedBy: who, returnResolvedAt: when, returnCondition: d.condition, returnOutcome: outcome, returnProcessNotes: notes || null, returnPhotoCount: d.photos.length, returnVideoCount: d.videos.length, returnNoVideo: d.videos.length === 0 };
     Object.keys(changes).forEach(function(k) { s[k] = changes[k]; });
     updateReturnStopRemote(d.dateKey, d.stopId, changes);
     saveReturnRecord(d.dateKey, s);
@@ -2233,7 +2233,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     var path = 'gcap/videos/' + stopId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
     var task = fbStorage.ref(path).put(file);
+    var vDone = false, vProgressed = false, vStart = Date.now();
+    task.on('state_changed', function(sn) { if (sn.bytesTransferred > 0) vProgressed = true; }, function() {});
+    /* If video storage isn't switched on the upload never starts — stop waiting after 25s instead of showing Uploading… forever. */
+    var vWatch = setInterval(function() {
+      if (vDone) { clearInterval(vWatch); return; }
+      if (!vProgressed && Date.now() - vStart > 25000) {
+        vDone = true; clearInterval(vWatch); try { task.cancel(); } catch (e) {}
+        var lv = currentDay.stops.find(function(x) { return x.id === stopId; });
+        if (lv) lv.videoUploading = false;
+        renderStops();
+        showToast("Video upload isn't working right now (video storage isn't switched on yet). Photos still work.", 'red');
+      }
+    }, 2000);
     task.then(function(snapshot) {
+      if (vDone) throw new Error('cancelled');
+      vDone = true; clearInterval(vWatch);
       return snapshot.ref.getDownloadURL();
     }).then(function(url) {
       var live = currentDay.stops.find(function(x) { return x.id === stopId; });
@@ -2246,6 +2261,9 @@ document.addEventListener('DOMContentLoaded', function() {
       renderStops();
       showToast('Video uploaded.', 'green');
     }).catch(function(err) {
+      clearInterval(vWatch);
+      if (vDone && String(err && err.message) === 'cancelled') return;
+      vDone = true;
       console.error('video upload failed', err);
       var live = currentDay.stops.find(function(x) { return x.id === stopId; });
       if (live) live.videoUploading = false;
@@ -2515,7 +2533,7 @@ function returnRecordData(dateKey, s) {
   return { id: s.id, dateKey: dateKey, loc: s.loc || null, addr: s.addr || null, so: s.so || null, part: s.part || null, assignedTo: s.assignedTo || null,
     returnReason: s.returnReason || null, returnNotes: s.returnNotes || null, markedBy: s.updatedBy || null, markedAt: s.updatedAt || null,
     resolved: !!s.returnResolved, resolvedBy: s.returnResolvedBy || null, resolvedAt: s.returnResolvedAt || null,
-    condition: s.returnCondition || null, outcome: s.returnResolved ? (s.returnOutcome || 'shelved') : null, processNotes: s.returnProcessNotes || null };
+    condition: s.returnCondition || null, outcome: s.returnResolved ? (s.returnOutcome || 'shelved') : null, processNotes: s.returnProcessNotes || null, noVideo: !!s.returnNoVideo };
 }
 function saveReturnRecord(dateKey, s) { if (s && s.returnReason) saveRecord('returns', s.id, returnRecordData(dateKey, s)); }
 var recordsBackfilled = false;
@@ -2630,7 +2648,7 @@ function renderRecordsModal() {
       return '<div class="team-row"><div style="flex:1 1 240px;"><span class="tname">' + escapeHtml(r.loc || 'Return') + '</span>' +
         '<div style="font-size:11.5px; color:var(--text-soft);">' + fmtDateDisplay(r.dateKey) + (r.so ? ' • SO# ' + escapeHtml(r.so) : '') + ' • ' + escapeHtml(r.part || '—') + '</div>' +
         '<div style="font-size:12px; margin-top:3px;"><b>Reason:</b> ' + escapeHtml(r.returnReason || '—') + (r.returnNotes ? ' — ' + escapeHtml(r.returnNotes) : '') + '</div></div>' +
-        '<div style="text-align:right; font-size:12px;">' + (r.resolved ? (r.outcome === 'disposed' ? '<span style="color:var(--red); font-weight:700;">🗑 Disposed</span>' : '<span style="color:var(--green); font-weight:700;">✅ Shelved</span>') + '<div style="margin:3px 0;">' + returnConditionPill(r.condition) + '</div>' + (r.condition ? '' : '<div><a href="#" onclick="pickReturnCondition(\'' + escapeHtml(r.id) + '\'); return false;">＋ Set condition</a></div>') + '<div style="color:var(--text-soft);">' + escapeHtml(r.resolvedBy || '') + ' ' + escapeHtml(r.resolvedAt || '') + '</div>' :'<span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>') + (r.deleted ? '<div style="color:var(--red);">deleted</div>' : '') +
+        '<div style="text-align:right; font-size:12px;">' + (r.resolved ? (r.outcome === 'disposed' ? '<span style="color:var(--red); font-weight:700;">🗑 Disposed</span>' : '<span style="color:var(--green); font-weight:700;">✅ Shelved</span>') + '<div style="margin:3px 0;">' + returnConditionPill(r.condition) + (r.noVideo ? ' <span style="font-size:11px; color:var(--amber); font-weight:700;">⚠ no video</span>' : '') + '</div>' + (r.condition ? '' : '<div><a href="#" onclick="pickReturnCondition(\'' + escapeHtml(r.id) + '\'); return false;">＋ Set condition</a></div>') + '<div style="color:var(--text-soft);">' + escapeHtml(r.resolvedBy || '') + ' ' + escapeHtml(r.resolvedAt || '') + '</div>' :'<span style="color:var(--amber); font-weight:700;">⏳ Needs shelving</span>') + (r.deleted ? '<div style="color:var(--red);">deleted</div>' : '') +
         '<div style="color:var(--text-soft);">marked by ' + escapeHtml(r.markedBy || '—') + '</div>' + (r.resolved && r.condition ? '<div><a href="#" onclick="viewReturnProof(\'' + escapeHtml(r.id) + '\'); return false;">View photo &amp; video</a></div>' : '') + '</div></div>';
     }).join('');
 }

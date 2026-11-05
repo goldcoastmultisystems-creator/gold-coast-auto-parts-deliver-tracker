@@ -2079,7 +2079,22 @@ document.addEventListener('DOMContentLoaded', function() {
     renderStops();
     var path = 'gcap/videos/' + stopId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
     var task = fbStorage.ref(path).put(file);
+    var vDone = false, vProgressed = false, vStart = Date.now();
+    task.on('state_changed', function(sn) { if (sn.bytesTransferred > 0) vProgressed = true; }, function() {});
+    /* If video storage isn't switched on the upload never starts — stop waiting after 25s instead of showing Uploading… forever. */
+    var vWatch = setInterval(function() {
+      if (vDone) { clearInterval(vWatch); return; }
+      if (!vProgressed && Date.now() - vStart > 25000) {
+        vDone = true; clearInterval(vWatch); try { task.cancel(); } catch (e) {}
+        var lv = currentDay.stops.find(function(x) { return x.id === stopId; });
+        if (lv) lv.videoUploading = false;
+        renderStops();
+        showToast("Video upload isn't working right now (video storage isn't switched on yet). Photos still work.", 'red');
+      }
+    }, 2000);
     task.then(function(snapshot) {
+      if (vDone) throw new Error('cancelled');
+      vDone = true; clearInterval(vWatch);
       return snapshot.ref.getDownloadURL();
     }).then(function(url) {
       var live = currentDay.stops.find(function(x) { return x.id === stopId; });
@@ -2092,6 +2107,9 @@ document.addEventListener('DOMContentLoaded', function() {
       renderStops();
       showToast('Video uploaded.', 'green');
     }).catch(function(err) {
+      clearInterval(vWatch);
+      if (vDone && String(err && err.message) === 'cancelled') return;
+      vDone = true;
       console.error('video upload failed', err);
       var live = currentDay.stops.find(function(x) { return x.id === stopId; });
       if (live) live.videoUploading = false;

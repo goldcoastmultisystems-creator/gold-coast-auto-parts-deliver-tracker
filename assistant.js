@@ -149,11 +149,21 @@ function addProofMedia(d, file, kind, rerender, folder) {
   }
   if (typeof fbStorage === 'undefined' || !fbStorage) { partToast('Video upload is not available on this page — add a photo instead.', 'red'); return; }
   if (file.size > PROOF_VIDEO_MAX) { partToast('That video is too large (max 300MB).', 'red'); return; }
-  d.uploading++; rerender();
-  fbStorage.ref('gcap/videos/' + folder + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_')).put(file)
-    .then(function(snap) { return snap.ref.getDownloadURL(); })
-    .then(function(url) { d.uploading--; d.videos.push(url); rerender(); })
-    .catch(function(e) { console.error('proof video upload failed', e); d.uploading--; partToast('Video upload failed — try again.', 'red'); rerender(); });
+  d.uploading++; d.videoFailed = false; rerender();
+  var task = fbStorage.ref('gcap/videos/' + folder + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_')).put(file);
+  var finished = false, progressed = false, startedAt = Date.now();
+  function failVideo(msg) {
+    if (finished) return; finished = true; clearInterval(watchdog);
+    try { task.cancel(); } catch (e) {}
+    d.uploading = Math.max(0, d.uploading - 1); d.videoFailed = true;
+    partToast(msg, 'red'); rerender();
+  }
+  task.on('state_changed', function(s) { if (s.bytesTransferred > 0) progressed = true; }, function() {});
+  /* If Cloud Storage isn't set up the upload never starts and would hang forever — give up after 25s. */
+  var watchdog = setInterval(function() { if (!progressed && Date.now() - startedAt > 25000) failVideo("Video upload isn't working right now (video storage isn't switched on yet)."); }, 2000);
+  task.then(function(snap) { return snap.ref.getDownloadURL(); })
+    .then(function(url) { if (finished) return; finished = true; clearInterval(watchdog); d.uploading--; d.videos.push(url); rerender(); })
+    .catch(function(e) { console.error('proof video upload failed', e); failVideo('Video upload failed — try again later.'); });
 }
 function proofMediaHtml(d) {
   return d.photos.map(function(p) { return '<img src="' + p + '" style="width:92px; height:92px; object-fit:cover; border-radius:10px; border:1px solid var(--glass-border); cursor:pointer;" onclick="window.open(this.src)">'; }).concat(
