@@ -30,7 +30,8 @@ function gcapDriveUpload(file, opts) {
   var auth = gcapDriveAuth();
   if (!auth) return Promise.reject(new Error('Please log out and log back in, then try again.'));
   var ext = (/\.[a-zA-Z0-9]{2,5}$/.exec(file.name || '') || [''])[0] || (file.type === 'video/quicktime' ? '.mov' : (/^video\//.test(file.type) ? '.mp4' : '.jpg'));
-  var name = ((opts.label || 'upload') + ' ' + new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19) + ' ' + Math.random().toString(36).slice(2, 6) + ext);
+  var PREFIX = { Videos: 'Video', Returns: 'Return video', Photos: 'Photo', Checks: 'Check' };
+  var name = ((PREFIX[opts.kind] || 'Upload') + ' - ' + (opts.label || 'upload') + ' - ' + new Date().toTimeString().slice(0, 8).replace(/:/g, '.') + ' ' + Math.random().toString(36).slice(2, 5) + ext);
   var mime = file.type || (ext === '.mov' ? 'video/quicktime' : 'video/mp4');
   var kind = opts.kind || 'Videos';
   return gcapDriveCall({ action: 'start', auth: auth, kind: kind, name: name, mimeType: mime, size: file.size, origin: location.origin }).then(function(start) {
@@ -48,7 +49,7 @@ function gcapDriveUpload(file, opts) {
       };
       xhr.send(file);
     }).then(function(id) {
-      return gcapDriveCall({ action: 'finish', auth: auth, kind: kind, fileId: id, name: start.name }).then(function(done) { return { id: done.id, url: done.url }; });
+      return gcapDriveCall({ action: 'finish', auth: auth, folderId: start.folderId, fileId: id, name: start.name }).then(function(done) { return { id: done.id, url: done.url }; });
     });
   });
 }
