@@ -619,6 +619,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
 <div class="video-modal-backdrop" id="videoModal">
   <span class="video-modal-close" onclick="closeVideoModal()">✕</span>
   <video id="videoModalPlayer" controls autoplay></video>
+  <iframe id="videoModalFrame" allow="autoplay; fullscreen" allowfullscreen style="display:none; width:min(94vw,1000px); height:min(80vh,600px); border:0; border-radius:12px; background:#000;"></iframe>
 </div>
 
 <input type="file" id="photoFileInput" accept="image/*" capture="environment" style="display:none;">
@@ -1479,7 +1480,7 @@ function renderStopCard(s, curId) {
   }).join('');
   var videosHtml = (s.videos||[]).map(function(v, vi) {
     return '<div class="video-thumb-wrap" onclick="event.stopPropagation(); openVideoModal(\''+escapeHtml(v)+'\')">' +
-      '<video src="'+v+'" preload="metadata" muted></video>' +
+      ((typeof gcapIsDriveUrl === 'function' && gcapIsDriveUrl(v)) ? '<img src="'+gcapDriveThumbUrl(v)+'" alt="video" style="width:100%;height:100%;object-fit:cover;background:#000;">' : '<video src="'+v+'" preload="metadata" muted></video>') +
       '<span class="video-play-badge">▶</span>' +
       '<span class="video-remove-badge" onclick="event.stopPropagation(); removeVideo(\''+s.id+'\','+vi+')" title="Remove">✕</span>' +
     '</div>';
@@ -2058,7 +2059,6 @@ function removePhoto(stopId, idx) {
 var videoTargetStopId = null;
 var VIDEO_MAX_BYTES = 300 * 1024 * 1024;
 function addVideo(stopId) {
-  if (!FIREBASE_ENABLED || !fbStorage) { showToast('Video needs Firebase connected — see setup notes.', 'red'); return; }
   videoTargetStopId = stopId;
   document.getElementById('videoFileInput').click();
 }
@@ -2073,47 +2073,75 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!s) return;
     s.videoUploading = true;
     renderStops();
-    var path = 'gcap/videos/' + stopId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-    var task = fbStorage.ref(path).put(file);
-    var vDone = false, vProgressed = false, vStart = Date.now();
-    task.on('state_changed', function(sn) { if (sn.bytesTransferred > 0) vProgressed = true; }, function() {});
-    /* If video storage isn't switched on the upload never starts — stop waiting after 25s instead of showing Uploading… forever. */
-    var vWatch = setInterval(function() {
-      if (vDone) { clearInterval(vWatch); return; }
-      if (!vProgressed && Date.now() - vStart > 25000) {
-        vDone = true; clearInterval(vWatch); try { task.cancel(); } catch (e) {}
-        var lv = currentDay.stops.find(function(x) { return x.id === stopId; });
-        if (lv) lv.videoUploading = false;
-        renderStops();
-        showToast("Video upload isn't working right now (video storage isn't switched on yet). Photos still work.", 'red');
-      }
-    }, 2000);
-    task.then(function(snapshot) {
-      if (vDone) throw new Error('cancelled');
-      vDone = true; clearInterval(vWatch);
-      return snapshot.ref.getDownloadURL();
-    }).then(function(url) {
+    /* Videos go to the company Google Drive folder when it is connected; otherwise to Firebase Storage (old route). */
+    var ready = (typeof gcapDriveReady === 'function') ? gcapDriveReady() : Promise.resolve(false);
+    ready.then(function(driveOk) { if (driveOk) driveStopVideo(file, stopId); else firebaseStopVideo(file, stopId); });
+  });
+});
+function driveStopVideo(file, stopId) {
+  var s0 = currentDay.stops.find(function(x) { return x.id === stopId; });
+  gcapDriveUpload(file, { kind: 'Videos', label: ((s0 && s0.loc) || 'stop') + (s0 && s0.so ? ' ' + s0.so : '') })
+    .then(function(r) {
       var live = currentDay.stops.find(function(x) { return x.id === stopId; });
-      if (live) {
-        live.videos = live.videos || [];
-        live.videos.push(url);
-        live.videoUploading = false;
-        saveDays(days);
-      }
+      if (live) { live.videos = live.videos || []; live.videos.push(r.url); live.videoUploading = false; saveDays(days); }
       renderStops();
-      showToast('Video uploaded.', 'green');
+      showToast('Video uploaded to Google Drive.', 'green');
     }).catch(function(err) {
-      clearInterval(vWatch);
-      if (vDone && String(err && err.message) === 'cancelled') return;
-      vDone = true;
-      console.error('video upload failed', err);
+      console.error('video upload to Drive failed', err);
       var live = currentDay.stops.find(function(x) { return x.id === stopId; });
       if (live) live.videoUploading = false;
       renderStops();
-      showToast('Video upload failed — check your connection.', 'red');
+      showToast('Video upload failed — ' + (err.message || 'check your connection') + '.', 'red');
     });
+}
+function firebaseStopVideo(file, stopId) {
+  if (typeof fbStorage === 'undefined' || !fbStorage) {
+    var l0 = currentDay.stops.find(function(x) { return x.id === stopId; });
+    if (l0) l0.videoUploading = false;
+    renderStops();
+    showToast('Video upload is not available right now. Photos still work.', 'red');
+    return;
+  }
+  var path = 'gcap/videos/' + stopId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  var task = fbStorage.ref(path).put(file);
+  var vDone = false, vProgressed = false, vStart = Date.now();
+  task.on('state_changed', function(sn) { if (sn.bytesTransferred > 0) vProgressed = true; }, function() {});
+  /* If video storage isn't switched on the upload never starts — stop waiting after 25s instead of showing Uploading… forever. */
+  var vWatch = setInterval(function() {
+    if (vDone) { clearInterval(vWatch); return; }
+    if (!vProgressed && Date.now() - vStart > 25000) {
+      vDone = true; clearInterval(vWatch); try { task.cancel(); } catch (e) {}
+      var lv = currentDay.stops.find(function(x) { return x.id === stopId; });
+      if (lv) lv.videoUploading = false;
+      renderStops();
+      showToast("Video upload isn't working right now (video storage isn't switched on yet). Photos still work.", 'red');
+    }
+  }, 2000);
+  task.then(function(snapshot) {
+    if (vDone) throw new Error('cancelled');
+    vDone = true; clearInterval(vWatch);
+    return snapshot.ref.getDownloadURL();
+  }).then(function(url) {
+    var live = currentDay.stops.find(function(x) { return x.id === stopId; });
+    if (live) {
+      live.videos = live.videos || [];
+      live.videos.push(url);
+      live.videoUploading = false;
+      saveDays(days);
+    }
+    renderStops();
+    showToast('Video uploaded.', 'green');
+  }).catch(function(err) {
+    clearInterval(vWatch);
+    if (vDone && String(err && err.message) === 'cancelled') return;
+    vDone = true;
+    console.error('video upload failed', err);
+    var live = currentDay.stops.find(function(x) { return x.id === stopId; });
+    if (live) live.videoUploading = false;
+    renderStops();
+    showToast('Video upload failed — check your connection.', 'red');
   });
-});
+}
 function removeVideo(stopId, idx) {
   if (!confirm('Remove this video?')) return;
   var s = currentDay.stops.find(function(x) { return x.id === stopId; });
@@ -2122,17 +2150,22 @@ function removeVideo(stopId, idx) {
   s.videos.splice(idx, 1);
   saveDays(days);
   renderStops();
-  if (fbStorage && url) { fbStorage.refFromURL(url).delete().catch(function() {}); }
+  if (fbStorage && url && !(typeof gcapIsDriveUrl === 'function' && gcapIsDriveUrl(url))) { try { fbStorage.refFromURL(url).delete().catch(function() {}); } catch (e) {} }
 }
 function openVideoModal(url) {
-  var player = document.getElementById('videoModalPlayer');
-  player.src = url;
+  var player = document.getElementById('videoModalPlayer'), frame = document.getElementById('videoModalFrame');
+  if (typeof gcapIsDriveUrl === 'function' && gcapIsDriveUrl(url)) {   // Google Drive videos play in Drive's own player
+    player.style.display = 'none'; frame.style.display = 'block'; frame.src = gcapDriveEmbedUrl(url);
+  } else {
+    frame.style.display = 'none'; frame.src = ''; player.style.display = ''; player.src = url;
+  }
   document.getElementById('videoModal').classList.add('open');
 }
 function closeVideoModal() {
-  var player = document.getElementById('videoModalPlayer');
+  var player = document.getElementById('videoModalPlayer'), frame = document.getElementById('videoModalFrame');
   player.pause();
   player.src = '';
+  frame.src = '';
   document.getElementById('videoModal').classList.remove('open');
 }
 
@@ -2590,6 +2623,7 @@ function assistantBoardContext() {
 
 init();
 </script>
+<script src="drive-client.js"></script>
 <script src="assistant.js"></script>
 <script src="zoho-orders-ui.js"></script>
 </body>

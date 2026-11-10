@@ -147,9 +147,24 @@ function addProofMedia(d, file, kind, rerender, folder) {
     reader.readAsDataURL(file);
     return;
   }
-  if (typeof fbStorage === 'undefined' || !fbStorage) { partToast('Video upload is not available on this page — add a photo instead.', 'red'); return; }
   if (file.size > PROOF_VIDEO_MAX) { partToast('That video is too large (max 300MB).', 'red'); return; }
   d.uploading++; d.videoFailed = false; rerender();
+  /* Videos go to the company Google Drive folder when it is connected; otherwise to Firebase Storage (old route). */
+  var ready = (typeof gcapDriveReady === 'function') ? gcapDriveReady() : Promise.resolve(false);
+  ready.then(function(driveOk) {
+    if (driveOk) { driveProofVideo(d, file, rerender, folder); }
+    else { d.uploading = Math.max(0, d.uploading - 1); firebaseProofVideo(d, file, rerender, folder); }
+  });
+}
+function driveProofVideo(d, file, rerender, folder) {
+  d.uploadPct = 0;
+  gcapDriveUpload(file, { kind: /^return_/.test(folder) ? 'Returns' : 'Videos', label: String(folder).replace(/_/g, ' '), onProgress: function(p) { d.uploadPct = p; rerender(); } })
+    .then(function(r) { d.uploading = Math.max(0, d.uploading - 1); d.uploadPct = null; d.videos.push(r.url); rerender(); })
+    .catch(function(e) { console.error('proof video upload to Drive failed', e); d.uploading = Math.max(0, d.uploading - 1); d.uploadPct = null; d.videoFailed = true; partToast('Video upload failed — ' + (e.message || 'try again') + '.', 'red'); rerender(); });
+}
+function firebaseProofVideo(d, file, rerender, folder) {
+  if (typeof fbStorage === 'undefined' || !fbStorage) { d.videoFailed = true; partToast('Video upload is not available right now — add a photo instead.', 'red'); rerender(); return; }
+  d.uploading++; rerender();
   var task = fbStorage.ref('gcap/videos/' + folder + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_')).put(file);
   var finished = false, progressed = false, startedAt = Date.now();
   function failVideo(msg) {
@@ -167,8 +182,11 @@ function addProofMedia(d, file, kind, rerender, folder) {
 }
 function proofMediaHtml(d) {
   return d.photos.map(function(p) { return '<img src="' + p + '" style="width:92px; height:92px; object-fit:cover; border-radius:10px; border:1px solid var(--glass-border); cursor:pointer;" onclick="window.open(this.src)">'; }).concat(
-    d.videos.map(function(u) { return '<video src="' + escapeHtml(u) + '" controls preload="metadata" style="width:160px; max-height:120px; border-radius:10px; border:1px solid var(--glass-border); background:#000;"></video>'; }),
-    d.uploading ? ['<div style="align-self:center; font-size:12px; color:var(--text-soft);">⏳ Uploading video…</div>'] : []).join('');
+    d.videos.map(function(u) {
+      if (typeof gcapIsDriveUrl === 'function' && gcapIsDriveUrl(u)) return '<a href="' + escapeHtml(u) + '" target="_blank" rel="noopener" title="Play video" style="position:relative; display:inline-block; width:132px; height:92px; border-radius:10px; overflow:hidden; border:1px solid var(--glass-border); background:#000 url(' + escapeHtml(gcapDriveThumbUrl(u)) + ') center/cover;"><span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:26px; text-shadow:0 0 8px #000;">▶</span></a>';
+      return '<video src="' + escapeHtml(u) + '" controls preload="metadata" style="width:160px; max-height:120px; border-radius:10px; border:1px solid var(--glass-border); background:#000;"></video>';
+    }),
+    d.uploading ? ['<div style="align-self:center; font-size:12px; color:var(--text-soft);">⏳ Uploading video…' + (d.uploadPct != null ? ' ' + d.uploadPct + '%' : '') + '</div>'] : []).join('');
 }
 function proofFileChosen(input, kind) {
   var file = input.files && input.files[0]; input.value = '';
