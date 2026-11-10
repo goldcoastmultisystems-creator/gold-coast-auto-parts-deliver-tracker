@@ -7,6 +7,7 @@
 <link rel="icon" type="image/png" href="./favicon.png">
 <link rel="apple-touch-icon" href="./favicon.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="safe-store.js"></script>
 <script src="theme.js"></script>
 <style>
 :root {
@@ -834,7 +835,7 @@ function getDriverSessionId() {
   return 'owner_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
 }
 function isTrackingPaused() { return localStorage.getItem('kgps_tracking_paused') === '1'; }
-function setTrackingPaused(paused) { localStorage.setItem('kgps_tracking_paused', paused ? '1' : '0'); }
+function setTrackingPaused(paused) { gcapSafeSet('kgps_tracking_paused', paused ? '1' : '0'); }
 function toggleTrackingPaused() {
   setTrackingPaused(!isTrackingPaused());
   updateTrackingForRole();
@@ -1044,15 +1045,13 @@ var TYPE_LABELS = { pickup:'Pickup', delivery:'Delivery', deposit:'Deposit', sto
 function loadSettings() {
   try { return JSON.parse(localStorage.getItem('kgps_settings')) || {}; } catch(e) { return {}; }
 }
-function saveSettings(s) { localStorage.setItem('kgps_settings', JSON.stringify(s)); if (FIREBASE_ENABLED && fbDb) fbDb.ref('gcap/settings').set(s); }
+function saveSettings(s) { gcapSafeSet('kgps_settings', JSON.stringify(s)); if (FIREBASE_ENABLED && fbDb) fbDb.ref('gcap/settings').set(s); }
 function updateSettingsFields(fields) {
   Object.keys(fields).forEach(function(k) { settings[k] = fields[k]; });
-  localStorage.setItem('kgps_settings', JSON.stringify(settings));
+  gcapSafeSet('kgps_settings', JSON.stringify(settings));
   if (FIREBASE_ENABLED && fbDb) fbDb.ref('gcap/settings').update(fields);
 }
-function loadSession() {
-  try { return JSON.parse(localStorage.getItem('kgps_session')) || null; } catch(e) { return null; }
-}
+function loadSession() { return gcapLoadSession(); }
 function isLocalStorageAvailable() {
   try {
     var k = '__kgps_test__';
@@ -1075,10 +1074,7 @@ function maybeShowGeoPermissionTip() {
     }
   }).catch(function() {});
 }
-function saveSession(s) {
-  if (s) localStorage.setItem('kgps_session', JSON.stringify(s));
-  else localStorage.removeItem('kgps_session');
-}
+function saveSession(s) { gcapSaveSession(s); }
 function loadDays() {
   try { return JSON.parse(localStorage.getItem('kgps_days')) || {}; } catch(e) { return {}; }
 }
@@ -1098,7 +1094,7 @@ function mergeStopsForSave(serverStops, localStops, knownIds) {
 }
 var saveDaysChain = Promise.resolve();
 function saveDays(d) {
-  localStorage.setItem('kgps_days', JSON.stringify(d));
+  gcapSaveDaysCache('kgps_days', d);
   if (!FIREBASE_ENABLED || !fbDb) return;
   var key = todayKey();
   var fallbackLocalDay = d[key] || { stops: [], activity: [], archived: [] };
@@ -1168,7 +1164,7 @@ function carryOverUnfinished() {
     days[k].stops = days[k].stops.filter(function(s) { return ids.indexOf(s.id) === -1; });
     removeStopsFromDayRemote(k, ids);
   });
-  localStorage.setItem('kgps_days', JSON.stringify(days));
+  gcapSaveDaysCache('kgps_days', days);
 }
 function checkDayRollover() {
   var k = todayKey();
@@ -2039,7 +2035,7 @@ function confirmProcessReturn() {
     updateReturnStopRemote(d.dateKey, d.stopId, changes);
     saveReturnRecord(d.dateKey, s);
     if (d.dateKey === todayKey()) {
-      localStorage.setItem('kgps_days', JSON.stringify(days));
+      gcapSaveDaysCache('kgps_days', days);
       addActivity('Return Resolved', (s.loc || 'Stop') + ' — ' + (outcome === 'disposed' ? 'disposed (damaged)' : 'shelved (' + returnConditionLabel(d.condition).toLowerCase() + ')') + ' by ' + who);
       renderAll();
     }
@@ -2056,7 +2052,7 @@ function deleteReturnEntry(dateKey, stopId) {
   removeReturnStopRemote(dateKey, stopId);
   saveRecord('returns', stopId, { deleted: true });
   if (dateKey === todayKey()) {
-    localStorage.setItem('kgps_days', JSON.stringify(days));
+    gcapSaveDaysCache('kgps_days', days);
     addActivity('Removed', (s ? s.loc : 'Return entry') + ' return was deleted');
     renderAll();
   }

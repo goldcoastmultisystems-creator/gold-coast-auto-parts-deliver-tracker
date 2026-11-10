@@ -6,6 +6,7 @@
 <title>Gold Coast Auto Parts — Inventory Management</title>
 <link rel="icon" type="image/png" href="./favicon.png">
 <link rel="apple-touch-icon" href="./favicon.png">
+<script src="safe-store.js"></script>
 <script src="theme.js"></script>
 <style>
 :root {
@@ -189,9 +190,9 @@ var WAREHOUSES = ['E2', 'E5', 'E9', 'Miramar', 'Dawson'];
 var inv = { defaultMin: 1, defaultTarget: 3, mins: {}, targets: {}, watch: {}, locations: {} };
 var LEVEL_LABEL = { ok: 'In Stock', low: 'Low Stock', out: 'Sold Out' };
 
-function loadSession() { try { return JSON.parse(localStorage.getItem('kgps_session')) || null; } catch (e) { return null; } }
+function loadSession() { return gcapLoadSession(); }
 function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
-function doLogout() { localStorage.removeItem('kgps_session'); location.href = 'index.html'; }
+function doLogout() { gcapSaveSession(null); location.href = 'index.html'; }
 function fbKey(sku) { return String(sku).replace(/[.#$\/\[\]%]/g, function(c) { return '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'); }); }
 function numOrNull(v) { var n = parseInt(v, 10); return isFinite(n) && n >= 0 ? n : null; }
 
