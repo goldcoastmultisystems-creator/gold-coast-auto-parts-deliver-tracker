@@ -459,6 +459,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <button class="hdr-btn" id="checksBtn" onclick="openChecksModal()">💵 Checks</button>
       <button class="hdr-btn" onclick="openZohoOrders()">🧾 Zoho Orders</button>
       <button class="hdr-btn" onclick="openAssistantModal()">🤖 Ask AI</button>
+      <button class="hdr-btn" onclick="openTraining()">🎓 Training</button>
       <button class="hdr-btn" onclick="location.href='inventory.html'">📦 Inventory Management →</button>
       <button class="hdr-btn" id="manageTeamBtn" onclick="openTeamModal()" style="display:none;">👥 Manage Team</button>
       <button class="hdr-btn" onclick="doLogout()">Log Out</button>
@@ -791,6 +792,7 @@ function attachFirebaseListeners() {
   });
   /* tiny indexes so the app doesn't need every old day loaded */
   fbDb.ref('gcap/zohoImported').on('value', function(snap) { zohoImportedIndex = snap.val() || {}; });
+  fbDb.ref('gcap/customerMop').on('value', function(snap) { customerMop = snap.val() || {}; });
   fbDb.ref('gcap/records/checks').on('value', function(snap) {
     var n = 0; snap.forEach(function(x) { var c = x.val() || {}; if (!c.deleted && c.status !== 'deposited') n++; });
     openChecksFromRecords = n; updateChecksBadge();
@@ -1884,6 +1886,8 @@ function submitAddStop() {
     notes: document.getElementById('f_notes').value.trim(),
     status: 'pending', photos: [], chat: [], createdAt: nowTimeStr()
   };
+  if (!stop.mop) { var sv = savedMopFor(loc); if (sv) stop.mop = sv; }
+  else saveCustomerMop(loc, stop.mop);
   currentDay.stops.push(stop);
   saveDays(days);
   geocodeStop(stop);
@@ -1922,6 +1926,7 @@ function saveEditStop(id) {
   s.part = document.getElementById('e_part_'+id).value.trim();
   if (s.mop !== document.getElementById('e_mop_'+id).value) s.mopSrc = 'manual';
   s.mop = document.getElementById('e_mop_'+id).value;
+  if (s.mop) saveCustomerMop(s.loc, s.mop);
   s.notes = document.getElementById('e_notes_'+id).value.trim();
   var assignedEl = document.getElementById('e_assigned_'+id);
   var newAssigned = assignedEl ? assignedEl.value : s.assignedTo;
@@ -2826,14 +2831,82 @@ function zohoSyncImportedStops(orders) {
   });
   if (changed) { saveDays(days); renderAll(); }
 }
-function zohoImportOrders(orders, assignedTo, asReturn) {
+/* ---------- MOP (method of payment) is asked for, per customer, before Zoho orders go to the drivers ---------- */
+var MOP_OPTIONS = ['Cash', 'Check', 'Charge Account'];
+var customerMop = {};                 // customer key -> { mop, name, by, at }, kept at gcap/customerMop
+var mopDraft = null;
+function customerKey(name) { return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80); }
+function savedMopFor(name) { var e = customerMop[customerKey(name)]; return (e && e.mop) || ''; }
+/* Remember how this customer pays, so the next order from them is already filled in. */
+function saveCustomerMop(name, mop) {
+  var k = customerKey(name);
+  if (!k || MOP_OPTIONS.indexOf(mop) === -1) return;
+  var entry = { mop: mop, name: String(name).slice(0, 120), by: (session && session.name) || (settings && settings.driverName) || null, at: Date.now() };
+  customerMop[k] = entry;
+  if (typeof fbDb !== 'undefined' && fbDb) fbDb.ref('gcap/customerMop/' + k).set(entry).catch(function(e) { console.error('customer MOP save failed', e); });
+}
+function ensureMopModal() {
+  if (document.getElementById('mopModal')) return;
+  var div = document.createElement('div');
+  div.className = 'modal-backdrop'; div.id = 'mopModal';
+  div.innerHTML = '<div class="modal wide"><h3>💳 Method of payment (MOP)</h3>' +
+    '<p class="modal-sub">Choose how each customer pays before these orders go to the drivers. It is saved for that customer, so next time it is already filled in.</p>' +
+    '<div id="mopRows" style="max-height:48vh; overflow-y:auto;"></div>' +
+    '<label style="display:flex; align-items:center; gap:8px; font-size:12.5px; margin:10px 0 2px; cursor:pointer;"><input type="checkbox" id="mopRemember" checked style="width:auto;" onchange="mopDraft.remember = this.checked"> Remember each customer\'s MOP for next time</label>' +
+    '<div id="mopMsg" style="font-size:12px; margin:6px 0; color:var(--amber);"></div>' +
+    '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeMopModal()">Cancel</button><button class="btn btn-gold" id="mopConfirm" onclick="confirmMopImport()">Add to deliveries</button></div></div>';
+  document.body.appendChild(div);
+}
+function closeMopModal() { var m = document.getElementById('mopModal'); if (m) m.classList.remove('open'); mopDraft = null; }
+/* Entry point from the Zoho panel's "Add to deliveries" button. */
+function zohoAskMopThenImport(orders, assignedTo) {
+  var pending = orders.filter(function(o) { return !zohoIsImported(o, false); });
+  if (!pending.length) { showToast('Already on the board.', ''); zohoState.selected = {}; renderZohoOrders(); return; }
+  ensureMopModal();
+  mopDraft = { assignedTo: assignedTo || '', remember: true, rows: pending.map(function(o) {
+    var z = zohoMop(o), sv = savedMopFor(o.customer);
+    return { order: o, mop: MOP_OPTIONS.indexOf(z) !== -1 ? z : (sv || ''), src: MOP_OPTIONS.indexOf(z) !== -1 ? 'zoho' : (sv ? 'saved' : '') };
+  }) };
+  document.getElementById('mopRemember').checked = true;
+  document.getElementById('mopModal').classList.add('open');
+  renderMopModal();
+}
+function mopPick(i, v) { if (!mopDraft) return; mopDraft.rows[i].mop = v; mopDraft.rows[i].src = ''; renderMopModal(); }
+function renderMopModal() {
+  if (!mopDraft) return;
+  document.getElementById('mopRows').innerHTML = mopDraft.rows.map(function(r, i) {
+    var o = r.order, total = o.money && o.money.total != null ? zohoMoney(o.money, o.money.total) : '';
+    return '<div class="team-row" style="align-items:center;"><div style="flex:1 1 220px; min-width:200px;"><span class="tname">' + escapeHtml(o.customer || 'Customer') + '</span> <span style="font-size:12px; color:var(--gold-2);">' + escapeHtml(o.number || '') + '</span>' +
+      '<div style="font-size:11.5px; color:var(--text-soft);">' + (o.lines || []).length + ' item' + ((o.lines || []).length === 1 ? '' : 's') + (total ? ' • ' + escapeHtml(total) : '') + (r.src === 'zoho' ? ' • MOP from Zoho' : (r.src === 'saved' ? ' • saved for this customer' : '')) + '</div></div>' +
+      '<select class="edit-input" style="width:auto; min-width:170px;" onchange="mopPick(' + i + ', this.value)"><option value="">— Select MOP —</option>' +
+        MOP_OPTIONS.map(function(m) { return '<option value="' + m + '"' + (r.mop === m ? ' selected' : '') + '>' + m + '</option>'; }).join('') + '</select></div>';
+  }).join('');
+  var missing = mopDraft.rows.filter(function(r) { return !r.mop; }).length;
+  document.getElementById('mopMsg').textContent = missing ? 'Choose a MOP for ' + missing + ' more order' + (missing === 1 ? '' : 's') + ' to continue.' : '';
+  var btn = document.getElementById('mopConfirm'), n = mopDraft.rows.length;
+  btn.textContent = '➕ Add ' + n + ' to deliveries';
+  btn.disabled = missing > 0; btn.style.opacity = missing ? '.45' : ''; btn.style.cursor = missing ? 'not-allowed' : '';
+}
+function confirmMopImport() {
+  var d = mopDraft;
+  if (!d || d.rows.some(function(r) { return !r.mop; })) return;
+  var map = {};
+  d.rows.forEach(function(r) { map[r.order.id] = r.mop; if (d.remember) saveCustomerMop(r.order.customer, r.mop); });
+  var added = zohoImportOrders(d.rows.map(function(r) { return r.order; }), d.assignedTo, false, map);
+  closeMopModal();
+  zohoState.selected = {};
+  showToast(added + ' order' + (added === 1 ? '' : 's') + ' added to today\'s deliveries.', 'green');
+  renderZohoOrders();
+}
+
+function zohoImportOrders(orders, assignedTo, asReturn, mopMap) {
   var added = [];
   orders.forEach(function(o) {
     if (zohoIsImported(o, asReturn)) return;
     var stop = {
       id: uid(), loc: o.customer || 'Zoho order', addr: o.address || '', type: asReturn ? 'pickup' : 'delivery', isReturn: !!asReturn, assignedTo: assignedTo || '',
       so: o.number || '', part: o.lines.map(function(l) { return l.qty + '× ' + l.name + (l.sku && String(l.name).indexOf(l.sku) === -1 ? ' (' + l.sku + ')' : ''); }).join('; '),
-      mop: zohoMop(o) || o.terms || '', mopSrc: zohoMop(o) ? 'zoho' : '', notes: [o.reference ? 'Ref ' + o.reference : '', zohoNonMopFields(o).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; }).filter(Boolean).join(' • '), o.method ? 'Delivery: ' + o.method : '', o.notes || ''].filter(Boolean).join(' • '), status: 'pending', photos: [], chat: [], createdAt: nowTimeStr(), zohoId: o.id
+      mop: (mopMap && mopMap[o.id]) || zohoMop(o) || savedMopFor(o.customer) || o.terms || '', mopSrc: (mopMap && mopMap[o.id]) ? (mopMap[o.id] === zohoMop(o) ? 'zoho' : 'manual') : (zohoMop(o) ? 'zoho' : ''), notes: [o.reference ? 'Ref ' + o.reference : '', zohoNonMopFields(o).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; }).filter(Boolean).join(' • '), o.method ? 'Delivery: ' + o.method : '', o.notes || ''].filter(Boolean).join(' • '), status: 'pending', photos: [], chat: [], createdAt: nowTimeStr(), zohoId: o.id
     };
     currentDay.stops.push(stop);
     added.push(stop);
@@ -3711,6 +3784,7 @@ function shareText(title, text) {
 
 init();
 </script>
+<script src="training.js"></script>
 <script src="drive-client.js"></script>
 <script src="assistant.js"></script>
 <script src="zoho-orders-ui.js"></script>

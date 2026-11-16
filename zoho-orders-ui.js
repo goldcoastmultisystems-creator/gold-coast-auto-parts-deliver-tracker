@@ -293,6 +293,8 @@ function renderZohoActions() {
 function zohoAddSelected(asReturn) {
   var picked = zohoState.orders.filter(function(o) { return zohoState.selected[o.id]; });
   if (!picked.length) return;
+  // orders going to the drivers first ask for the customer's MOP (method of payment), which is then remembered
+  if (!asReturn && typeof zohoAskMopThenImport === 'function') { zohoAskMopThenImport(picked, document.getElementById('zohoDriver').value); return; }
   var added = zohoImportOrders(picked, document.getElementById('zohoDriver').value, !!asReturn);
   zohoState.selected = {};
   if (typeof showToast === 'function') showToast(added ? added + (asReturn ? ' return pickup' : ' order') + (added === 1 ? '' : 's') + ' added to today\'s ' + (asReturn ? 'stops.' : 'deliveries.') : 'Already on the board.', added ? 'green' : '');

@@ -104,6 +104,7 @@ td.num, th.num { text-align: right; white-space: nowrap; }
   <div style="display:flex; gap:8px; flex-wrap:wrap;">
     <button class="hdr-btn" onclick="openZohoOrders()">🧾 Zoho Orders</button>
     <button class="hdr-btn" onclick="openAssistantModal()">🤖 Ask AI</button>
+    <button class="hdr-btn" onclick="openTraining()">🎓 Training</button>
     <button class="hdr-btn" id="backDelivery" onclick="location.href='index.html'">🚚 Delivery</button>
     <button class="hdr-btn" id="backSales" onclick="location.href='sales-routes.html'">🧾 Sales Routes</button>
     <button class="hdr-btn" onclick="doLogout()">Log Out</button>
@@ -381,6 +382,7 @@ function shareReorder() {
 function assistantBoardContext() { return ''; }
 var assistantBoardName = 'inventory';
 </script>
+<script src="training.js"></script>
 <script src="drive-client.js"></script>
 <script src="assistant.js"></script>
 <script src="zoho-orders-ui.js"></script>

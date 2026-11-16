@@ -238,6 +238,14 @@
     'Follow-Ups Scheduled': 'Seguimientos programados', 'Target': 'Meta', 'Actual': 'Real', 'KPIs': 'KPI'
   });
 
+  Object.assign(ES, {
+    '🎓 Training': '🎓 Capacitación', 'Training': 'Capacitación', 'Short lessons on how to use the app': 'Lecciones cortas sobre cómo usar la aplicación',
+    '💳 Method of payment (MOP)': '💳 Forma de pago (MOP)',
+    'Choose how each customer pays before these orders go to the drivers. It is saved for that customer, so next time it is already filled in.': 'Elige cómo paga cada cliente antes de que estos pedidos pasen a los conductores. Se guarda para ese cliente, así que la próxima vez ya estará llenado.',
+    "Remember each customer's MOP for next time": 'Recordar el MOP de cada cliente para la próxima vez', '— Select MOP —': '— Selecciona el MOP —', 'Add to deliveries': 'Agregar a entregas',
+    'MOP from Zoho': 'MOP de Zoho', 'saved for this customer': 'guardado para este cliente'
+  });
+
   /* ---------------- phrases with changing parts ---------------- */
   var ST = { 'pending': 'pendiente', 'en route': 'en camino', 'at location': 'en el lugar', 'completed': 'completada', 'postponed': 'pospuesta', 'returned part': 'pieza devuelta', 'returned': 'devuelta' };
   var STC = { 'Pending': 'Pendiente', 'En Route': 'En camino', 'At Location': 'En el lugar', 'Completed': 'Completada', 'Postponed': 'Pospuesta', 'Returned Part': 'Pieza devuelta' };
@@ -311,6 +319,7 @@
     [/^Where is (.+) kept\? Separate several places with .*$/, function(m) { return '¿Dónde está guardada ' + m[1] + '? Separa varios lugares con | (ejemplo: E9 · Estante G2 | E2 · Estante A3). Déjalo en blanco para borrar.'; }],
     [/^(\d+) visits?$/, function(m) { return pl(m[1], 'visita', 'visitas'); }],
     [/^Route in progress — (\d+) of (\d+) visits complete\.$/, function(m) { return 'Ruta en curso — ' + m[1] + ' de ' + m[2] + ' visitas completadas.'; }],
+    [/^Choose a MOP for (\d+) more orders? to continue\.$/, function(m) { return 'Elige un MOP para ' + m[1] + ' pedido' + (m[1] === '1' ? '' : 's') + ' más para continuar.'; }],
     [/^(.+) • (.+) • (.+)$/, null]   // placeholder: resolved by splitting on " • " below
   ];
   PAT.pop();
@@ -448,6 +457,7 @@
     try { if (es) { walk(document.documentElement); } else { restore(document.documentElement); } } finally { busy = false; }
     if (es) start(); else if (observer) { observer.disconnect(); observer = null; }
     renderMenu();
+    try { window.dispatchEvent(new Event('gcap-lang')); } catch (e) {}
   }
   window.setLanguage = function(l) { try { localStorage.setItem(KEY, l === 'es' ? 'es' : 'en'); } catch (e) {} apply(); };
   window.gcapLang = lang;
