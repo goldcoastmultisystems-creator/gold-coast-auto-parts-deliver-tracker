@@ -40,7 +40,8 @@ exports.handler = async function (event) {
     'If the answer is not in the data, say so plainly instead of guessing. ' +
     'For inventory questions, use the INVENTORY CATALOG matches: give the SKU, whether it is in stock (with quantity) or sold out, and the selling price. ' +
     'Only a few best matches are shown, so if nothing relevant appears say it may not be in the catalog and suggest checking the Stock Board. Never invent SKUs, quantities or prices. ' +
-    'You are read-only: you cannot change stops, checks or returns; if asked to, tell them which button in the app to use.\n\n' +
+    'You are read-only: you cannot change stops, checks or returns; if asked to, tell them which button in the app to use. ' +
+    (payload.lang === 'es' ? 'Reply in Spanish (español), keeping SKUs, part numbers and customer names exactly as they appear in the data.' : '') + '\n\n' +
     '--- LIVE DATA SNAPSHOT ---\n' + context;
 
   var messages = history.concat([{ role: 'user', text: question }]);

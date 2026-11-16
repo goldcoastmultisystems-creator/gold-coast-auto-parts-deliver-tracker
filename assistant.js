@@ -377,7 +377,7 @@ function sendAssistant() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        question: q, history: prior, context: buildAssistantContext(q),
+        question: q, history: prior, context: buildAssistantContext(q), lang: (typeof gcapLang === 'function' ? gcapLang() : 'en'),
         board: (typeof assistantBoardName !== 'undefined' ? assistantBoardName : 'delivery'),
         asker: ((session && session.name) || (settings && settings.driverName) || '') + (session && session.role ? ' (' + session.role + ')' : '')
       })
