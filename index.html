@@ -766,16 +766,19 @@ function attachFirebaseListeners() {
     refreshSettingsUI();
     populateGuestNameSelect();
   });
-  fbDb.ref('gcap/days').on('value', function(snap) {
-    var incoming = normalizeDays(snap.val() || {});
+  /* Only today + the carry-over look-back stay live. Older days are fetched when someone opens History / Checks / Returns. */
+  fbDb.ref('gcap/days').orderByKey().startAt(windowStartKey()).on('value', function(snap) {
+    var raw = snap.val() || {};
     var key = todayKey();
+    lastServerDays[key] = serverDayState(raw[key]);
+    var incoming = normalizeDays(raw);
     var localToday = days && days[key];
     if (localToday) {
       if (!incoming[key]) incoming[key] = { stops: [], activity: [], archived: [] };
       incoming[key].stops = mergeStopsForSave(incoming[key].stops, localToday.stops, knownStopIds);
       incoming[key].activity = localToday.activity && localToday.activity.length > (incoming[key].activity||[]).length ? localToday.activity : incoming[key].activity;
     }
-    days = incoming;
+    days = Object.assign({}, olderDays, incoming);
     currentDay = getDay(key);
     currentDayKey = key;
     knownStopIds = {};
@@ -784,6 +787,12 @@ function attachFirebaseListeners() {
     renderAll();
     checkStaleDrivers();
     setTimeout(backfillRecords, 3000);
+  });
+  /* tiny indexes so the app doesn't need every old day loaded */
+  fbDb.ref('gcap/zohoImported').on('value', function(snap) { zohoImportedIndex = snap.val() || {}; });
+  fbDb.ref('gcap/records/checks').on('value', function(snap) {
+    var n = 0; snap.forEach(function(x) { var c = x.val() || {}; if (!c.deleted && c.status !== 'deposited') n++; });
+    openChecksFromRecords = n; updateChecksBadge();
   });
   if (typeof loadInventory === 'function') loadInventory();
   fbDb.ref('gcap/drivers').on('value', function(snap) {
@@ -1093,25 +1102,97 @@ function mergeStopsForSave(serverStops, localStops, knownIds) {
   });
   return merged;
 }
+
+/* ---------- LIVE WINDOW: keep only recent days loaded; older ones come on demand ---------- */
+var DAYS_WINDOW = 4;                 // today + 3 days back (matches the carry-over look-back)
+var olderDays = {}, olderLoaded = false, olderLoading = null;
+var zohoImportedIndex = {}, openChecksFromRecords = null;
+function windowStartKey() { var d = new Date(); d.setDate(d.getDate() - (DAYS_WINDOW - 1)); return dayKeyFromDate(d); }
+/* Loads every day older than the live window, once, then calls back. Safe to call repeatedly. */
+function ensureOlderDaysLoaded() {
+  if (olderLoaded || !FIREBASE_ENABLED || !fbDb) return Promise.resolve();
+  if (olderLoading) return olderLoading;
+  olderLoading = fbDb.ref('gcap/days').orderByKey().endAt(windowStartKey()).once('value').then(function(snap) {
+    olderDays = normalizeDays(snap.val() || {});
+    Object.keys(olderDays).forEach(function(k) { if (!days[k]) days[k] = olderDays[k]; });
+    olderLoaded = true;
+    indexOlderZohoImports();
+  }).catch(function(e) { console.error('older days failed to load', e); }).then(function() { olderLoading = null; });
+  return olderLoading;
+}
+/* Self-healing: make sure every imported Zoho order in the older days is in the small index. */
+function indexOlderZohoImports() {
+  if (!fbDb) return;
+  Object.keys(olderDays).forEach(function(k) {
+    (olderDays[k].stops || []).forEach(function(s) {
+      if (!s.zohoId) return;
+      var ik = zohoIndexKey(s.zohoId, !!s.isReturn);
+      if (!zohoImportedIndex[ik]) { zohoImportedIndex[ik] = k; fbDb.ref('gcap/zohoImported/' + ik).set(k).catch(function() {}); }
+    });
+  });
+}
+function zohoIndexKey(zohoId, asReturn) { return String(zohoId).replace(/[.#$\/\[\]]/g, '_') + (asReturn ? '_r' : '_d'); }
+/* Run a render now, and again once the older days have arrived (modals that look across many days). */
+function renderWithOlderDays(renderFn) {
+  renderFn();
+  if (olderLoaded) return;
+  ensureOlderDaysLoaded().then(function() { renderFn(); });
+}
+
 var saveDaysChain = Promise.resolve();
+/* What the server held for each day the last time we heard from it, so a save only has to send what changed
+   (instead of downloading and re-uploading the whole day, photos and all, on every tap). */
+var lastServerDays = {};
+/* JSON with sorted keys that leaves out null / undefined / empty arrays and objects — i.e. what Firebase actually stores. */
+function stableJson(v) {
+  function clean(x) {
+    if (x === null || x === undefined) return undefined;
+    if (Array.isArray(x)) { var a = x.map(clean); while (a.length && a[a.length - 1] === undefined) a.pop(); return a.length ? a.map(function(i) { return i === undefined ? null : i; }) : undefined; }
+    if (typeof x === 'object') { var o = {}, any = false; Object.keys(x).sort().forEach(function(k) { var c = clean(x[k]); if (c !== undefined) { o[k] = c; any = true; } }); return any ? o : undefined; }
+    return x;
+  }
+  var c = clean(v);
+  return c === undefined ? '' : JSON.stringify(c);
+}
+function serverDayState(rawDay) {
+  if (!rawDay) return { exists: false, stops: [], stopsJson: [], activityJson: '', archivedJson: '' };
+  // Firebase hands back a sparse list (missing entries) as an object or with nulls; then our index-by-index diff can't be trusted, so we rewrite the whole day once to heal it.
+  var rs = rawDay.stops, dirty = false;
+  if (rs && (!Array.isArray(rs) || rs.some(function(x) { return x == null; }))) dirty = true;
+  var d = normalizeDayEntry(JSON.parse(JSON.stringify(rawDay)));
+  return { exists: true, dirty: dirty, stops: d.stops, stopsJson: d.stops.map(stableJson), activityJson: stableJson(d.activity), archivedJson: stableJson(d.archived) };
+}
 function saveDays(d) {
   gcapSaveDaysCache('kgps_days', d);
   if (!FIREBASE_ENABLED || !fbDb) return;
   var key = todayKey();
   var fallbackLocalDay = d[key] || { stops: [], activity: [], archived: [] };
   saveDaysChain = saveDaysChain.then(function() {
-    return fbDb.ref('gcap/days/' + key).once('value').then(function(snap) {
-      var serverDay = snap.val() || {};
+    var have = lastServerDays[key];
+    var ready = have ? Promise.resolve(have) : fbDb.ref('gcap/days/' + key).once('value').then(function(snap) { return serverDayState(snap.val()); });
+    return ready.then(function(srv) {
       var localDay = (days && days[key]) || fallbackLocalDay;
-      var mergedStops = mergeStopsForSave(serverDay.stops, localDay.stops, knownStopIds);
-      var toWrite = { stops: mergedStops, activity: localDay.activity || [], archived: localDay.archived || [] };
+      var mergedStops = mergeStopsForSave(srv.stops, localDay.stops, knownStopIds);
       if (days && days[key]) days[key].stops = mergedStops;
       knownStopIds = {};
       mergedStops.forEach(function(s) { knownStopIds[s.id] = true; });
-      return fbDb.ref('gcap/days/' + key).set(toWrite);
+      var base = 'gcap/days/' + key;
+      var activity = localDay.activity || [], archived = localDay.archived || [];
+      var stopsJson = mergedStops.map(stableJson), aJson = stableJson(activity), arJson = stableJson(archived);
+      var next = { exists: true, stops: mergedStops, stopsJson: stopsJson, activityJson: aJson, archivedJson: arJson };
+      if (!srv.exists || srv.dirty) { lastServerDays[key] = next; return fbDb.ref(base).set({ stops: mergedStops, activity: activity, archived: archived }); }
+      var updates = {}, changed = 0;
+      mergedStops.forEach(function(st, i) { if (stopsJson[i] !== srv.stopsJson[i]) { updates[base + '/stops/' + i] = st; changed++; } });
+      for (var i = mergedStops.length; i < srv.stopsJson.length; i++) { updates[base + '/stops/' + i] = null; changed++; }
+      if (aJson !== srv.activityJson) { updates[base + '/activity'] = activity.length ? activity : null; changed++; }
+      if (arJson !== srv.archivedJson) { updates[base + '/archived'] = archived.length ? archived : null; changed++; }
+      lastServerDays[key] = next;
+      if (!changed) return;
+      return fbDb.ref().update(updates);
     });
   }).catch(function(e) {
-    console.error('saveDays merge-read failed', e);
+    lastServerDays[todayKey()] = null;   // forget our picture of the server so the next save re-reads it
+    console.error('saveDays failed', e);
   });
 }
 
@@ -1284,6 +1365,8 @@ var days, currentDay, settings, session;
 
 function normalizeDayEntry(d) {
   if (!d.stops) d.stops = [];
+  if (!Array.isArray(d.stops)) d.stops = Object.keys(d.stops).sort(function(a, b) { return a - b; }).map(function(k) { return d.stops[k]; });
+  d.stops = d.stops.filter(Boolean);
   if (!d.activity) d.activity = [];
   if (!d.archived) d.archived = [];
   d.archived.forEach(function(a) { if (!a.stops) a.stops = []; if (!a.activity) a.activity = []; });
@@ -1925,7 +2008,7 @@ function collectOpenReturns() {
 }
 function openReturnsModal() {
   document.getElementById('returnsModal').classList.add('open');
-  renderReturnsList();
+  renderWithOlderDays(renderReturnsList);
 }
 function closeReturnsModal() { document.getElementById('returnsModal').classList.remove('open'); }
 function renderReturnsList() {
@@ -2419,12 +2502,12 @@ function collectOpenChecks() {
 function updateChecksBadge() {
   var btn = document.getElementById('checksBtn');
   if (!btn) return;
-  var n = collectOpenChecks().length;
+  var n = (!olderLoaded && openChecksFromRecords != null) ? Math.max(openChecksFromRecords, collectOpenChecks().length) : collectOpenChecks().length;
   btn.textContent = '💵 Checks' + (n ? ' (' + n + ')' : '');
 }
 function openChecksModal() {
   document.getElementById('checksModal').classList.add('open');
-  renderChecksList();
+  renderWithOlderDays(renderChecksList);
 }
 function closeChecksModal() { document.getElementById('checksModal').classList.remove('open'); }
 function renderChecksList() {
@@ -2723,6 +2806,7 @@ function downloadRecordsCsv() {
 /* ---------- ZOHO ORDERS -> deliveries (dashboard lives in zoho-orders-ui.js) ---------- */
 function zohoCanImport() { return !!session && !isDriverSession() && (session.type === 'owner' || !!session.isAdmin || session.role === 'Dispatcher'); }
 function zohoIsImported(o, asReturn) {
+  if (zohoImportedIndex[zohoIndexKey(o.id, asReturn)]) return true;
   return Object.keys(days).some(function(k) { return (days[k].stops || []).some(function(s) { return s.zohoId === o.id && !!s.isReturn === !!asReturn; }); });
 }
 /* Keep MOP on imported stops in step with Zoho. Only touches today's stops, and only when the stop has no MOP yet
@@ -2752,6 +2836,9 @@ function zohoImportOrders(orders, assignedTo, asReturn) {
     };
     currentDay.stops.push(stop);
     added.push(stop);
+    var ik = zohoIndexKey(o.id, !!asReturn);
+    zohoImportedIndex[ik] = todayKey();
+    if (fbDb) fbDb.ref('gcap/zohoImported/' + ik).set(todayKey()).catch(function() {});
   });
   if (added.length) {
     addActivity('Zoho Import', added.length + (asReturn ? ' return pickup(s)' : ' order(s)') + ' added from Zoho' + (assignedTo ? ' as ' + assignedTo + "'s route" : ''));
@@ -3098,7 +3185,7 @@ function startNewList() {
 }
 function openHistory() {
   document.getElementById('historyModal').classList.add('open');
-  renderHistoryDateList();
+  renderWithOlderDays(renderHistoryDateList);
 }
 function closeHistory() { document.getElementById('historyModal').classList.remove('open'); }
 function renderHistoryDateList() {
