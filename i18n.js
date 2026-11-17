@@ -257,6 +257,13 @@
     'Make admin': 'Hacer administrador', 'Remove admin': 'Quitar administrador', 'You cannot remove your own admin access.': 'No puedes quitarte tu propio acceso de administrador.'
   });
 
+  Object.assign(ES, {
+    '👤 Assign route': '👤 Asignar ruta', 'Give this whole route to a driver': 'Da toda esta ruta a un conductor', '👤 Assign to a driver': '👤 Asignar a un conductor', 'Assign': 'Asignar',
+    'Change who this stop is assigned to': 'Cambiar a quién está asignada esta parada', 'No active drivers yet — add one in Manage Team (role: Driver).': 'Aún no hay conductores activos — agrega uno en Gestionar equipo (función: Conductor).',
+    '— Unassigned —': '— Sin asignar —', '(current)': '(actual)', 'Driver': 'Conductor', 'Nothing to change — already assigned that way.': 'Nada que cambiar — ya está asignada así.',
+    'Assign driver ▾': 'Asignar conductor ▾', '✓ Make unassigned': '✓ Dejar sin asignar'
+  });
+
   /* ---------------- phrases with changing parts ---------------- */
   var ST = { 'pending': 'pendiente', 'en route': 'en camino', 'at location': 'en el lugar', 'completed': 'completada', 'postponed': 'pospuesta', 'returned part': 'pieza devuelta', 'returned': 'devuelta' };
   var STC = { 'Pending': 'Pendiente', 'En Route': 'En camino', 'At Location': 'En el lugar', 'Completed': 'Completada', 'Postponed': 'Pospuesta', 'Returned Part': 'Pieza devuelta' };
@@ -338,6 +345,12 @@
     [/^Remove admin access from (.+)\?$/, function(m) { return '¿Quitar el acceso de administrador a ' + m[1] + '?'; }],
     [/^(.+) is now an admin\.$/, function(m) { return m[1] + ' ahora es administrador.'; }],
     [/^(.+) is no longer an admin\.$/, function(m) { return m[1] + ' ya no es administrador.'; }],
+    [/^(.+) — (\d+) stops?\. Pick who should do (it|them)\.$/, function(m) { return tr(m[1]) + ' — ' + pl(m[2], 'parada', 'paradas') + '. Elige quién debe hacerla' + (m[2] === '1' ? '' : 's') + '.'; }],
+    [/^✓ Assign to (.+)$/, function(m) { return '✓ Asignar a ' + m[1]; }],
+    [/^🚚 (.+)'s route$/, function(m) { return '🚚 Ruta de ' + m[1]; }],
+    [/^👤 (.+) ▾$/, function(m) { return '👤 ' + m[1] + ' ▾'; }],
+    [/^(\d+) stops? assigned to (.+)\.$/, function(m) { return pl(m[1], 'parada asignada', 'paradas asignadas') + ' a ' + m[2] + '.'; }],
+    [/^(\d+) stops? made unassigned\.$/, function(m) { return pl(m[1], 'parada dejada', 'paradas dejadas') + ' sin asignar.'; }],
     [/^(.+) • (.+) • (.+)$/, null]   // placeholder: resolved by splitting on " • " below
   ];
   PAT.pop();

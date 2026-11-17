@@ -120,6 +120,7 @@
         'Tick the orders for today, choose the driver, and tap “➕ Add to deliveries”.',
         'The app asks for each customer’s MOP (Cash, Check or Charge Account) and their closing time, so drivers know how late they can deliver. If Zoho already has the MOP, or you answered before, it is pre-filled. Fill in what is missing and confirm.',
         'The MOP and closing time are saved for that customer, so next time they are already filled in. A stop shows “🕔 Closes 5:00 PM” — it turns amber under an hour and red once the shop has closed.',
+        'Each order has its own Driver choice in that window, so different orders can go to different drivers. To change it later, tap “👤 Assign route” on a route to give the whole route to one driver, or tap the driver tag on a single stop.',
         'Use “↩ Add as return” to schedule picking a part up from the customer.',
         '💬 WhatsApp or ↗ Share sends the order as a neat message.'
       ], [
@@ -127,6 +128,7 @@
         'Marca los pedidos de hoy, elige al conductor y toca “➕ Agregar a entregas”.',
         'La aplicación pide el MOP de cada cliente (Efectivo, Cheque o Cuenta de crédito) y su hora de cierre, para que los conductores sepan hasta qué hora pueden entregar. Si Zoho ya tiene el MOP, o respondiste antes, aparece ya llenado. Completa lo que falte y confirma.',
         'El MOP y la hora de cierre se guardan para ese cliente, así que la próxima vez ya estarán llenados. Una parada muestra “🕔 Cierra a las 5:00 PM” — se pone ámbar con menos de una hora y roja cuando el taller ya cerró.',
+        'Cada pedido tiene su propia opción de Conductor en esa ventana, así que pedidos distintos pueden ir a conductores distintos. Para cambiarlo después, toca “👤 Asignar ruta” en una ruta para dar toda la ruta a un conductor, o toca la etiqueta del conductor en una sola parada.',
         'Usa “↩ Agregar como devolución” para programar recoger una pieza con el cliente.',
         '💬 WhatsApp o ↗ Compartir envía el pedido como un mensaje ordenado.'
       ]),

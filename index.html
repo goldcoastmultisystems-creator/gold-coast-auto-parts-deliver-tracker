@@ -1685,9 +1685,12 @@ function renderStops() {
     var mapsBtn = openCount > 0
       ? '<button class="btn btn-ghost btn-sm" style="' + (openCount > 1 ? '' : 'margin-left:auto; ') + 'text-transform:none; letter-spacing:0;" onclick="openRouteInGoogleMaps(\'' + escapeHtml(key) + '\')" title="Open this route\'s open stops, in the order shown, in Google Maps">🗺 Google Maps</button>'
       : '';
+    var assignBtn = (canAssignRoutes() && groupStops.some(function(s) { return s.status !== 'completed'; }))
+      ? ' <button class="btn btn-ghost btn-sm" style="text-transform:none; letter-spacing:0;" onclick="openAssignRoute(' + "'" + escapeHtml(key) + "'" + ')" title="Give this whole route to a driver">👤 Assign route</button>'
+      : '';
     var routeBtn = (openCount > 1
       ? '<button class="btn btn-ghost btn-sm" style="margin-left:auto; text-transform:none; letter-spacing:0;" onclick="openRouteModal(\'' + escapeHtml(key) + '\')">🧭 Suggest route' + (saving ? ' · 💡 saves ~' + saving.toFixed(1) + ' mi' : '') + '</button>'
-      : '') + mapsBtn;
+      : '') + mapsBtn + assignBtn;
     return '<div class="route-group">' +
       '<div class="route-group-head" style="display:flex; align-items:center; gap:8px;">' + escapeHtml(label) + '<span class="route-group-count">' + groupStops.length + '</span>' + routeBtn + '</div>' +
       groupStops.map(function(s, gi) { return renderStopCard(s, gi, curId); }).join('') +
@@ -1756,7 +1759,7 @@ function renderStopCard(s, i, curId) {
         '<div class="addr">'+escapeHtml(s.addr||'')+'</div>' +
       '</div>' +
       '<span class="type-badge type-'+s.type+'">'+TYPE_LABELS[s.type]+'</span>' +
-      (s.assignedTo ? '<span class="assigned-badge">👤 '+escapeHtml(s.assignedTo)+'</span>' : '') +
+      (canAssignRoutes() && s.status !== 'completed' ? '<span class="assigned-badge" style="cursor:pointer;" onclick="openAssignStops([\''+s.id+'\'], \''+escapeHtml(String(s.loc||'This stop').replace(/['\\]/g, ''))+'\')" title="Change who this stop is assigned to">👤 '+(s.assignedTo ? escapeHtml(s.assignedTo) : 'Assign driver')+' ▾</span>' : (s.assignedTo ? '<span class="assigned-badge">👤 '+escapeHtml(s.assignedTo)+'</span>' : '')) +
       (s.carriedFrom ? '<span class="assigned-badge" title="Unfinished, carried over from an earlier day">↪ from '+fmtDateDisplay(s.carriedFrom)+'</span>' : '') +
       '<button class="stop-share-btn" onclick="whatsappStop(\''+s.id+'\')" title="Send on WhatsApp" style="border-color:rgba(52,211,153,0.55); background:rgba(52,211,153,0.14); color:#34d399;">💬</button>' +
       '<button class="stop-share-btn" onclick="shareStop(\''+s.id+'\')" title="Share (with photos)">↗</button>' +
@@ -2841,6 +2844,62 @@ function zohoSyncImportedStops(orders) {
   });
   if (changed) { saveDays(days); renderAll(); }
 }
+/* ---------- ASSIGN ROUTES / STOPS TO A DRIVER (owner, admins and Dispatchers) ---------- */
+function canAssignRoutes() { return !!session && (session.type === 'owner' || !!session.isAdmin || (!isDriverSession() && session.role === 'Dispatcher')); }
+var assignDraft = null;
+function ensureAssignModal() {
+  if (document.getElementById('assignModal')) return;
+  var div = document.createElement('div');
+  div.className = 'modal-backdrop'; div.id = 'assignModal';
+  div.innerHTML = '<div class="modal"><h3 id="assignTitle">👤 Assign to a driver</h3><p class="modal-sub" id="assignSub"></p>' +
+    '<div id="assignChoices" style="display:grid; gap:8px; margin-bottom:10px;"></div>' +
+    '<div class="modal-actions"><button class="btn btn-ghost" onclick="closeAssignModal()">Cancel</button><button class="btn btn-gold" id="assignConfirm" onclick="confirmAssign()">Assign</button></div></div>';
+  document.body.appendChild(div);
+}
+function closeAssignModal() { var m = document.getElementById('assignModal'); if (m) m.classList.remove('open'); assignDraft = null; }
+/* a whole route: every stop in that route that is not completed yet */
+function openAssignRoute(key) {
+  var ids = currentDay.stops.filter(function(s) { return (s.assignedTo || '__unassigned__') === key && s.status !== 'completed'; }).map(function(s) { return s.id; });
+  openAssignStops(ids, key === '__unassigned__' ? 'Unassigned stops' : key + "'s route", key === '__unassigned__' ? '' : key);
+}
+function openAssignStops(ids, label, current) {
+  if (!canAssignRoutes() || !ids || !ids.length) return;
+  ensureAssignModal();
+  if (current === undefined) { var one = currentDay.stops.find(function(x) { return x.id === ids[0]; }); current = (one && one.assignedTo) || ''; }
+  assignDraft = { ids: ids, label: label || 'this stop', choice: null, current: current };
+  document.getElementById('assignModal').classList.add('open');
+  renderAssignModal();
+}
+function assignPick(v) { if (assignDraft) { assignDraft.choice = v; renderAssignModal(); } }
+function renderAssignModal() {
+  var d = assignDraft; if (!d) return;
+  var drivers = activeDriverNames();
+  document.getElementById('assignSub').textContent = d.label + ' — ' + d.ids.length + ' stop' + (d.ids.length === 1 ? '' : 's') + '. Pick who should do ' + (d.ids.length === 1 ? 'it' : 'them') + '.';
+  var opts = drivers.map(function(n) { return { v: n, label: '🚚 ' + n + "'s route" }; }).concat([{ v: '', label: '— Unassigned —' }]);
+  document.getElementById('assignChoices').innerHTML = (drivers.length ? '' : '<div class="hist-empty">No active drivers yet — add one in Manage Team (role: Driver).</div>') +
+    opts.map(function(o) {
+      var on = d.choice === o.v, cur = d.current === o.v;
+      return '<button type="button" onclick="assignPick(' + JSON.stringify(o.v).replace(/"/g, '&quot;') + ')" style="text-align:left; cursor:pointer; font:inherit; padding:11px 14px; border-radius:10px; color:var(--text); background:' + (on ? 'rgba(212,164,65,0.2)' : 'transparent') + '; border:1.5px solid ' + (on ? 'var(--gold)' : 'var(--glass-border)') + ';"><b>' + escapeHtml(o.label) + '</b>' + (cur ? ' <span style="font-size:11px; color:var(--text-soft);">(current)</span>' : '') + '</button>';
+    }).join('');
+  var btn = document.getElementById('assignConfirm'), ready = d.choice !== null;
+  btn.textContent = ready ? (d.choice ? '✓ Assign to ' + d.choice : '✓ Make unassigned') : 'Assign';
+  btn.disabled = !ready; btn.style.opacity = ready ? '' : '.45'; btn.style.cursor = ready ? '' : 'not-allowed';
+}
+function confirmAssign() {
+  var d = assignDraft; if (!d || d.choice === null) return;
+  var who = d.choice, n = 0;
+  currentDay.stops.forEach(function(s) {
+    if (d.ids.indexOf(s.id) === -1 || (s.assignedTo || '') === who) return;
+    s.assignedTo = who; s.updatedBy = (session && session.name) || 'Someone'; s.updatedAtMs = Date.now(); n++;
+  });
+  closeAssignModal();
+  if (!n) { showToast('Nothing to change — already assigned that way.', ''); return; }
+  saveDays(days);
+  addActivity('Assigned', n + ' stop' + (n === 1 ? '' : 's') + (who ? ' assigned to ' + who : ' made unassigned') + ' by ' + ((session && session.name) || 'someone'));
+  renderAll();
+  showToast(n + ' stop' + (n === 1 ? '' : 's') + (who ? ' assigned to ' + who + '.' : ' made unassigned.'), 'green');
+}
+
 /* ---------- MOP (method of payment) and CLOSING TIME are asked for, per customer, before Zoho orders go to the drivers ---------- */
 var MOP_OPTIONS = ['Cash', 'Check', 'Charge Account'];
 var customerMop = {};                 // customer key -> { mop, closing, name, by, at }, kept at gcap/customerMop
@@ -2913,13 +2972,14 @@ function zohoAskMopThenImport(orders, assignedTo) {
   mopDraft = { assignedTo: assignedTo || '', remember: true, rows: pending.map(function(o) {
     var z = zohoMop(o), sv = savedMopFor(o.customer), sc = savedClosingFor(o.customer);
     var zok = MOP_OPTIONS.indexOf(z) !== -1;
-    return { order: o, mop: zok ? z : (sv || ''), src: zok ? 'zoho' : (sv ? 'saved' : ''),
+    return { order: o, driver: assignedTo || '', mop: zok ? z : (sv || ''), src: zok ? 'zoho' : (sv ? 'saved' : ''),
              closing: sc && sc !== 'none' ? sc : '', noClose: sc === 'none', closeSaved: !!sc };
   }) };
   document.getElementById('mopRemember').checked = true;
   document.getElementById('mopModal').classList.add('open');
   renderMopModal();
 }
+function mopDriver(i, v) { if (mopDraft) mopDraft.rows[i].driver = v; }
 function mopPick(i, v) { if (!mopDraft) return; mopDraft.rows[i].mop = v; mopDraft.rows[i].src = ''; renderMopModal(); }
 function mopClosing(i, v) { if (!mopDraft) return; mopDraft.rows[i].closing = v; mopDraft.rows[i].closeSaved = false; updateMopState(); }
 function mopNoClose(i, on) { if (!mopDraft) return; mopDraft.rows[i].noClose = !!on; if (on) mopDraft.rows[i].closing = ''; mopDraft.rows[i].closeSaved = false; renderMopModal(); }
@@ -2938,6 +2998,7 @@ function renderMopModal() {
     var tags = (r.src === 'zoho' ? ' • MOP from Zoho' : (r.src === 'saved' ? ' • saved for this customer' : ''));
     return '<div class="team-row" style="align-items:center; flex-wrap:wrap;"><div style="flex:1 1 200px; min-width:180px;"><span class="tname">' + escapeHtml(o.customer || 'Customer') + '</span> <span style="font-size:12px; color:var(--gold-2);">' + escapeHtml(o.number || '') + '</span>' +
       '<div style="font-size:11.5px; color:var(--text-soft);">' + (o.lines || []).length + ' item' + ((o.lines || []).length === 1 ? '' : 's') + (total ? ' • ' + escapeHtml(total) : '') + tags + '</div></div>' +
+      '<div style="display:flex; flex-direction:column; gap:3px; min-width:150px;"><label style="font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft);">Driver</label><select class="edit-input" onchange="mopDriver(' + i + ', this.value)">' + assignedDriverOptionsHtml(r.driver) + '</select></div>' +
       '<select class="edit-input" style="width:auto; min-width:150px;" onchange="mopPick(' + i + ', this.value)"><option value="">— Select MOP —</option>' +
         MOP_OPTIONS.map(function(m) { return '<option value="' + m + '"' + (r.mop === m ? ' selected' : '') + '>' + m + '</option>'; }).join('') + '</select>' +
       '<div style="display:flex; flex-direction:column; gap:3px; min-width:150px;"><label style="font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-soft);">Closes at' + (r.closeSaved ? ' <span style="text-transform:none;">(saved)</span>' : '') + '</label>' +
@@ -2954,19 +3015,21 @@ function confirmMopImport() {
     map[r.order.id] = r.mop; closeMap[r.order.id] = r.noClose ? 'none' : r.closing;
     if (d.remember) saveCustomerInfo(r.order.customer, { mop: r.mop, closing: closeMap[r.order.id] });
   });
-  var added = zohoImportOrders(d.rows.map(function(r) { return r.order; }), d.assignedTo, false, map, closeMap);
+  var driverMap = {};
+  d.rows.forEach(function(r) { driverMap[r.order.id] = r.driver || ''; });
+  var added = zohoImportOrders(d.rows.map(function(r) { return r.order; }), d.assignedTo, false, map, closeMap, driverMap);
   closeMopModal();
   zohoState.selected = {};
   showToast(added + ' order' + (added === 1 ? '' : 's') + ' added to today\'s deliveries.', 'green');
   renderZohoOrders();
 }
 
-function zohoImportOrders(orders, assignedTo, asReturn, mopMap, closeMap) {
+function zohoImportOrders(orders, assignedTo, asReturn, mopMap, closeMap, driverMap) {
   var added = [];
   orders.forEach(function(o) {
     if (zohoIsImported(o, asReturn)) return;
     var stop = {
-      id: uid(), loc: o.customer || 'Zoho order', addr: o.address || '', type: asReturn ? 'pickup' : 'delivery', isReturn: !!asReturn, assignedTo: assignedTo || '',
+      id: uid(), loc: o.customer || 'Zoho order', addr: o.address || '', type: asReturn ? 'pickup' : 'delivery', isReturn: !!asReturn, assignedTo: (driverMap && driverMap[o.id] !== undefined) ? driverMap[o.id] : (assignedTo || ''),
       closing: (closeMap && closeMap[o.id] !== undefined) ? (closeMap[o.id] === 'none' ? '' : closeMap[o.id]) : (savedClosingFor(o.customer) === 'none' ? '' : savedClosingFor(o.customer)),
       so: o.number || '', part: o.lines.map(function(l) { return l.qty + '× ' + l.name + (l.sku && String(l.name).indexOf(l.sku) === -1 ? ' (' + l.sku + ')' : ''); }).join('; '),
       mop: (mopMap && mopMap[o.id]) || zohoMop(o) || savedMopFor(o.customer) || o.terms || '', mopSrc: (mopMap && mopMap[o.id]) ? (mopMap[o.id] === zohoMop(o) ? 'zoho' : 'manual') : (zohoMop(o) ? 'zoho' : ''), notes: [o.reference ? 'Ref ' + o.reference : '', zohoNonMopFields(o).map(function(c) { return c.value ? c.label + ' ' + c.value : ''; }).filter(Boolean).join(' • '), o.method ? 'Delivery: ' + o.method : '', o.notes || ''].filter(Boolean).join(' • '), status: 'pending', photos: [], chat: [], createdAt: nowTimeStr(), zohoId: o.id
