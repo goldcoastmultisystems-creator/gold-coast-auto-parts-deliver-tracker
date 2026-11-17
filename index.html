@@ -2819,7 +2819,8 @@ function downloadRecordsCsv() {
 }
 
 /* ---------- ZOHO ORDERS -> deliveries (dashboard lives in zoho-orders-ui.js) ---------- */
-function zohoCanImport() { return !!session && !isDriverSession() && (session.type === 'owner' || !!session.isAdmin || session.role === 'Dispatcher'); }
+/* The owner and admins can always import orders (even while their Role box says Driver); otherwise only Dispatchers can. */
+function zohoCanImport() { return !!session && (session.type === 'owner' || !!session.isAdmin || (!isDriverSession() && session.role === 'Dispatcher')); }
 function zohoIsImported(o, asReturn) {
   if (zohoImportedIndex[zohoIndexKey(o.id, asReturn)]) return true;
   return Object.keys(days).some(function(k) { return (days[k].stops || []).some(function(s) { return s.zohoId === o.id && !!s.isReturn === !!asReturn; }); });
