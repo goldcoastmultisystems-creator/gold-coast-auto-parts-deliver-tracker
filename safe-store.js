@@ -12,8 +12,24 @@
   var DROPPABLE = ['kgps_days', 'kgps_sales_days', 'kgps_geocache'];   // caches that are safe to throw away to make room
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
-  function dayKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
-  function oldestKept(n) { var d = new Date(); d.setDate(d.getDate() - (n - 1)); return dayKey(d); }
+
+  /* ---- US Eastern time (Florida) is the business clock for every page, whatever the device's time zone is ---- */
+  var ET_TZ = 'America/New_York';
+  var etFmt = new Intl.DateTimeFormat('en-US', { timeZone: ET_TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  function etParts(ms) {
+    var o = {}; etFmt.formatToParts(new Date(ms == null ? Date.now() : ms)).forEach(function(p) { o[p.type] = p.value; });
+    return { y: o.year, mo: o.month, d: o.day, h: Number(o.hour) % 24, mi: Number(o.minute) };
+  }
+  function etDateKey(ms) { var p = etParts(ms); return p.y + '-' + p.mo + '-' + p.d; }
+  function etTimeStr(ms) { var p = etParts(ms), h12 = p.h % 12 || 12; return h12 + ':' + pad(p.mi) + ' ' + (p.h >= 12 ? 'PM' : 'AM'); }
+  function etMinutes(ms) { var p = etParts(ms); return p.h * 60 + p.mi; }
+  /* add or subtract whole days from a "YYYY-MM-DD" key */
+  function shiftKey(key, delta) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key), d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + delta));
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+  }
+  window.gcapEt = { tz: ET_TZ, parts: etParts, dateKey: etDateKey, timeStr: etTimeStr, minutes: etMinutes, shiftKey: shiftKey };
+  function oldestKept(n) { return shiftKey(etDateKey(Date.now()), -(n - 1)); }
   function recentDays(days, n) {
     var out = {}, min = oldestKept(n);
     Object.keys(days || {}).forEach(function(k) { if (k >= min) out[k] = days[k]; });

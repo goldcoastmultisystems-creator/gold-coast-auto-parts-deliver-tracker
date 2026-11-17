@@ -250,7 +250,7 @@ function renderZohoList() {
   var list = zohoVisible();
   if (count) count.textContent = '(' + list.length + ' ' + zohoState.statuses + ')';
   var sub = document.getElementById('zohoSub');
-  if (sub) sub.textContent = 'From Zoho Inventory • newest 200 orders checked' + (zohoState.truncated ? ', showing 30' : '') + ' • updated ' + new Date(zohoState.lastLoaded).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ' • read-only';
+  if (sub) sub.textContent = 'From Zoho Inventory • newest 200 orders checked' + (zohoState.truncated ? ', showing 30' : '') + ' • updated ' + new Date(zohoState.lastLoaded).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' , timeZone: 'America/New_York'}) + ' • read-only';
   if (!list.length) { el.innerHTML = '<div class="hist-empty">No orders with this status.</div>'; return; }
   var canImport = typeof zohoCanImport === 'function' && zohoCanImport();
   el.innerHTML = list.map(function(o) {

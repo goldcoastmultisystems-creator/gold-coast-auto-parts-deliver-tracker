@@ -364,7 +364,7 @@ function renderReorder() {
 function reorderText() {
   var items = reorderItems();
   if (!items.length) return '';
-  return 'Gold Coast Auto Parts — reorder list (' + new Date().toLocaleDateString() + ')\n' + items.map(function(it) {
+  return 'Gold Coast Auto Parts — reorder list (' + new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }) + ')\n' + items.map(function(it) {
     return '• ' + it.r[0] + ' — ' + it.r[6] + ' | on hand ' + (it.r[2] || 0) + ', order ' + it.order + (locText(it.r[0]) ? ' | ' + locText(it.r[0]) : '');
   }).join('\n') + '\n\nSent from the Gold Coast Auto Parts web app.';
 }

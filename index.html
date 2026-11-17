@@ -787,12 +787,14 @@ function attachFirebaseListeners() {
     knownStopIds = {};
     currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
     carryOverUnfinished();
+    adoptFutureDays();
+    daysLoadedOnce = true; if (indexLoadedOnce) zohoReconcileIndex();
     renderAll();
     checkStaleDrivers();
     setTimeout(backfillRecords, 3000);
   });
   /* tiny indexes so the app doesn't need every old day loaded */
-  fbDb.ref('gcap/zohoImported').on('value', function(snap) { zohoImportedIndex = snap.val() || {}; });
+  fbDb.ref('gcap/zohoImported').on('value', function(snap) { zohoImportedIndex = snap.val() || {}; indexLoadedOnce = true; if (daysLoadedOnce) zohoReconcileIndex(); });
   fbDb.ref('gcap/customerMop').on('value', function(snap) { customerMop = snap.val() || {}; });
   fbDb.ref('gcap/records/checks').on('value', function(snap) {
     var n = 0; snap.forEach(function(x) { var c = x.val() || {}; if (!c.deleted && c.status !== 'deposited') n++; });
@@ -1111,7 +1113,7 @@ function mergeStopsForSave(serverStops, localStops, knownIds) {
 var DAYS_WINDOW = 4;                 // today + 3 days back (matches the carry-over look-back)
 var olderDays = {}, olderLoaded = false, olderLoading = null;
 var zohoImportedIndex = {}, openChecksFromRecords = null;
-function windowStartKey() { var d = new Date(); d.setDate(d.getDate() - (DAYS_WINDOW - 1)); return dayKeyFromDate(d); }
+function windowStartKey() { return gcapEt.shiftKey(todayKey(), -(DAYS_WINDOW - 1)); }
 /* Loads every day older than the live window, once, then calls back. Safe to call repeatedly. */
 function ensureOlderDaysLoaded() {
   if (olderLoaded || !FIREBASE_ENABLED || !fbDb) return Promise.resolve();
@@ -1202,7 +1204,8 @@ function saveDays(d) {
 
 function pad2(n) { return n < 10 ? '0'+n : ''+n; }
 function dayKeyFromDate(d) { return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
-function todayKey() { return dayKeyFromDate(new Date()); }
+/* The business day is US Eastern (Florida) time, no matter where the device is. */
+function todayKey() { return gcapEt.dateKey(Date.now()); }
 
 /* ---------- NEW DAY: unfinished stops carry over instead of staying behind ---------- */
 var CARRY_LOOKBACK_DAYS = 3;
@@ -1221,8 +1224,7 @@ function removeStopsFromDayRemote(dateKey, ids) {
 function carryOverUnfinished() {
   if (!days || !currentDay) return;
   var today = todayKey();
-  var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - CARRY_LOOKBACK_DAYS);
-  var cutoffKey = dayKeyFromDate(cutoff);
+  var cutoffKey = gcapEt.shiftKey(today, -CARRY_LOOKBACK_DAYS);
   var have = {}, haveSO = {};
   currentDay.stops.forEach(function(s) { have[s.id] = true; if (s.so) haveSO[String(s.so).trim().toLowerCase()] = true; });
   var sources = {}, moved = [];
@@ -1267,11 +1269,7 @@ function checkDayRollover() {
 setInterval(checkDayRollover, 60 * 1000);
 document.addEventListener('visibilitychange', function() { if (!document.hidden) checkDayRollover(); });
 function fmtDateDisplay(key) { var p = key.split('-'); return p[1]+'/'+p[2]+'/'+p[0]; }
-function nowTimeStr() {
-  var d = new Date(); var h = d.getHours(); var m = pad2(d.getMinutes());
-  var ap = h >= 12 ? 'PM' : 'AM'; var h12 = h % 12; if (h12 === 0) h12 = 12;
-  return h12+':'+m+' '+ap;
-}
+function nowTimeStr() { return gcapEt.timeStr(Date.now()); }
 function uid() { return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function escapeHtml(s) {
   return (s || '').replace(/[&<>"']/g, function(c) {
@@ -1411,7 +1409,7 @@ function init() {
   carryOverUnfinished();
   if (!settings.team) { settings.team = []; saveSettings(settings); }
 
-  document.getElementById('todayPill').textContent = fmtDateDisplay(todayKey());
+  document.getElementById('todayPill').textContent = fmtDateDisplay(todayKey()) + ' • ET';
   document.getElementById('footerYear').textContent = new Date().getFullYear();
   document.getElementById('driverName').value = settings.driverName || '';
   document.getElementById('driverRole').value = settings.driverRole || 'Driver';
@@ -1910,6 +1908,7 @@ function deleteStop(id) {
   var s = currentDay.stops.find(function(x) { return x.id === id; });
   currentDay.stops = currentDay.stops.filter(function(x) { return x.id !== id; });
   saveDays(days);
+  if (s && s.zohoId) { zohoForgetImport(s.zohoId, s.isReturn); try { renderZohoOrders(); } catch (e) {} }   // the order can be added again
   if (s) addActivity('Removed', s.loc + ' was deleted');
   renderAll();
 }
@@ -2153,6 +2152,7 @@ function deleteReturnEntry(dateKey, stopId) {
   if (day) day.stops = day.stops.filter(function(x) { return x.id !== stopId; });
   removeReturnStopRemote(dateKey, stopId);
   saveRecord('returns', stopId, { deleted: true });
+  if (s && s.zohoId) zohoForgetImport(s.zohoId, s.isReturn);
   if (dateKey === todayKey()) {
     gcapSaveDaysCache('kgps_days', days);
     addActivity('Removed', (s ? s.loc : 'Return entry') + ' return was deleted');
@@ -2844,6 +2844,52 @@ function zohoSyncImportedStops(orders) {
   });
   if (changed) { saveDays(days); renderAll(); }
 }
+
+/* ---------- DAYS SAVED UNDER THE WRONG DATE ----------
+   Before the board ran on US Eastern time, a device in another time zone could save stops under tomorrow's date, where the
+   rest of the team could not see them. Any stops found under a date later than today (Eastern) are moved into today. */
+var daysLoadedOnce = false, indexLoadedOnce = false;
+function adoptFutureDays() {
+  if (!days || !currentDay) return 0;
+  var today = todayKey(), moved = 0, from = [];
+  Object.keys(days).filter(function(k) { return k > today && k <= gcapEt.shiftKey(today, 2); }).sort().forEach(function(k) {
+    var d = days[k], list = (d && d.stops) || [];
+    if (!list.length) return;
+    var ids = list.map(function(x) { return x.id; });
+    list.forEach(function(st) {
+      if (currentDay.stops.some(function(x) { return x.id === st.id; })) return;
+      currentDay.stops.push(st); knownStopIds[st.id] = true; moved++;
+    });
+    d.stops = [];
+    from.push(fmtDateDisplay(k));
+    removeStopsFromDayRemote(k, ids);
+  });
+  if (moved) {
+    saveDays(days);
+    addActivity('Moved to today', moved + ' stop' + (moved === 1 ? '' : 's') + ' saved under ' + from.join(', ') + ' were moved into today (the board now runs on US Eastern time).');
+  }
+  return moved;
+}
+/* The small "already imported" list must never say an order is on the board when its stop is gone (deleted, or never saved). */
+var zohoRecentImports = {};
+function zohoForgetImport(zohoId, asReturn) {
+  var ik = zohoIndexKey(zohoId, !!asReturn);
+  delete zohoImportedIndex[ik];
+  if (typeof fbDb !== 'undefined' && fbDb) fbDb.ref('gcap/zohoImported/' + ik).remove().catch(function() {});
+}
+function zohoReconcileIndex() {
+  if (!days || typeof fbDb === 'undefined' || !fbDb) return;
+  var ws = windowStartKey(), present = {}, now = Date.now();
+  Object.keys(days).forEach(function(k) { (days[k].stops || []).forEach(function(st) { if (st.zohoId) present[zohoIndexKey(st.zohoId, !!st.isReturn)] = true; }); });
+  Object.keys(zohoImportedIndex).forEach(function(ik) {
+    if (String(zohoImportedIndex[ik]) < ws || present[ik]) return;            // older than the loaded days (can't tell), or its stop exists
+    if (zohoRecentImports[ik] && now - zohoRecentImports[ik] < 3 * 60 * 1000) return;   // just imported, still saving
+    delete zohoImportedIndex[ik];
+    fbDb.ref('gcap/zohoImported/' + ik).remove().catch(function() {});
+  });
+  if (typeof zohoState !== 'undefined' && typeof renderZohoOrders === 'function') { try { renderZohoOrders(); } catch (e) {} }
+}
+
 /* ---------- ASSIGN ROUTES / STOPS TO A DRIVER (owner, admins and Dispatchers) ---------- */
 function canAssignRoutes() { return !!session && (session.type === 'owner' || !!session.isAdmin || (!isDriverSession() && session.role === 'Dispatcher')); }
 var assignDraft = null;
@@ -2920,7 +2966,7 @@ function closingChipInfo(s) {
   var at = closingMinutes(s.closing);
   if (at == null) return null;
   var openStatus = ['pending', 'onway', 'arrived', 'postponed'].indexOf(s.status) !== -1;
-  var now = new Date(), mins = now.getHours() * 60 + now.getMinutes(), left = at - mins;
+  var mins = gcapEt.minutes(Date.now()), left = at - mins;
   if (openStatus && left < 0) return { text: '🕔 Closed at ' + fmtClosing(s.closing), color: 'var(--red)' };
   if (openStatus && left <= 60) return { text: '🕔 Closes in ' + left + ' min (' + fmtClosing(s.closing) + ')', color: 'var(--amber)' };
   return { text: '🕔 Closes ' + fmtClosing(s.closing), color: 'var(--text-soft)' };
@@ -3037,7 +3083,7 @@ function zohoImportOrders(orders, assignedTo, asReturn, mopMap, closeMap, driver
     currentDay.stops.push(stop);
     added.push(stop);
     var ik = zohoIndexKey(o.id, !!asReturn);
-    zohoImportedIndex[ik] = todayKey();
+    zohoImportedIndex[ik] = todayKey(); zohoRecentImports[ik] = Date.now();
     if (fbDb) fbDb.ref('gcap/zohoImported/' + ik).set(todayKey()).catch(function() {});
   });
   if (added.length) {
@@ -3704,12 +3750,7 @@ function shareFooter() {
 var STALE_THRESHOLD_MS = 3 * 60 * 60 * 1000;
 var staleDismissed = {};
 var currentStaleList = [];
-function fmtTimeFromMs(ms) {
-  var d = new Date(ms);
-  var h = d.getHours(), m = pad2(d.getMinutes());
-  var ap = h >= 12 ? 'PM' : 'AM'; var h12 = h % 12; if (h12 === 0) h12 = 12;
-  return h12 + ':' + m + ' ' + ap;
-}
+function fmtTimeFromMs(ms) { return gcapEt.timeStr(ms); }
 function checkStaleDrivers() {
   var el = document.getElementById('staleDriverBanner');
   if (!DRIVER_TRACKING_ENABLED) { if (el) el.style.display = 'none'; return; }

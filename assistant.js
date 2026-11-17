@@ -57,7 +57,7 @@ function attachPartStatus() {
 function partStatusInner(key) {
   var st = partStatus[key] || {};
   function btn(field, label, on, color) {
-    var who = st[field] && st[field].by ? st[field].by + (st[field].at ? ' • ' + new Date(st[field].at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '') : '';
+    var who = st[field] && st[field].by ? st[field].by + (st[field].at ? ' • ' + new Date(st[field].at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : '') : '';
     var proofN = field === 'found' && st.found ? (st.found.p || 0) + (st.found.v || 0) : 0;
     var tip = field === 'found' ? (on ? who + ' — tap to see the proof or undo' : 'Add a photo or video, then mark it found') : (on ? who + ' — tap to undo' : (st.found ? 'Tap to mark loaded' : 'Mark it Found first'));
     return '<button type="button" onclick="event.stopPropagation(); togglePartStatus(\'' + key + '\',\'' + field + '\')" title="' + escapeHtml(tip) + '" style="cursor:pointer; font:inherit; font-size:11.5px; font-weight:800; padding:3px 9px; border-radius:7px; margin-left:4px; white-space:nowrap; ' +
@@ -123,7 +123,7 @@ function renderProofModal() {
   document.getElementById('proofAdd').style.display = adding ? 'flex' : 'none';
   document.getElementById('proofMedia').innerHTML = proofMediaHtml(d) || (d.loading ? '<div class="hist-empty">Loading…</div>' : '<div class="hist-empty">' + (adding ? 'Nothing added yet.' : ((partStatus[d.key] && partStatus[d.key].found && partStatus[d.key].found.skip) ? 'Marked found without a photo or video (rush).' : 'No photo or video was saved for this part (it was marked found before proof was required).')) + '</div>');
   var st = partStatus[d.key] && partStatus[d.key].found;
-  document.getElementById('proofMsg').textContent = adding ? '' : (st ? 'Marked found by ' + (st.by || '—') + (st.at ? ' at ' + new Date(st.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '') : '');
+  document.getElementById('proofMsg').textContent = adding ? '' : (st ? 'Marked found by ' + (st.by || '—') + (st.at ? ' at ' + new Date(st.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' , timeZone: 'America/New_York'}) : '') : '');
   var ready = d.photos.length + d.videos.length > 0 && !d.uploading;
   document.getElementById('proofActions').innerHTML = adding
     ? '<button class="btn btn-ghost" onclick="closeProofModal()">Cancel</button><button class="btn btn-ghost" onclick="confirmFoundNoProof()" title="In a rush? Mark it found now — no photo or video">⚡ Skip — just mark Found</button><button class="btn btn-gold" id="proofConfirmBtn" onclick="confirmFoundProof()"' + (ready ? '' : ' disabled style="opacity:.45; cursor:not-allowed;"') + '>✓ Mark as Found with proof</button>'

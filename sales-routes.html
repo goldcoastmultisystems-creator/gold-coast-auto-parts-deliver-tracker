@@ -1056,13 +1056,9 @@ function saveDays(d) {
 }
 
 function pad2(n) { return n < 10 ? '0'+n : ''+n; }
-function todayKey() { var d = new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function todayKey() { return gcapEt.dateKey(Date.now()); }
 function fmtDateDisplay(key) { var p = key.split('-'); return p[1]+'/'+p[2]+'/'+p[0]; }
-function nowTimeStr() {
-  var d = new Date(); var h = d.getHours(); var m = pad2(d.getMinutes());
-  var ap = h >= 12 ? 'PM' : 'AM'; var h12 = h % 12; if (h12 === 0) h12 = 12;
-  return h12+':'+m+' '+ap;
-}
+function nowTimeStr() { return gcapEt.timeStr(Date.now()); }
 function uid() { return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function escapeHtml(s) {
   return (s || '').replace(/[&<>"']/g, function(c) {
@@ -1185,7 +1181,7 @@ function init() {
   currentDay.stops.forEach(function(s) { knownStopIds[s.id] = true; });
   if (!settings.team) { settings.team = []; saveSettings(settings); }
 
-  document.getElementById('todayPill').textContent = fmtDateDisplay(todayKey());
+  document.getElementById('todayPill').textContent = fmtDateDisplay(todayKey()) + ' • ET';
   document.getElementById('footerYear').textContent = new Date().getFullYear();
   document.getElementById('driverName').value = settings.driverName || '';
   document.getElementById('companyName').value = settings.companyName || 'Gold Coast Auto Parts';
@@ -2497,12 +2493,7 @@ function shareFooter() {
 var STALE_THRESHOLD_MS = 3 * 60 * 60 * 1000;
 var staleDismissed = {};
 var currentStaleList = [];
-function fmtTimeFromMs(ms) {
-  var d = new Date(ms);
-  var h = d.getHours(), m = pad2(d.getMinutes());
-  var ap = h >= 12 ? 'PM' : 'AM'; var h12 = h % 12; if (h12 === 0) h12 = 12;
-  return h12 + ':' + m + ' ' + ap;
-}
+function fmtTimeFromMs(ms) { return gcapEt.timeStr(ms); }
 function checkStaleDrivers() {
   var el = document.getElementById('staleDriverBanner');
   if (!el || !driverPositions || !currentDay) return;
