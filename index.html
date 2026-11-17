@@ -3388,6 +3388,7 @@ function renderTeamList() {
       (m.isAdmin ? '<span class="role-badge admin">Admin</span>' : '') +
       '<span class="pin-tag">' + escapeHtml(m.pin) + '</span>' +
       '<div class="team-row-actions">' +
+        (canManageTeam() ? '<button class="btn btn-ghost btn-sm" onclick="toggleTeamMemberAdmin(\'' + m.id + '\')">' + (m.isAdmin ? 'Remove admin' : 'Make admin') + '</button>' : '') +
         '<button class="btn btn-ghost btn-sm" onclick="toggleTeamMemberActive(\'' + m.id + '\')">' + (m.active === false ? 'Reactivate' : 'Deactivate') + '</button>' +
         '<button class="stop-delete-btn" style="width:28px;height:28px;font-size:12px;" onclick="removeTeamMember(\'' + m.id + '\')" title="Remove">🗑</button>' +
       '</div></div>';
@@ -3419,6 +3420,20 @@ function removeTeamMember(id) {
   saveSettings(settings);
   renderTeamList();
   populateGuestNameSelect();
+}
+/* Owner / admins only: give or take away admin access for an existing person. Takes effect the next time that person logs in. */
+function toggleTeamMemberAdmin(id) {
+  if (!canManageTeam()) return;
+  var m = (settings.team || []).find(function(x) { return x.id === id; });
+  if (!m) return;
+  var making = !m.isAdmin;
+  if (!making && m.id === (session && session.memberId)) { alert('You cannot remove your own admin access.'); return; }
+  var msg = making ? 'Give ' + m.name + ' admin access? Admins can manage the team and see everyone' + "'" + 's passwords. It applies the next time they log in.' : 'Remove admin access from ' + m.name + '?';
+  if (!confirm(msg)) return;
+  m.isAdmin = making;
+  saveSettings(settings);
+  renderTeamList();
+  showToast(m.name + (making ? ' is now an admin.' : ' is no longer an admin.'), 'green');
 }
 function toggleTeamMemberActive(id) {
   var m = (settings.team || []).find(function(x) { return x.id === id; });

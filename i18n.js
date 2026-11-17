@@ -253,6 +253,10 @@
     'Closes at': 'Cierra a las', '(saved)': '(guardado)', 'No closing time': 'Sin hora de cierre', 'Closing time': 'Hora de cierre', 'Closing time (optional)': 'Hora de cierre (opcional)'
   });
 
+  Object.assign(ES, {
+    'Make admin': 'Hacer administrador', 'Remove admin': 'Quitar administrador', 'You cannot remove your own admin access.': 'No puedes quitarte tu propio acceso de administrador.'
+  });
+
   /* ---------------- phrases with changing parts ---------------- */
   var ST = { 'pending': 'pendiente', 'en route': 'en camino', 'at location': 'en el lugar', 'completed': 'completada', 'postponed': 'pospuesta', 'returned part': 'pieza devuelta', 'returned': 'devuelta' };
   var STC = { 'Pending': 'Pendiente', 'En Route': 'En camino', 'At Location': 'En el lugar', 'Completed': 'Completada', 'Postponed': 'Pospuesta', 'Returned Part': 'Pieza devuelta' };
@@ -330,6 +334,10 @@
     [/^🕔 Closes (.+)$/, function(m) { var r = /^in (\d+) min \((.+)\)$/.exec(m[1]); return r ? '🕔 Cierra en ' + r[1] + ' min (' + r[2] + ')' : '🕔 Cierra a las ' + m[1]; }],
     [/^🕔 Closed at (.+)$/, function(m) { return '🕔 Cerró a las ' + m[1]; }],
     [/^Choose a MOP and closing time for (\d+) more orders? to continue\.$/, function(m) { return 'Elige el MOP y la hora de cierre de ' + m[1] + ' pedido' + (m[1] === '1' ? '' : 's') + ' más para continuar.'; }],
+    [/^Give (.+) admin access\? Admins can manage the team and see everyone's passwords\. It applies the next time they log in\.$/, function(m) { return '¿Dar acceso de administrador a ' + m[1] + '? Los administradores pueden gestionar el equipo y ver las contraseñas de todos. Se aplica la próxima vez que inicie sesión.'; }],
+    [/^Remove admin access from (.+)\?$/, function(m) { return '¿Quitar el acceso de administrador a ' + m[1] + '?'; }],
+    [/^(.+) is now an admin\.$/, function(m) { return m[1] + ' ahora es administrador.'; }],
+    [/^(.+) is no longer an admin\.$/, function(m) { return m[1] + ' ya no es administrador.'; }],
     [/^(.+) • (.+) • (.+)$/, null]   // placeholder: resolved by splitting on " • " below
   ];
   PAT.pop();
