@@ -246,6 +246,13 @@
     'MOP from Zoho': 'MOP de Zoho', 'saved for this customer': 'guardado para este cliente'
   });
 
+  Object.assign(ES, {
+    '💳 Method of payment (MOP) & closing time': '💳 Forma de pago (MOP) y hora de cierre',
+    'Before these orders go to the drivers, set how each customer pays and when they close. It is saved for that customer, so next time it is already filled in.': 'Antes de que estos pedidos pasen a los conductores, indica cómo paga cada cliente y a qué hora cierra. Se guarda para ese cliente, así que la próxima vez ya estará llenado.',
+    "Remember each customer's MOP and closing time for next time": 'Recordar el MOP y la hora de cierre de cada cliente para la próxima vez',
+    'Closes at': 'Cierra a las', '(saved)': '(guardado)', 'No closing time': 'Sin hora de cierre', 'Closing time': 'Hora de cierre', 'Closing time (optional)': 'Hora de cierre (opcional)'
+  });
+
   /* ---------------- phrases with changing parts ---------------- */
   var ST = { 'pending': 'pendiente', 'en route': 'en camino', 'at location': 'en el lugar', 'completed': 'completada', 'postponed': 'pospuesta', 'returned part': 'pieza devuelta', 'returned': 'devuelta' };
   var STC = { 'Pending': 'Pendiente', 'En Route': 'En camino', 'At Location': 'En el lugar', 'Completed': 'Completada', 'Postponed': 'Pospuesta', 'Returned Part': 'Pieza devuelta' };
@@ -320,6 +327,9 @@
     [/^(\d+) visits?$/, function(m) { return pl(m[1], 'visita', 'visitas'); }],
     [/^Route in progress — (\d+) of (\d+) visits complete\.$/, function(m) { return 'Ruta en curso — ' + m[1] + ' de ' + m[2] + ' visitas completadas.'; }],
     [/^Choose a MOP for (\d+) more orders? to continue\.$/, function(m) { return 'Elige un MOP para ' + m[1] + ' pedido' + (m[1] === '1' ? '' : 's') + ' más para continuar.'; }],
+    [/^🕔 Closes (.+)$/, function(m) { var r = /^in (\d+) min \((.+)\)$/.exec(m[1]); return r ? '🕔 Cierra en ' + r[1] + ' min (' + r[2] + ')' : '🕔 Cierra a las ' + m[1]; }],
+    [/^🕔 Closed at (.+)$/, function(m) { return '🕔 Cerró a las ' + m[1]; }],
+    [/^Choose a MOP and closing time for (\d+) more orders? to continue\.$/, function(m) { return 'Elige el MOP y la hora de cierre de ' + m[1] + ' pedido' + (m[1] === '1' ? '' : 's') + ' más para continuar.'; }],
     [/^(.+) • (.+) • (.+)$/, null]   // placeholder: resolved by splitting on " • " below
   ];
   PAT.pop();

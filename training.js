@@ -118,15 +118,15 @@
       steps: T([
         'Open 🧾 Zoho Orders. Tap an order to see everything: addresses, items, prices and MOP.',
         'Tick the orders for today, choose the driver, and tap “➕ Add to deliveries”.',
-        'The app asks for each customer’s MOP: Cash, Check or Charge Account. If Zoho already has it, or you answered before, it is pre-filled. Choose and confirm.',
-        'The MOP is saved for that customer, so next time it is already filled in.',
+        'The app asks for each customer’s MOP (Cash, Check or Charge Account) and their closing time, so drivers know how late they can deliver. If Zoho already has the MOP, or you answered before, it is pre-filled. Fill in what is missing and confirm.',
+        'The MOP and closing time are saved for that customer, so next time they are already filled in. A stop shows “🕔 Closes 5:00 PM” — it turns amber under an hour and red once the shop has closed.',
         'Use “↩ Add as return” to schedule picking a part up from the customer.',
         '💬 WhatsApp or ↗ Share sends the order as a neat message.'
       ], [
         'Abre 🧾 Pedidos de Zoho. Toca un pedido para ver todo: direcciones, artículos, precios y MOP.',
         'Marca los pedidos de hoy, elige al conductor y toca “➕ Agregar a entregas”.',
-        'La aplicación pide el MOP de cada cliente: Efectivo, Cheque o Cuenta de crédito. Si Zoho ya lo tiene, o respondiste antes, aparece ya llenado. Elige y confirma.',
-        'El MOP se guarda para ese cliente, así que la próxima vez ya estará llenado.',
+        'La aplicación pide el MOP de cada cliente (Efectivo, Cheque o Cuenta de crédito) y su hora de cierre, para que los conductores sepan hasta qué hora pueden entregar. Si Zoho ya tiene el MOP, o respondiste antes, aparece ya llenado. Completa lo que falte y confirma.',
+        'El MOP y la hora de cierre se guardan para ese cliente, así que la próxima vez ya estarán llenados. Una parada muestra “🕔 Cierra a las 5:00 PM” — se pone ámbar con menos de una hora y roja cuando el taller ya cerró.',
         'Usa “↩ Agregar como devolución” para programar recoger una pieza con el cliente.',
         '💬 WhatsApp o ↗ Compartir envía el pedido como un mensaje ordenado.'
       ]),
