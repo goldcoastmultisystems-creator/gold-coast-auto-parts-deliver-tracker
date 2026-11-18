@@ -165,6 +165,23 @@
       ]),
       tip: T('Only people with the right role can edit; others can look but not change.', 'Solo quienes tienen la función adecuada pueden editar; los demás pueden ver pero no cambiar.') },
 
+    { id: 'tracking', roles: ['driver', 'dispatcher'], icon: '📍',
+      title: T('Location tracking on deliveries', 'Rastreo de ubicación en las entregas'),
+      steps: T([
+        'Drivers: the first time you log in the app explains what is shared. Tap “I understand — start sharing”, then allow location (choose “While using the app”).',
+        'Keep the app open with the screen on while driving. The 📍 Tracking button at the top shows ON or OFF — tap it to pause on a break; nobody sees you while it is paused.',
+        'Dispatch: tap 📍 Live Map to see each driver, how recent the signal is, their next stop and a rough ETA. “Today’s route” draws where a driver has been today.',
+        'On a stop you will see “📍 Anthony is 3.2 mi away • ~9 min”. If the driver would arrive after the customer’s closing time it turns red.',
+        'When a driver gets close to the next stop, it is marked “At Location” automatically.'
+      ], [
+        'Conductores: la primera vez que inicias sesión la aplicación explica qué se comparte. Toca “Entiendo — empezar a compartir” y permite la ubicación (elige “Mientras uso la app”).',
+        'Mantén la aplicación abierta con la pantalla encendida mientras manejas. El botón 📍 Rastreo de arriba muestra ACTIVO o APAGADO — tócalo para pausar en un descanso; nadie te ve mientras está en pausa.',
+        'Despacho: toca 📍 Mapa en vivo para ver a cada conductor, qué tan reciente es la señal, su siguiente parada y un tiempo estimado. “Ruta de hoy” dibuja por dónde ha pasado un conductor hoy.',
+        'En una parada verás “📍 Anthony está a 3.2 mi • ~9 min”. Si el conductor llegaría después de la hora de cierre del cliente, se pone en rojo.',
+        'Cuando un conductor se acerca a la siguiente parada, se marca “En el lugar” automáticamente.'
+      ]),
+      tip: T('The phone must stay on this page — if the app is closed or the screen locks, the map stops updating.', 'El teléfono debe quedarse en esta página — si se cierra la aplicación o se bloquea la pantalla, el mapa deja de actualizarse.') },
+
     { id: 'ai', roles: ['all'], icon: '🤖',
       title: T('Ask AI', 'Preguntar a la IA'),
       steps: T([
@@ -209,12 +226,12 @@
         'Owner or admin: open 👥 Manage Team → Add a Person.',
         'Type the name, choose the role (Driver, Dispatcher, Sales Rep or Inventory Specialist) and give each person their own password.',
         'Deactivate or Remove someone who leaves so they can no longer log in. Change a password from the same screen.',
-        'Only Drivers are location-tracked (live tracking is currently switched off).'
+        'Only Drivers are location-tracked while logged in (admins can switch it on for themselves).'
       ], [
         'Dueño o administrador: abre 👥 Gestionar equipo → Agregar una persona.',
         'Escribe el nombre, elige la función (Conductor, Despachador, Representante de ventas o Especialista de inventario) y da a cada persona su propia contraseña.',
         'Desactiva o Quita a quien se vaya para que ya no pueda iniciar sesión. Cambia una contraseña desde la misma pantalla.',
-        'Solo a los Conductores se les rastrea la ubicación (el rastreo en vivo está apagado por ahora).'
+        'Solo a los Conductores se les rastrea la ubicación mientras tienen la sesión iniciada (los administradores pueden activarlo para sí mismos).'
       ]) }
   ];
 

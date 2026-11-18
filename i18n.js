@@ -264,6 +264,22 @@
     'Assign driver ▾': 'Asignar conductor ▾', '✓ Make unassigned': '✓ Dejar sin asignar'
   });
 
+  Object.assign(ES, {
+    '📍 Location sharing for deliveries': '📍 Compartir ubicación para las entregas',
+    'While you are logged in and tracking is ON, dispatch can see where you are on the map. It is used to:': 'Mientras hayas iniciado sesión y el rastreo esté ACTIVO, el despacho puede ver dónde estás en el mapa. Se usa para:',
+    "show customers' arrival times and warn if a shop will close first": 'mostrar la hora de llegada a los clientes y avisar si un taller cerrará antes',
+    'mark a stop "At Location" when you arrive': 'marcar una parada como "En el lugar" cuando llegues', "keep a record of today's route": 'guardar un registro de la ruta de hoy',
+    'Keep this page open and the screen on while driving. You can pause sharing any time (for example on a break) with the 📍 Tracking button at the top. Nothing is shared when you are logged out.': 'Mantén esta página abierta y la pantalla encendida mientras manejas. Puedes pausar en cualquier momento (por ejemplo en un descanso) con el botón 📍 Rastreo de arriba. No se comparte nada cuando cierras sesión.',
+    'Not now': 'Ahora no', 'I understand — start sharing': 'Entiendo — empezar a compartir',
+    '📍 Tracking: ON': '📍 Rastreo: ACTIVO', '📍 Tracking: OFF': '📍 Rastreo: APAGADO', '📍 Live Map': '📍 Mapa en vivo', 'Live Driver Map': 'Mapa en vivo de conductores',
+    'Drivers sharing location': 'Conductores compartiendo ubicación', 'None right now.': 'Ninguno por ahora.', 'Live': 'En vivo', 'Slow signal': 'Señal lenta', 'Center': 'Centrar',
+    "Today's route": 'Ruta de hoy', 'Hide route': 'Ocultar ruta', '📍 Location tracking paused.': '📍 Rastreo de ubicación en pausa.',
+    'No route recorded yet today for this driver.': 'Aún no hay ruta registrada hoy para este conductor.', "Couldn't load the route.": 'No se pudo cargar la ruta.',
+    'Location is blocked for this site — turn it on in your phone/browser settings so dispatch can see your deliveries.': 'La ubicación está bloqueada para este sitio — actívala en los ajustes de tu teléfono/navegador para que el despacho vea tus entregas.',
+    "Admin access — can manage the team and freely switch their own Driver/Dispatcher role. Admins aren't location-tracked unless they turn it on themselves.": 'Acceso de administrador — puede gestionar el equipo y cambiar su propia función de Conductor/Despachador. A los administradores no se les rastrea la ubicación a menos que lo activen ellos mismos.',
+    "Admin access — can manage the team and freely switch their own role. Admins aren't location-tracked unless they turn it on themselves.": 'Acceso de administrador — puede gestionar el equipo y cambiar su propia función. A los administradores no se les rastrea la ubicación a menos que lo activen ellos mismos.'
+  });
+
   /* ---------------- phrases with changing parts ---------------- */
   var ST = { 'pending': 'pendiente', 'en route': 'en camino', 'at location': 'en el lugar', 'completed': 'completada', 'postponed': 'pospuesta', 'returned part': 'pieza devuelta', 'returned': 'devuelta' };
   var STC = { 'Pending': 'Pendiente', 'En Route': 'En camino', 'At Location': 'En el lugar', 'Completed': 'Completada', 'Postponed': 'Pospuesta', 'Returned Part': 'Pieza devuelta' };
@@ -351,6 +367,18 @@
     [/^👤 (.+) ▾$/, function(m) { return '👤 ' + m[1] + ' ▾'; }],
     [/^(\d+) stops? assigned to (.+)\.$/, function(m) { return pl(m[1], 'parada asignada', 'paradas asignadas') + ' a ' + m[2] + '.'; }],
     [/^(\d+) stops? made unassigned\.$/, function(m) { return pl(m[1], 'parada dejada', 'paradas dejadas') + ' sin asignar.'; }],
+    [/^📍 Live Map \((\d+)\)$/, function(m) { return '📍 Mapa en vivo (' + m[1] + ')'; }],
+    [/^📍 (.+) is arriving$/, function(m) { return '📍 ' + m[1] + ' está llegando'; }],
+    [/^📍 (.+) is (\d+(?:\.?\d+)?) mi away$/, function(m) { return '📍 ' + m[1] + ' está a ' + m[2] + ' mi'; }],
+    [/^~(\d+) min$/, function(m) { return '~' + m[1] + ' min'; }],
+    [/^⚠ may arrive after closing \((.+)\)$/, function(m) { return '⚠ podría llegar después del cierre (' + m[1] + ')'; }],
+    [/^Last seen (.+)$/, function(m) { return 'Visto por última vez ' + m[1].replace(/ago$/, 'atrás'); }],
+    [/^Next: (.+?) • (\d+(?:\.?\d+)?) mi • ~(\d+) min$/, function(m) { return 'Siguiente: ' + m[1] + ' • ' + m[2] + ' mi • ~' + m[3] + ' min'; }],
+    [/^Next: (.+)$/, function(m) { return 'Siguiente: ' + m[1]; }],
+    [/^Updated (.+?)( • (\d+) mph)?$/, function(m) { return 'Actualizado ' + m[1] + (m[3] ? ' • ' + m[3] + ' mph' : ''); }],
+    [/^⚪ Not sharing: (.+)$/, function(m) { return '⚪ Sin compartir: ' + m[1]; }],
+    [/^Start (.+)$/, function(m) { return 'Inicio ' + m[1]; }],
+    [/^Latest (.+)$/, function(m) { return 'Último ' + m[1]; }],
     [/^(.+) • (.+) • (.+)$/, null]   // placeholder: resolved by splitting on " • " below
   ];
   PAT.pop();
