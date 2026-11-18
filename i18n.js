@@ -280,6 +280,8 @@
     "Admin access — can manage the team and freely switch their own role. Admins aren't location-tracked unless they turn it on themselves.": 'Acceso de administrador — puede gestionar el equipo y cambiar su propia función. A los administradores no se les rastrea la ubicación a menos que lo activen ellos mismos.'
   });
 
+  Object.assign(ES, { '📍 Route Map': '📍 Mapa de rutas', 'Only admins can see live locations.': 'Solo los administradores pueden ver las ubicaciones en vivo.' });
+
   /* ---------------- phrases with changing parts ---------------- */
   var ST = { 'pending': 'pendiente', 'en route': 'en camino', 'at location': 'en el lugar', 'completed': 'completada', 'postponed': 'pospuesta', 'returned part': 'pieza devuelta', 'returned': 'devuelta' };
   var STC = { 'Pending': 'Pendiente', 'En Route': 'En camino', 'At Location': 'En el lugar', 'Completed': 'Completada', 'Postponed': 'Pospuesta', 'Returned Part': 'Pieza devuelta' };

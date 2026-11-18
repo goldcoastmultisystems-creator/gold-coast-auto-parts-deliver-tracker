@@ -801,14 +801,7 @@ function attachFirebaseListeners() {
     openChecksFromRecords = n; updateChecksBadge();
   });
   if (typeof loadInventory === 'function') loadInventory();
-  fbDb.ref('gcap/drivers').on('value', function(snap) {
-    driverPositions = snap.val() || {};
-    renderLiveMapMarkers();
-    renderDriverListPanel();
-    checkStaleDrivers();
-    refreshEtaChips();
-    updateLiveMapButton();
-  });
+  attachDriversListener();
 }
 function setSyncStatus(state) {
   var dot = document.getElementById('syncDot');
@@ -866,6 +859,8 @@ function toggleTrackingPaused() {
   updateTrackingForRole();
   if (nowPaused) showToast('📍 Location tracking paused.', 'red');
 }
+/* Only the owner and admins can see where drivers are (map, list, route, ETA tags). Drivers still share their own location. */
+function canSeeTracking() { return !!session && (session.type === 'owner' || !!session.isAdmin); }
 function isTrackableSession() {
   return DRIVER_TRACKING_ENABLED && !!(session && session.type === 'guest' && session.role === 'Driver');
 }
@@ -918,7 +913,22 @@ function syncTrackingToggleUI() {
   btn.textContent = paused ? '📍 Tracking: OFF' : '📍 Tracking: ON';
   btn.classList.toggle('tracking-off', paused);
 }
+var driversListenerOn = false;
+function attachDriversListener() {
+  if (driversListenerOn || !fbDb || !canSeeTracking()) return;
+  driversListenerOn = true;
+  fbDb.ref('gcap/drivers').on('value', function(snap) {
+    driverPositions = canSeeTracking() ? (snap.val() || {}) : {};
+    renderLiveMapMarkers();
+    renderDriverListPanel();
+    checkStaleDrivers();
+    refreshEtaChips();
+    updateLiveMapButton();
+  });
+}
 function updateTrackingForRole() {
+  attachDriversListener();
+  updateLiveMapButton();
   if (isTrackableSession() && FIREBASE_ENABLED && !isTrackingPaused()) ensureTrackingConsent(function() { if (isTrackableSession() && !isTrackingPaused()) startLocationTracking(); });
   else stopLocationTracking();
   syncTrackingToggleUI();
@@ -991,7 +1001,7 @@ function etaInfo(pos, stop) {
 }
 /* "📍 Anthony is 3.2 mi away • ~9 min", plus a red warning if that is after the customer closes */
 function etaChipInfo(s) {
-  if (!DRIVER_TRACKING_ENABLED || !s.assignedTo || ['pending', 'onway', 'arrived'].indexOf(s.status) === -1) return null;
+  if (!DRIVER_TRACKING_ENABLED || !canSeeTracking() || !s.assignedTo || ['pending', 'onway', 'arrived'].indexOf(s.status) === -1) return null;
   var pos = findDriverPos(s.assignedTo);
   if (!pos || driverLiveState(pos).k === 'stale') return null;
   var next = driverNextStop(s.assignedTo);
@@ -1018,8 +1028,8 @@ setInterval(refreshEtaChips, 20000);
 function liveDriverCount() { return Object.keys(driverPositions || {}).filter(function(id) { return driverLiveState(driverPositions[id]).k !== 'stale'; }).length; }
 function updateLiveMapButton() {
   var b = document.getElementById('liveMapBtn'); if (!b) return;
-  var n = DRIVER_TRACKING_ENABLED ? liveDriverCount() : 0;
-  b.textContent = '📍 Live Map' + (n ? ' (' + n + ')' : '');
+  var n = (DRIVER_TRACKING_ENABLED && canSeeTracking()) ? liveDriverCount() : 0;
+  b.textContent = canSeeTracking() ? '📍 Live Map' + (n ? ' (' + n + ')' : '') : '📍 Route Map';
 }
 function driverPopupHtml(id, d) {
   var st = driverLiveState(d), next = driverNextStop(d.name), e = next ? etaInfo(d, next) : null;
@@ -1050,7 +1060,7 @@ function toggleDriverTrail(id) {
 }
 /* routes older than 14 days are cleared (done by dispatchers/admins when they open the map) */
 function pruneOldTrails() {
-  if (!fbDb || !canAssignRoutes()) return;
+  if (!fbDb || !canSeeTracking()) return;
   fbDb.ref('gcap/driverTrail').orderByKey().endAt(gcapEt.shiftKey(todayKey(), -14)).once('value').then(function(snap) {
     snap.forEach(function(x) { fbDb.ref('gcap/driverTrail/' + x.key).remove().catch(function() {}); });
   }).catch(function() {});
@@ -1088,7 +1098,7 @@ function openLiveMap() {
     leafletMap = L.map('liveMapEl', { zoomControl: true }).setView([27.6648, -81.5158], 7); // Florida
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors', maxZoom: 19 }).addTo(leafletMap);
   }
-  document.getElementById('mapTitle').textContent = DRIVER_TRACKING_ENABLED ? 'Live Driver Map' : 'Route Map';
+  document.getElementById('mapTitle').textContent = (DRIVER_TRACKING_ENABLED && canSeeTracking()) ? 'Live Driver Map' : 'Route Map';
   mapNeedsFit = true;
   pruneOldTrails();
   geocodeAllStops();
@@ -1151,7 +1161,7 @@ function renderLiveMapMarkers() {
   });
 
   /* live driver positions (only while driver tracking is enabled) */
-  var ids = DRIVER_TRACKING_ENABLED ? Object.keys(driverPositions || {}) : [];
+  var ids = (DRIVER_TRACKING_ENABLED && canSeeTracking()) ? Object.keys(driverPositions || {}) : [];
   ids.forEach(function(id) {
     var d = driverPositions[id];
     if (typeof d.lat !== 'number' || typeof d.lng !== 'number') return;
@@ -1199,7 +1209,7 @@ function renderDriverListPanel() {
     }
     html += '<div style="padding:10px 0; border-bottom:1px solid var(--glass-border);">' + head + body + '</div>';
   });
-  if (DRIVER_TRACKING_ENABLED) html += driversLiveListHtml();
+  if (DRIVER_TRACKING_ENABLED && canSeeTracking()) html += driversLiveListHtml();
   html += '<div style="font-size:11px; color:var(--text-soft); margin-top:10px;"><b style="color:var(--gold-2);">🏭 ' + escapeHtml(DEPOT.name) + '</b><br>' + escapeHtml(DEPOT.address) + '<br>This is the start point. Distances are straight-line. Each route has its own color and is numbered the same way as on the board.</div>';
   el.innerHTML = html;
 }
@@ -3904,7 +3914,7 @@ var currentStaleList = [];
 function fmtTimeFromMs(ms) { return gcapEt.timeStr(ms); }
 function checkStaleDrivers() {
   var el = document.getElementById('staleDriverBanner');
-  if (!DRIVER_TRACKING_ENABLED) { if (el) el.style.display = 'none'; return; }
+  if (!DRIVER_TRACKING_ENABLED || !canSeeTracking()) { if (el) el.style.display = 'none'; return; }
   if (!el || !driverPositions || !currentDay) return;
   var names = Object.keys(driverPositions).map(function(id) { return driverPositions[id].name; }).filter(Boolean);
   var uniqueNames = names.filter(function(n, i) { return names.indexOf(n) === i; });
