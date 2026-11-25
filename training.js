@@ -99,6 +99,25 @@
       ]),
       tip: T('If videos are not working, you can continue with photos only — it is marked “no video”.', 'Si los videos no funcionan, puedes continuar solo con fotos — queda marcado como “sin video”.') },
 
+    { id: 'cases', roles: ['dispatcher', 'warehouse', 'sales', 'owner'], icon: '↩',
+      title: T('Cancellations, returns & refunds', 'Cancelaciones, devoluciones y reembolsos'),
+      steps: T([
+        'Open “↩ Cancellations, Returns & Refunds” from the delivery board or the dashboard chooser. Every customer request is one case (CR-0001, CR-0002…).',
+        'Start a case with “+ New Case”, from 🧾 Zoho Orders (✖ Cancel order / ↩ Return / 💲 Refund on an order), or from a stop on the delivery board (the link under the status buttons).',
+        'Cancellation: “✓ Approve cancellation” takes the stop off the delivery board. If it was already delivered, the app offers to turn it into a Return.',
+        'Return: “🚚 Schedule pickup” puts a red RETURN stop on today’s board for the driver. When the driver marks it Completed the case moves to “Picked up” by itself. Then “🔍 Inspect part”: condition + photo + video.',
+        'A “Returned Part” on the delivery board (the shop refused it) opens a Return case automatically, and shelving it on either page updates the other.',
+        'Refunds: anyone who handles cases can ask for one (“💲 Refund needed”). Only the owner or an admin can approve it and mark it refunded.'
+      ], [
+        'Abre “↩ Cancelaciones, devoluciones y reembolsos” desde el tablero de entregas o el selector de tableros. Cada solicitud de un cliente es un caso (CR-0001, CR-0002…).',
+        'Empieza un caso con “+ Nuevo caso”, desde 🧾 Pedidos de Zoho (✖ Cancelar pedido / ↩ Devolución / 💲 Reembolso en un pedido), o desde una parada del tablero de entregas (el enlace debajo de los botones de estado).',
+        'Cancelación: “✓ Aprobar cancelación” quita la parada del tablero de entregas. Si ya se entregó, la aplicación ofrece convertirla en una devolución.',
+        'Devolución: “🚚 Programar recogida” pone una parada roja de DEVOLUCIÓN en el tablero de hoy para el conductor. Cuando el conductor la marca Completada, el caso pasa a “Recogido” solo. Luego “🔍 Inspeccionar pieza”: condición + foto + video.',
+        'Una “Pieza devuelta” en el tablero de entregas (el taller la rechazó) abre un caso de devolución automáticamente, y guardarla en cualquiera de las dos páginas actualiza la otra.',
+        'Reembolsos: cualquiera que maneje casos puede pedir uno (“💲 Se necesita reembolso”). Solo el dueño o un administrador puede aprobarlo y marcarlo como reembolsado.'
+      ]),
+      tip: T('Tap a case chip on a delivery stop (for example “↩ CR-0007 • Return pickup scheduled”) to jump straight to that case.', 'Toca la etiqueta del caso en una parada (por ejemplo “↩ CR-0007 • Devolución recogida programada”) para ir directo a ese caso.') },
+
     { id: 'checks', roles: ['driver', 'dispatcher'], icon: '💵',
       title: T('Checks from customers', 'Cheques de los clientes'),
       steps: T([

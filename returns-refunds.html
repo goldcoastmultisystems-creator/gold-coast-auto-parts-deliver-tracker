@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Gold Coast Auto Parts — Cancellations, Returns & Refunds</title>
+<link rel="icon" type="image/png" href="./favicon.png">
+<link rel="apple-touch-icon" href="./favicon.png">
+<script src="safe-store.js"></script>
+<script src="theme.js"></script>
+<script src="i18n.js"></script>
+<style>
+:root {
+  color-scheme: dark;
+  --void: #07070a;
+  --glass: rgba(255,255,255,0.045);
+  --glass-border: rgba(255,255,255,0.10); --glass-border-gold: rgba(212,164,65,0.45);
+  --gold: #d4a441; --gold-2: #f2d38a; --gold-ink: #1a1305;
+  --green: #34d399; --red: #f87171; --amber: #fbbf24; --blue: #60a5fa;
+  --text: #f3f1ec; --text-soft: #a39d94;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: radial-gradient(ellipse 900px 700px at 15% 0%, rgba(212,164,65,0.18), transparent 60%), var(--void); color: var(--text); min-height: 100vh; }
+header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--glass-border-gold); background: rgba(10,9,6,0.8); }
+header .brand { display: flex; align-items: center; gap: 12px; }
+header img { height: 34px; }
+header h1 { font-size: 15px; margin: 0; }
+header .sub { font-size: 11.5px; color: var(--gold-2); }
+.hdr-btn { background: var(--glass); border: 1px solid var(--glass-border); color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.hdr-btn:hover { background: rgba(212,164,65,0.16); border-color: var(--glass-border-gold); }
+.hdr-btn.primary { background: linear-gradient(135deg, var(--gold), #b9862a); color: var(--gold-ink); border-color: transparent; }
+main { max-width: 1000px; margin: 0 auto; padding: 16px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stat { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; padding: 12px; text-align: center; color: inherit; font: inherit; cursor: pointer; }
+.stat:hover { border-color: var(--glass-border-gold); }
+.stat .num { font-size: 22px; font-weight: 800; }
+.stat .lbl { font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
+.stat.alert { border-color: rgba(248,113,113,0.5); }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.controls input[type=search] { flex: 1 1 260px; border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px 12px; font-size: 14px; background: rgba(255,255,255,0.06); color: var(--text); }
+.seg { display: flex; flex-wrap: wrap; border: 1px solid var(--glass-border); border-radius: 10px; overflow: hidden; }
+.seg button { background: transparent; border: none; color: var(--text-soft); padding: 9px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.seg button.active { background: rgba(212,164,65,0.22); color: var(--gold-2); }
+.meta { font-size: 12px; color: var(--text-soft); margin-bottom: 8px; }
+.notice { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.4); color: var(--amber); border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-bottom: 12px; }
+.btn { border: none; border-radius: 10px; padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-gold { background: linear-gradient(135deg, var(--gold), #b9862a); color: var(--gold-ink); }
+.btn-navy { background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border-gold); color: var(--gold-2); }
+.btn-navy:hover { background: rgba(212,164,65,0.14); }
+.btn-ghost { background: transparent; border: 1px solid var(--glass-border); color: var(--text-soft); }
+.btn-ghost:hover { border-color: rgba(255,255,255,0.25); color: var(--text); }
+.btn-red { background: rgba(248,113,113,0.14); border: 1px solid rgba(248,113,113,0.55); color: var(--red); }
+.btn-green { background: rgba(52,211,153,0.14); border: 1px solid rgba(52,211,153,0.55); color: var(--green); }
+.btn-sm { padding: 6px 10px; font-size: 12px; border-radius: 7px; }
+/* case cards — same feel as the delivery stop cards */
+.case-card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; margin-bottom: 12px; }
+.case-card.flash { box-shadow: 0 0 0 2px var(--gold); }
+.case-card.closed { opacity: .72; }
+.case-banner { text-align: center; font-size: 13px; font-weight: 800; letter-spacing: .3px; padding: 8px 16px; color: #fff; }
+.case-banner.t-cancel { background: linear-gradient(135deg, #b3261e, #d64537); }
+.case-banner.t-return { background: linear-gradient(135deg, #a16207, #d99a1e); }
+.case-banner.t-refund { background: linear-gradient(135deg, #0f8a5f, #14b37d); }
+.case-head { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px 4px; flex-wrap: wrap; }
+.case-id { font-weight: 800; color: var(--gold-2); font-size: 13px; border: 1px solid var(--glass-border-gold); border-radius: 8px; padding: 3px 8px; white-space: nowrap; }
+.case-title { flex: 1 1 220px; min-width: 0; }
+.case-title .cust { font-weight: 800; font-size: 15px; }
+.case-title .sub { font-size: 12px; color: var(--text-soft); margin-top: 2px; }
+.case-amt { font-weight: 800; font-size: 15px; white-space: nowrap; }
+.case-body { padding: 4px 14px 14px; }
+.stages { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0 10px; }
+.stage { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--glass-border); color: var(--text-soft); }
+.stage.done { border-color: rgba(52,211,153,0.5); color: var(--green); }
+.stage.now { border-color: var(--gold); color: var(--gold-2); background: rgba(212,164,65,0.16); }
+.stage.bad { border-color: rgba(248,113,113,0.6); color: var(--red); background: rgba(248,113,113,0.12); }
+.details { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; font-size: 12.5px; }
+.details .full { grid-column: 1 / -1; }
+.details b { color: var(--text-soft); font-weight: 700; }
+.link-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 99px; border: 1px solid rgba(96,165,250,0.5); color: var(--blue); background: rgba(96,165,250,0.1); cursor: pointer; text-decoration: none; }
+.refund-box { margin-top: 10px; border: 1px solid rgba(52,211,153,0.35); background: rgba(52,211,153,0.07); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; }
+.refund-box.denied { border-color: rgba(248,113,113,0.4); background: rgba(248,113,113,0.07); }
+.refund-box .rhead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-weight: 800; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.hist { margin-top: 10px; border-top: 1px solid var(--glass-border); padding-top: 8px; font-size: 12px; }
+.hist div { padding: 2px 0; color: var(--text-soft); }
+.hist b { color: var(--text); font-weight: 600; }
+.pill { display: inline-block; border-radius: 99px; padding: 2px 9px; font-size: 11px; font-weight: 800; white-space: nowrap; border: 1px solid currentColor; }
+.hist-empty { font-size: 12.5px; color: var(--text-soft); font-style: italic; padding: 10px 4px; }
+.team-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--glass-border); flex-wrap: wrap; }
+.team-row .tname { font-weight: 700; color: var(--text); font-size: 13.5px; }
+.chat-msg { font-size: 12.5px; padding: 4px 0px; display: flex; gap: 6px; }
+.chat-msg.ai { background: rgba(212,164,65,0.08); border: 1px solid rgba(212,164,65,0.2); border-radius: 7px; padding: 5px 8px; margin: 2px 0; }
+.chat-msg .who { font-weight: 700; color: var(--gold-2); white-space: nowrap; }
+.chat-input-row { display: flex; gap: 6px; }
+.chat-input-row input { flex: 1 1 0%; border: 1px solid var(--glass-border); border-radius: 7px; padding: 7px 10px; font-size: 12.5px; background: rgba(255,255,255,0.06); color: var(--text); }
+.modal-backdrop { position: fixed; inset: 0px; background: rgba(0,0,0,0.65); backdrop-filter: blur(6px); display: none; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto; z-index: 50; }
+.modal-backdrop.open { display: flex; }
+.modal { background: rgba(20,17,12,0.94); border: 1px solid var(--glass-border-gold); box-shadow: 0 24px 80px rgba(0,0,0,0.6); border-radius: 18px; max-width: 560px; width: 100%; padding: 20px; margin-top: 20px; color: var(--text); }
+.modal.wide { max-width: 640px; }
+.modal h3 { margin: 0px 0px 6px; color: var(--gold-2); font-size: 16px; }
+.modal .modal-sub { font-size: 12.5px; color: var(--text-soft); margin: 0px 0px 14px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 16px; }
+.edit-input { width: 100%; border: 1px solid var(--glass-border); border-radius: 8px; padding: 8px 10px; font-size: 13px; background: rgba(255,255,255,0.06); color: var(--text); font-family: inherit; }
+select.edit-input option { color: #111; }
+.edit-label { display: block; font-size: 11.5px; font-weight: 700; color: var(--text-soft); margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .3px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.type-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.type-pick button { text-align: left; cursor: pointer; font: inherit; padding: 10px 12px; border-radius: 10px; color: var(--text); background: transparent; border: 1.5px solid var(--glass-border); }
+.type-pick button b { display: block; font-size: 13px; }
+.type-pick button span { font-size: 11px; color: var(--text-soft); }
+.type-pick button.on { border-color: var(--gold); background: rgba(212,164,65,0.16); }
+.check-row { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; margin: 12px 0 2px; }
+.check-row input { width: auto; }
+.update-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(120px); background: rgba(20,17,12,0.96); border: 1px solid var(--glass-border-gold); color: var(--text); border-radius: 12px; padding: 12px 18px; font-size: 13px; font-weight: 700; z-index: 2000; transition: transform .25s; max-width: 90vw; }
+.update-toast.show { transform: translateX(-50%) translateY(0); }
+.update-toast.green { border-color: rgba(52,211,153,0.6); }
+.update-toast.red { border-color: rgba(248,113,113,0.7); }
+html[data-theme="light"] .modal { background: rgba(255,255,255,0.98); }
+html[data-theme="light"] .update-toast { background: #fff; }
+@media (max-width: 640px) { .details, .row2 { grid-template-columns: 1fr; } .type-pick { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img src="gca-logo.png" alt="Gold Coast Auto Parts">
+    <div><h1>Cancellations, Returns &amp; Refunds</h1><div class="sub" id="who"></div></div>
+  </div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <button class="hdr-btn primary" id="newCaseBtn" onclick="openNewCase()" style="display:none;">+ New Case</button>
+    <button class="hdr-btn" onclick="openZohoOrders()">🧾 Zoho Orders</button>
+    <button class="hdr-btn" onclick="downloadCasesCsv()">⬇ CSV</button>
+    <button class="hdr-btn" onclick="openAssistantModal()">🤖 Ask AI</button>
+    <button class="hdr-btn" onclick="openTraining()">🎓 Training</button>
+    <button class="hdr-btn" id="backDelivery" onclick="location.href='index.html'">🚚 Delivery Board</button>
+    <button class="hdr-btn" id="backSales" onclick="location.href='sales-routes.html'" style="display:none;">🧾 Sales Routes</button>
+    <button class="hdr-btn" onclick="doLogout()">Log Out</button>
+  </div>
+</header>
+<main>
+  <div id="notice"></div>
+  <div class="stats" id="stats"></div>
+  <div class="controls">
+    <input id="q" type="search" placeholder="Search case #, customer, SO#, part, reason…" oninput="renderCases()" autocomplete="off">
+  </div>
+  <div class="controls">
+    <div class="seg" id="typeSeg">
+      <button data-v="all" class="active" onclick="setTypeFilter('all')">All</button>
+      <button data-v="cancel" onclick="setTypeFilter('cancel')">✖ Cancellations</button>
+      <button data-v="return" onclick="setTypeFilter('return')">↩ Returns</button>
+      <button data-v="refund" onclick="setTypeFilter('refund')">💲 Refunds</button>
+    </div>
+    <div class="seg" id="stateSeg">
+      <button data-v="open" class="active" onclick="setStateFilter('open')">Open</button>
+      <button data-v="refundWait" onclick="setStateFilter('refundWait')">Refunds to approve / pay</button>
+      <button data-v="closed" onclick="setStateFilter('closed')">Closed</button>
+      <button data-v="all" onclick="setStateFilter('all')">All</button>
+    </div>
+  </div>
+  <div class="meta" id="meta"></div>
+  <div id="caseList"><div class="hist-empty">Loading…</div></div>
+</main>
+
+<!-- New case -->
+<div class="modal-backdrop" id="caseModal">
+  <div class="modal wide">
+    <h3 id="cmTitle">New case</h3>
+    <p class="modal-sub" id="cmSub">What does the customer want?</p>
+    <div class="type-pick" id="cmTypes"></div>
+    <div class="row2">
+      <div><label class="edit-label">Customer *</label><input class="edit-input" id="cmCustomer" placeholder="Body shop / customer name"></div>
+      <div><label class="edit-label">Sales Order #</label><input class="edit-input" id="cmSo" placeholder="SO-00123"></div>
+    </div>
+    <label class="edit-label">Address</label><input class="edit-input" id="cmAddr" placeholder="Where the part is / where to pick it up">
+    <label class="edit-label">Part(s)</label><textarea class="edit-input" id="cmItems" rows="2" placeholder="1× Front bumper (SKU…)"></textarea>
+    <div class="row2">
+      <div><label class="edit-label">Order amount</label><input class="edit-input" id="cmAmount" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div><label class="edit-label">MOP (how they paid)</label><input class="edit-input" id="cmMop" placeholder="Cash / Check / Charge Account…"></div>
+    </div>
+    <div class="row2">
+      <div><label class="edit-label">Reason *</label><select class="edit-input" id="cmReason"></select></div>
+      <div><label class="edit-label">Delivery stop</label><select class="edit-input" id="cmStop"><option value="">— Not on the delivery board —</option></select></div>
+    </div>
+    <label class="edit-label">Notes</label><input class="edit-input" id="cmNotes" placeholder="Anything the team should know">
+    <div id="cmRefundWrap">
+      <label class="check-row" id="cmRefundToggleRow"><input type="checkbox" id="cmRefundOn" onchange="renderNewCaseRefund()"> 💲 The customer already paid — a refund is needed</label>
+      <div class="row2" id="cmRefundFields">
+        <div><label class="edit-label">Refund amount *</label><input class="edit-input" id="cmRefundAmt" type="number" min="0" step="0.01" placeholder="0.00"></div>
+        <div><label class="edit-label">Refund how</label><select class="edit-input" id="cmRefundMethod"></select></div>
+      </div>
+    </div>
+    <div id="cmPickupWrap">
+      <label class="check-row"><input type="checkbox" id="cmPickupOn" onchange="renderNewCasePickup()"> 🚚 Put the pickup on today's delivery board now</label>
+      <div id="cmPickupFields"><label class="edit-label">Driver</label><select class="edit-input" id="cmDriver"></select></div>
+    </div>
+    <div id="cmMsg" style="font-size:12px; color:var(--amber); margin-top:10px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('caseModal')">Cancel</button>
+      <button class="btn btn-gold" id="cmSave" onclick="saveNewCase()">Create case</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule pickup -->
+<div class="modal-backdrop" id="pickupModal">
+  <div class="modal">
+    <h3>🚚 Schedule the return pickup</h3>
+    <p class="modal-sub" id="pkSub"></p>
+    <label class="edit-label">Driver</label><select class="edit-input" id="pkDriver"></select>
+    <p class="modal-sub" style="margin-top:10px;">It goes on <b>today's</b> delivery board as a red “↩ RETURN PART” stop. When the driver marks it Completed, this case moves to “Picked up” by itself.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('pickupModal')">Cancel</button>
+      <button class="btn btn-gold" id="pkSave" onclick="confirmPickup()">Add to delivery board</button>
+    </div>
+  </div>
+</div>
+
+<!-- Inspect returned part -->
+<div class="modal-backdrop" id="inspectModal">
+  <div class="modal wide">
+    <h3>🔍 Inspect the returned part</h3>
+    <p class="modal-sub" id="inSub"></p>
+    <div id="inConditions" style="display:grid; gap:8px;"></div>
+    <label class="edit-label">Photo + video of the part</label>
+    <div id="inMedia" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;"></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-navy btn-sm" onclick="document.getElementById('inPhoto').click()">📷 Add photo</button>
+      <button class="btn btn-navy btn-sm" onclick="document.getElementById('inVideo').click()">🎥 Add video</button>
+    </div>
+    <input type="file" id="inPhoto" accept="image/*" capture="environment" style="display:none" onchange="inspectFile(this, 'photo')">
+    <input type="file" id="inVideo" accept="video/*" capture="environment" style="display:none" onchange="inspectFile(this, 'video')">
+    <label class="edit-label">Notes</label><input class="edit-input" id="inNotes" placeholder="Scratches on the left corner…">
+    <div id="inMsg" style="font-size:12px; color:var(--amber); margin-top:10px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeInspect()">Cancel</button>
+      <button class="btn btn-gold" id="inSave" onclick="confirmInspect()">Save inspection</button>
+    </div>
+  </div>
+</div>
+
+<!-- Refund -->
+<div class="modal-backdrop" id="refundModal">
+  <div class="modal">
+    <h3 id="rfTitle">💲 Refund</h3>
+    <p class="modal-sub" id="rfSub"></p>
+    <div class="row2">
+      <div><label class="edit-label">Amount *</label><input class="edit-input" id="rfAmount" type="number" min="0" step="0.01"></div>
+      <div><label class="edit-label">How</label><select class="edit-input" id="rfMethod"></select></div>
+    </div>
+    <label class="edit-label" id="rfRefLabel">Reference (check #, transaction ID…)</label><input class="edit-input" id="rfRef">
+    <label class="edit-label">Note</label><input class="edit-input" id="rfNote">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('refundModal')">Cancel</button>
+      <button class="btn btn-gold" id="rfSave" onclick="confirmRefund()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Inspection proof viewer -->
+<div class="modal-backdrop" id="proofView">
+  <div class="modal wide">
+    <h3 id="pvTitle">Inspection photos</h3>
+    <p class="modal-sub" id="pvSub"></p>
+    <div id="pvMedia" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('proofView')">Close</button></div>
+  </div>
+</div>
+
+<div class="update-toast" id="updateToast"><span id="updateToastMsg"></span></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
+<script src="cases-lib.js"></script>
+<script>
+var FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBQiE4TlMIcO6iyCob2G1js3eEVcmmjNmI",
+  authDomain: "gold-coast-auto-parts.firebaseapp.com",
+  databaseURL: "https://gold-coast-auto-parts-default-rtdb.firebaseio.com",
+  projectId: "gold-coast-auto-parts",
+  storageBucket: "gold-coast-auto-parts.firebasestorage.app",
+  messagingSenderId: "610239286841"
+};
+var FIREBASE_ENABLED = true;
+var fbDb = null, fbStorage = null, session = null, settings = {}, customerMop = {};
+var typeFilter = 'all', stateFilter = 'open', openHistory = {}, loadedOnce = false, flashId = null;
+var toastTimer = null;
+
+function escapeHtml(s) { return caseEsc(s); }
+function doLogout() { gcapSaveSession(null); location.href = 'index.html'; }
+function showToast(msg, cls, duration) {
+  var t = document.getElementById('updateToast');
+  document.getElementById('updateToastMsg').textContent = msg;
+  t.className = 'update-toast show' + (cls ? ' ' + cls : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { t.className = 'update-toast'; }, duration || 3500);
+}
+function showNotice(msg) { document.getElementById('notice').innerHTML = msg ? '<div class="notice">' + escapeHtml(msg) + '</div>' : ''; }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function fmtWhen(ms) { return ms ? new Date(ms).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : ''; }
+function activeDriverNames() { return (settings.team || []).filter(function(m) { return m && m.role === 'Driver' && m.active !== false; }).map(function(m) { return m.name; }); }
+function driverOptionsHtml(selected) {
+  return '<option value="">— Unassigned —</option>' + activeDriverNames().map(function(n) { return '<option value="' + escapeHtml(n) + '"' + (n === selected ? ' selected' : '') + '>' + escapeHtml(n) + '\'s Route</option>'; }).join('');
+}
+function refundMethodOptions(sel) { return REFUND_METHODS.map(function(m) { return '<option' + (m === sel ? ' selected' : '') + '>' + m + '</option>'; }).join(''); }
+
+session = gcapLoadSession();
+if (!session) {
+  location.href = 'index.html';
+} else {
+  document.getElementById('who').textContent = (session.name || '') + (session.role ? ' • ' + session.role : '');
+  var isSalesOnly = session.type === 'guest' && !session.isAdmin && session.role === 'Sales Rep';
+  document.getElementById('backDelivery').style.display = isSalesOnly ? 'none' : '';
+  document.getElementById('backSales').style.display = isSalesOnly || caseIsAdmin() ? '' : 'none';
+  document.getElementById('newCaseBtn').style.display = caseCanCreate() ? '' : 'none';
+  startFirebase();
+}
+
+function startFirebase() {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  fbDb = firebase.database();
+  try { fbStorage = firebase.storage(); } catch (e) { console.error('storage unavailable', e); }
+  firebase.auth().onAuthStateChanged(function(user) {
+    if (!user) return;
+    if (typeof loadInventory === 'function') loadInventory();   // parts lookup for Zoho lines / Ask AI, now that we're signed in
+    fbDb.ref('gcap/settings/team').on('value', function(snap) { settings.team = snap.val() || []; if (!Array.isArray(settings.team)) settings.team = Object.keys(settings.team).map(function(k) { return settings.team[k]; }); });
+    fbDb.ref('gcap/customerMop').on('value', function(snap) { customerMop = snap.val() || {}; });
+    casesListen(function() {
+      var first = !loadedOnce; loadedOnce = true;
+      renderAll();
+      if (first) handleLink();
+    });
+  });
+  firebase.auth().signInAnonymously().catch(function() { showNotice('Could not connect. Check your internet and refresh.'); });
+}
+
+/* index.html#CR-0007 opens that case; ?from=stop&day=…&stop=… starts a case for a delivery stop */
+function handleLink() {
+  var m = /CR-\d+/i.exec(location.hash || '');
+  if (m) { var id = m[0].toUpperCase(); focusCase(id); }
+  var p = new URLSearchParams(location.search);
+  if (p.get('from') === 'stop' && p.get('day') && p.get('stop')) {
+    caseFindStop(p.get('day'), p.get('stop')).then(function(s) {
+      if (!s) { showToast('That delivery stop was not found.', 'red'); return; }
+      if (s.caseId && casesData[s.caseId]) { focusCase(s.caseId); showToast('This stop already has case ' + s.caseId + '.', ''); return; }
+      openNewCase({ type: s.status === 'completed' ? 'return' : 'cancel', customer: s.loc, address: s.addr, so: s.so, items: s.part, mop: s.mop, zohoId: s.zohoId, stopKey: p.get('day') + '|' + s.id });
+    });
+    history.replaceState(null, '', location.pathname + location.hash);
+  }
+}
+function focusCase(id) {
+  if (!casesData[id]) return;
+  stateFilter = 'all'; typeFilter = 'all'; syncSegs();
+  document.getElementById('q').value = id;
+  flashId = id; openHistory[id] = true;
+  renderCases();
+  var el = document.getElementById('case_' + id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ---------- list ---------- */
+function setTypeFilter(v) { typeFilter = v; syncSegs(); renderCases(); }
+function setStateFilter(v) { stateFilter = v; syncSegs(); renderCases(); }
+function syncSegs() {
+  Array.prototype.forEach.call(document.querySelectorAll('#typeSeg button'), function(b) { b.classList.toggle('active', b.getAttribute('data-v') === typeFilter); });
+  Array.prototype.forEach.call(document.querySelectorAll('#stateSeg button'), function(b) { b.classList.toggle('active', b.getAttribute('data-v') === stateFilter); });
+}
+function refundWaiting(c) { return !!(c.refund && (c.refund.status === 'pending' || c.refund.status === 'approved')); }
+function renderAll() { renderStats(); renderCases(); if (typeof renderZohoList === 'function' && document.getElementById('zohoList')) renderZohoList(); }
+function renderStats() {
+  var all = caseList(), open = all.filter(caseIsOpen);
+  var monthKey = gcapEt.dateKey(Date.now()).slice(0, 7);
+  var waiting = all.filter(refundWaiting), waitAmt = waiting.reduce(function(a, c) { return a + (Number(c.refund.amount) || 0); }, 0);
+  var paid = all.filter(function(c) { return c.refund && c.refund.status === 'refunded' && c.refund.paidAt && gcapEt.dateKey(c.refund.paidAt).slice(0, 7) === monthKey; });
+  var paidAmt = paid.reduce(function(a, c) { return a + (Number(c.refund.amount) || 0); }, 0);
+  function count(t) { return open.filter(function(c) { return c.type === t; }).length; }
+  document.getElementById('stats').innerHTML =
+    '<button class="stat" onclick="setTypeFilter(\'all\'); setStateFilter(\'open\')"><div class="num">' + open.length + '</div><div class="lbl">Open cases</div></button>' +
+    '<button class="stat" onclick="setTypeFilter(\'cancel\'); setStateFilter(\'open\')"><div class="num" style="color:var(--red)">' + count('cancel') + '</div><div class="lbl">Cancellations open</div></button>' +
+    '<button class="stat" onclick="setTypeFilter(\'return\'); setStateFilter(\'open\')"><div class="num" style="color:var(--amber)">' + count('return') + '</div><div class="lbl">Returns open</div></button>' +
+    '<button class="stat' + (waiting.length ? ' alert' : '') + '" onclick="setTypeFilter(\'all\'); setStateFilter(\'refundWait\')"><div class="num" style="color:var(--green)">' + waiting.length + (waitAmt ? ' <span style="font-size:13px;">(' + caseMoney(waitAmt) + ')</span>' : '') + '</div><div class="lbl">Refunds to approve / pay</div></button>' +
+    '<button class="stat" onclick="setTypeFilter(\'all\'); setStateFilter(\'closed\')"><div class="num">' + caseMoney(paidAmt || 0) + '</div><div class="lbl">Refunded this month</div></button>';
+}
+function caseMatches(c, tokens) {
+  var hay = [c.id, c.customer, c.so, c.items, c.reason, c.notes, c.address, c.createdBy, c.pickup && c.pickup.driver].join(' ').toLowerCase();
+  return tokens.every(function(t) { return hay.indexOf(t) !== -1; });
+}
+function visibleCases() {
+  var tokens = document.getElementById('q').value.toLowerCase().split(/\s+/).filter(Boolean);
+  return caseList().filter(function(c) {
+    if (typeFilter !== 'all' && c.type !== typeFilter) return false;
+    if (stateFilter === 'open' && !caseIsOpen(c)) return false;
+    if (stateFilter === 'closed' && caseIsOpen(c)) return false;
+    if (stateFilter === 'refundWait' && !refundWaiting(c)) return false;
+    return !tokens.length || caseMatches(c, tokens);
+  }).sort(function(a, b) { return (caseIsOpen(b) ? 1 : 0) - (caseIsOpen(a) ? 1 : 0) || (b.createdAt || 0) - (a.createdAt || 0); });
+}
+function renderCases() {
+  var el = document.getElementById('caseList');
+  if (!loadedOnce) return;
+  var list = visibleCases();
+  document.getElementById('meta').textContent = list.length + ' case' + (list.length === 1 ? '' : 's') + (caseCanEdit() ? '' : (caseCanCreate() ? ' • you can open new cases; dispatch and admins move them along' : ' • view only'));
+  el.innerHTML = list.map(caseCardHtml).join('') || '<div class="hist-empty">' + (caseList().length ? 'No cases match.' : 'No cases yet. Tap “+ New Case”, or open Zoho Orders and use ✖ Cancel / ↩ Return / 💲 Refund on an order.') + '</div>';
+  if (flashId) { var id = flashId; setTimeout(function() { var c = document.getElementById('case_' + id); if (c) c.classList.remove('flash'); if (flashId === id) flashId = null; }, 2500); }
+}
+function stagesHtml(c) {
+  var steps = CASE_STAGES[c.type] || [], at = steps.indexOf(c.stage), bad = c.stage === 'rejected' || c.stage === 'denied';
+  var html = steps.map(function(st, i) {
+    var cls = bad ? '' : (i < at ? ' done' : (i === at ? ' now' : ''));
+    if (c.stage === 'closed' || c.stage === 'cancelled' || c.stage === 'refunded') cls = i <= at ? ' done' : '';
+    return '<span class="stage' + cls + '">' + (i < at || (cls === ' done') ? '✓ ' : '') + CASE_STAGE_LABEL[st] + '</span>';
+  }).join('<span style="color:var(--text-soft); font-size:11px; align-self:center;">›</span>');
+  if (bad) html += ' <span class="stage bad">✕ ' + CASE_STAGE_LABEL[c.stage] + '</span>';
+  return '<div class="stages">' + html + '</div>';
+}
+function stopChipHtml(link, label) {
+  if (!link || !link.stopId) return '';
+  var st = link.status ? ' • ' + (CASE_STOP_STATUS_LABEL[link.status] || link.status) : '';
+  if (link.removed) return '<span class="link-chip" style="opacity:.6; cursor:default;">🚚 ' + label + ' — taken off the board</span>';
+  return '<a class="link-chip" href="index.html" title="Open the delivery board">🚚 ' + label + (link.driver ? ' — ' + escapeHtml(link.driver) : '') + st + (link.day && link.day !== gcapEt.dateKey(Date.now()) ? ' (' + link.day + ')' : '') + ' →</a>';
+}
+function refundBoxHtml(c) {
+  var r = c.refund;
+  if (!r || !r.status) return '';
+  var k = escapeHtml(c.id), admin = caseCanApproveMoney();
+  var color = r.status === 'refunded' ? 'var(--green)' : (r.status === 'denied' ? 'var(--red)' : 'var(--amber)');
+  var lines = [];
+  if (r.requestedBy) lines.push('Requested by ' + escapeHtml(r.requestedBy) + ' ' + fmtWhen(r.requestedAt));
+  if (r.approvedBy) lines.push('Approved by ' + escapeHtml(r.approvedBy) + ' ' + fmtWhen(r.approvedAt));
+  if (r.paidBy) lines.push('Paid by ' + escapeHtml(r.paidBy) + ' ' + fmtWhen(r.paidAt) + (r.reference ? ' • ref ' + escapeHtml(r.reference) : ''));
+  if (r.deniedBy) lines.push('Denied by ' + escapeHtml(r.deniedBy) + ' ' + fmtWhen(r.deniedAt));
+  if (r.note) lines.push('Note: ' + escapeHtml(r.note));
+  var btns = '';
+  if (r.status === 'pending') btns = admin
+    ? '<button class="btn btn-green btn-sm" onclick="approveRefund(\'' + k + '\')">✓ Approve refund</button><button class="btn btn-red btn-sm" onclick="denyRefund(\'' + k + '\')">✕ Deny</button>'
+    : '<span style="color:var(--text-soft); font-size:12px;">Waiting for the owner / an admin to approve.</span>';
+  else if (r.status === 'approved') btns = admin ? '<button class="btn btn-green btn-sm" onclick="openRefund(\'' + k + '\', \'pay\')">💵 Mark as refunded…</button>' : '<span style="color:var(--text-soft); font-size:12px;">Approved — the owner / an admin pays it out.</span>';
+  return '<div class="refund-box' + (r.status === 'denied' ? ' denied' : '') + '"><div class="rhead">💲 Refund ' + (caseMoney(r.amount) || '') + (r.method ? ' • ' + escapeHtml(r.method) : '') +
+    ' <span class="pill" style="color:' + color + ';">' + (REFUND_STATUS_LABEL[r.status] || r.status) + '</span>' +
+    (caseCanEdit() && (r.status === 'pending' || (admin && r.status === 'approved')) ? '<button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="openRefund(\'' + k + '\', \'edit\')">✎ Edit</button>' : '') + '</div>' +
+    (lines.length ? '<div style="color:var(--text-soft); margin-top:4px;">' + lines.join(' • ') + '</div>' : '') +
+    (btns ? '<div class="actions" style="margin-top:8px;">' + btns + '</div>' : '') + '</div>';
+}
+function caseActionsHtml(c) {
+  var k = escapeHtml(c.id), edit = caseCanEdit(), a = [];
+  if (edit && !c.deleted) {
+    if (c.type === 'cancel' && c.stage === 'requested') {
+      a.push('<button class="btn btn-gold btn-sm" onclick="approveCancel(\'' + k + '\')">✓ Approve cancellation</button>');
+      a.push('<button class="btn btn-ghost btn-sm" onclick="rejectCase(\'' + k + '\')">✕ Reject</button>');
+    }
+    if (c.type === 'return') {
+      if (c.stage === 'requested') {
+        a.push('<button class="btn btn-gold btn-sm" onclick="openPickup(\'' + k + '\')">🚚 Schedule pickup</button>');
+        a.push('<button class="btn btn-navy btn-sm" onclick="markPickedUp(\'' + k + '\', \'dropoff\')">📦 Customer dropped it off</button>');
+        a.push('<button class="btn btn-ghost btn-sm" onclick="rejectCase(\'' + k + '\')">✕ Reject</button>');
+      }
+      if (c.stage === 'pickup_scheduled') a.push('<button class="btn btn-navy btn-sm" onclick="markPickedUp(\'' + k + '\')">📦 Mark picked up</button>');
+      if (c.stage === 'picked_up') a.push('<button class="btn btn-gold btn-sm" onclick="openInspect(\'' + k + '\')">🔍 Inspect part</button>');
+      if (c.stage === 'inspected') a.push('<button class="btn btn-gold btn-sm" onclick="closeCase(\'' + k + '\')">✓ Close case</button>');
+    }
+    if (c.type === 'refund' && c.stage === 'requested' && !(c.refund && c.refund.status)) a.push('<button class="btn btn-gold btn-sm" onclick="openRefund(\'' + k + '\', \'request\')">💲 Add refund details</button>');
+    if (c.type !== 'refund' && !(c.refund && c.refund.status) && c.stage !== 'rejected') a.push('<button class="btn btn-green btn-sm" onclick="openRefund(\'' + k + '\', \'request\')">💲 Refund needed</button>');
+    if (CASE_END[c.stage] && c.stage !== 'refunded' && !refundWaiting(c)) a.push('<button class="btn btn-ghost btn-sm" onclick="reopenCase(\'' + k + '\')">↺ Reopen</button>');
+  }
+  if (c.proofPath || c.hasProof) a.push('<button class="btn btn-navy btn-sm" onclick="viewProof(\'' + k + '\')">📷 Inspection photos</button>');
+  a.push('<button class="btn btn-ghost btn-sm" onclick="shareCase(\'' + k + '\')">↗ Share</button>');
+  a.push('<button class="btn btn-ghost btn-sm" onclick="toggleHistory(\'' + k + '\')">🕘 History' + (openHistory[c.id] ? ' ▴' : ' ▾') + '</button>');
+  if (caseIsAdmin()) a.push('<button class="btn btn-ghost btn-sm" style="color:var(--red); margin-left:auto;" onclick="deleteCase(\'' + k + '\')">🗑 Delete</button>');
+  return '<div class="actions">' + a.join('') + '</div>';
+}
+function caseCardHtml(c) {
+  var t = CASE_TYPES[c.type] || CASE_TYPES['return'], k = escapeHtml(c.id);
+  var cond = caseConditionInfo(c.condition);
+  var amt = caseMoney(c.amount);
+  var hist = c.history ? Object.keys(c.history).map(function(h) { return c.history[h]; }).sort(function(a, b) { return (a.at || 0) - (b.at || 0); }) : [];
+  return '<div class="case-card' + (caseIsOpen(c) ? '' : ' closed') + (flashId === c.id ? ' flash' : '') + '" id="case_' + k + '">' +
+    '<div class="case-banner t-' + c.type + '">' + t.banner + '</div>' +
+    '<div class="case-head"><span class="case-id">' + k + '</span>' +
+      '<div class="case-title"><div class="cust">' + escapeHtml(c.customer || 'Unnamed customer') + '</div>' +
+      '<div class="sub">' + [c.so ? 'SO# ' + escapeHtml(c.so) : '', 'opened ' + fmtWhen(c.createdAt) + ' by ' + escapeHtml(c.createdBy || '—')].filter(Boolean).join(' • ') + '</div></div>' +
+      (amt ? '<div class="case-amt">' + amt + '</div>' : '') + '</div>' +
+    '<div class="case-body">' + stagesHtml(c) +
+      '<div class="details">' +
+        (c.reason ? '<div><b>Reason:</b> ' + escapeHtml(c.reason) + '</div>' : '') +
+        (c.mop ? '<div><b>MOP:</b> ' + escapeHtml(c.mop) + '</div>' : '') +
+        (c.items ? '<div class="full"><b>Part(s):</b> ' + escapeHtml(c.items) + '</div>' : '') +
+        (c.address ? '<div class="full"><b>Address:</b> ' + escapeHtml(c.address) + '</div>' : '') +
+        (c.notes ? '<div class="full"><b>Notes:</b> ' + escapeHtml(c.notes) + '</div>' : '') +
+        (cond ? '<div class="full"><b>Condition:</b> <span class="pill" style="color:' + cond.color + ';">' + cond.icon + ' ' + cond.label + '</span> ' + (c.outcome === 'disposed' ? '🗑 disposed' : '✅ back on the shelf') + (c.inspectedBy ? ' • by ' + escapeHtml(c.inspectedBy) : '') + (c.inspectNotes ? ' — ' + escapeHtml(c.inspectNotes) : '') + '</div>' : '') +
+        ((c.stop && c.stop.stopId) || (c.pickup && c.pickup.stopId) ? '<div class="full" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">' + stopChipHtml(c.stop, 'Delivery stop') + stopChipHtml(c.pickup, 'Pickup stop') + '</div>' : '') +
+      '</div>' +
+      refundBoxHtml(c) + caseActionsHtml(c) +
+      (openHistory[c.id] ? '<div class="hist">' + (hist.map(function(h) { return '<div>' + fmtWhen(h.at) + ' — <b>' + escapeHtml(h.by || '') + '</b>: ' + escapeHtml(h.text) + '</div>'; }).join('') || '<div>No history.</div>') + '</div>' : '') +
+    '</div></div>';
+}
+function toggleHistory(id) { openHistory[id] = !openHistory[id]; renderCases(); }
+
+/* ---------- new case ---------- */
+var draft = null;
+function openNewCase(pre) {
+  if (!caseCanCreate()) { showToast('Drivers can’t open cases — tell dispatch.', 'red'); return; }
+  pre = pre || {};
+  draft = { type: pre.type || 'cancel', zohoId: pre.zohoId || null, stopKey: pre.stopKey || '' };
+  document.getElementById('cmCustomer').value = pre.customer || '';
+  document.getElementById('cmSo').value = pre.so || '';
+  document.getElementById('cmAddr').value = pre.address || '';
+  document.getElementById('cmItems').value = pre.items || '';
+  document.getElementById('cmAmount').value = pre.amount != null && pre.amount !== '' ? pre.amount : '';
+  document.getElementById('cmMop').value = pre.mop || '';
+  document.getElementById('cmNotes').value = '';
+  document.getElementById('cmRefundOn').checked = draft.type === 'refund';
+  document.getElementById('cmRefundAmt').value = pre.amount != null && pre.amount !== '' ? pre.amount : '';
+  document.getElementById('cmRefundMethod').innerHTML = refundMethodOptions(/cash/i.test(pre.mop || '') ? 'Cash' : (/check/i.test(pre.mop || '') ? 'Check' : ''));
+  document.getElementById('cmDriver').innerHTML = driverOptionsHtml('');
+  document.getElementById('cmPickupOn').checked = caseCanEdit();
+  document.getElementById('cmMsg').textContent = '';
+  document.getElementById('cmSave').disabled = false;
+  document.getElementById('cmTitle').textContent = pre.zohoId || pre.stopKey ? 'New case — ' + (pre.customer || '') + (pre.so ? ' (' + pre.so + ')' : '') : 'New case';
+  renderNewCaseType();
+  loadStopChoices(pre);
+  document.getElementById('caseModal').classList.add('open');
+}
+function pickCaseType(t) { draft.type = t; if (t === 'refund') document.getElementById('cmRefundOn').checked = true; renderNewCaseType(); }
+function renderNewCaseType() {
+  var hints = { cancel: 'Order not wanted any more — stop the delivery', 'return': 'Part comes back — pickup, inspect, shelve', refund: 'Money back only (overcharge, credit…)' };
+  document.getElementById('cmTypes').innerHTML = ['cancel', 'return', 'refund'].map(function(t) {
+    return '<button type="button" class="' + (draft.type === t ? 'on' : '') + '" onclick="pickCaseType(\'' + t + '\')"><b>' + CASE_TYPES[t].icon + ' ' + CASE_TYPES[t].label + '</b><span>' + hints[t] + '</span></button>';
+  }).join('');
+  var sel = document.getElementById('cmReason'), cur = sel.value;
+  sel.innerHTML = '<option value="">— Pick a reason —</option>' + CASE_REASONS[draft.type].map(function(r) { return '<option' + (r === cur ? ' selected' : '') + '>' + r + '</option>'; }).join('');
+  document.getElementById('cmRefundToggleRow').style.display = draft.type === 'refund' ? 'none' : '';
+  document.getElementById('cmPickupWrap').style.display = draft.type === 'return' && caseCanEdit() ? '' : 'none';
+  document.getElementById('cmSave').textContent = draft.type === 'cancel' ? 'Create cancellation' : (draft.type === 'return' ? 'Create return' : 'Create refund');
+  renderNewCaseRefund(); renderNewCasePickup();
+}
+function renderNewCaseRefund() { document.getElementById('cmRefundFields').style.display = document.getElementById('cmRefundOn').checked || draft.type === 'refund' ? '' : 'none'; }
+function renderNewCasePickup() { document.getElementById('cmPickupFields').style.display = document.getElementById('cmPickupOn').checked ? '' : 'none'; }
+/* recent delivery-board stops the case can be tied to (today + 3 days back) */
+var stopChoices = [];
+function loadStopChoices(pre) {
+  var sel = document.getElementById('cmStop');
+  sel.innerHTML = '<option value="">— Not on the delivery board —</option>';
+  stopChoices = [];
+  fbDb.ref('gcap/days').orderByKey().startAt(gcapEt.shiftKey(gcapEt.dateKey(Date.now()), -3)).once('value').then(function(snap) {
+    var raw = snap.val() || {};
+    Object.keys(raw).sort().reverse().forEach(function(day) {
+      var st = raw[day] && raw[day].stops; if (!st) return;
+      (Array.isArray(st) ? st : Object.keys(st).map(function(k) { return st[k]; })).filter(Boolean).forEach(function(s) { stopChoices.push({ key: day + '|' + s.id, day: day, s: s }); });
+    });
+    var want = draft && draft.stopKey;
+    if (!want && pre) {
+      var hit = stopChoices.find(function(x) { return !x.s.isReturn && ((pre.zohoId && x.s.zohoId === pre.zohoId) || (pre.so && x.s.so === pre.so)); });
+      if (hit) want = hit.key;
+    }
+    sel.innerHTML = '<option value="">— Not on the delivery board —</option>' + stopChoices.map(function(x) {
+      var s = x.s;
+      return '<option value="' + escapeHtml(x.key) + '"' + (x.key === want ? ' selected' : '') + '>' + escapeHtml((s.loc || 'Stop') + (s.so ? ' — ' + s.so : '') + ' — ' + (CASE_STOP_STATUS_LABEL[s.status] || s.status) + (s.isReturn ? ' (return)' : '') + ' — ' + x.day) + '</option>';
+    }).join('');
+  }).catch(function(e) { console.error('stop list failed', e); });
+}
+function saveNewCase() {
+  var d = draft; if (!d) return;
+  var v = function(id) { return document.getElementById(id).value.trim(); };
+  var customer = v('cmCustomer'), reason = v('cmReason'), amount = v('cmAmount');
+  var needRefund = d.type === 'refund' || document.getElementById('cmRefundOn').checked;
+  var refundAmt = v('cmRefundAmt'), msg = document.getElementById('cmMsg');
+  if (!customer) { msg.textContent = 'Type the customer name.'; return; }
+  if (!reason) { msg.textContent = 'Pick a reason.'; return; }
+  if (needRefund && !(Number(refundAmt) > 0)) { msg.textContent = 'Type the refund amount.'; return; }
+  var stopKey = v('cmStop'), link = stopChoices.find(function(x) { return x.key === stopKey; });
+  if (link && link.s.caseId && casesData[link.s.caseId] && !casesData[link.s.caseId].deleted) { msg.textContent = 'That stop already has case ' + link.s.caseId + '. Open that case instead.'; return; }
+  if (d.type === 'cancel' && link && link.s.status === 'completed' && !confirm('That order was already delivered. A cancellation can’t take it off the truck — usually this should be a Return. Create the cancellation anyway?')) return;
+  var who = caseWho(), now = Date.now();
+  var data = {
+    type: d.type, customer: customer, so: v('cmSo'), address: v('cmAddr'), items: v('cmItems'), amount: amount ? Number(amount) : null,
+    mop: v('cmMop'), reason: reason, notes: v('cmNotes'), zohoId: d.zohoId || null, source: d.zohoId ? 'Zoho order' : (link ? 'delivery board' : null),
+    stop: link ? { day: link.day, stopId: link.s.id, status: link.s.status || 'pending' } : null,
+    refund: needRefund ? { amount: Number(refundAmt), method: v('cmRefundMethod'), status: 'pending', requestedBy: who, requestedAt: now } : null
+  };
+  if (d.type === 'return' && link && (link.s.status === 'returned')) data.stage = 'picked_up';   // the driver already brought it back
+  var schedule = d.type === 'return' && data.stage !== 'picked_up' && caseCanEdit() && document.getElementById('cmPickupOn').checked;
+  var btn = document.getElementById('cmSave'); btn.disabled = true; msg.textContent = 'Saving…';
+  caseCreate(data).then(function(c) {
+    var jobs = [];
+    if (link) jobs.push(casePatchStop(link.day, link.s.id, { caseId: c.id }).catch(function(e) { console.error(e); }));
+    if (schedule) jobs.push(caseSchedulePickup(c, v('cmDriver'), pickupExtras(c)));
+    return Promise.all(jobs).then(function() { return c; });
+  }).then(function(c) {
+    closeModal('caseModal');
+    showToast(c.id + ' created' + (schedule ? ' — pickup is on today’s delivery board' : '') + '.', 'green');
+    focusCase(c.id);
+  }).catch(function(e) { console.error('create case failed', e); btn.disabled = false; msg.textContent = 'Could not save — check your connection and try again.'; });
+}
+/* closing time / MOP remembered for this customer go on the pickup stop too */
+function pickupExtras(c) {
+  var info = customerMop[caseCustomerKey(c.customer)] || {};
+  return { closing: info.closing && info.closing !== 'none' ? info.closing : '' };
+}
+
+/* ---------- Zoho orders: start a case straight from an order ---------- */
+function zohoExtraOrderActions(o) {
+  var id = escapeHtml(o.id), chips = caseList().filter(function(c) { return c.zohoId === o.id; }).map(function(c) {
+    return '<button class="btn btn-ghost btn-sm" onclick="focusCase(\'' + escapeHtml(c.id) + '\')">' + escapeHtml(caseShortLabel(c)) + '</button>';
+  }).join('');
+  if (!caseCanCreate()) return chips;
+  return chips +
+    '<button class="btn btn-red btn-sm" onclick="caseFromZoho(\'' + id + '\', \'cancel\')">✖ Cancel order</button>' +
+    '<button class="btn btn-sm" style="background:rgba(251,191,36,0.14); border:1px solid rgba(251,191,36,0.55); color:var(--amber);" onclick="caseFromZoho(\'' + id + '\', \'return\')">↩ Return</button>' +
+    '<button class="btn btn-green btn-sm" onclick="caseFromZoho(\'' + id + '\', \'refund\')">💲 Refund</button>';
+}
+function caseFromZoho(id, type) {
+  var o = zohoFindOrder(id); if (!o) return;
+  openNewCase({
+    type: type, customer: o.customer, so: o.number, address: o.address, zohoId: o.id, mop: zohoMop(o) || o.terms || '',
+    amount: o.money && o.money.total != null ? o.money.total : '',
+    items: (o.lines || []).map(function(l) { return l.qty + '× ' + l.name + (l.sku && String(l.name).indexOf(l.sku) === -1 ? ' (' + l.sku + ')' : ''); }).join('; ')
+  });
+}
+
+/* ---------- moving a case along ---------- */
+function approveCancel(id) {
+  var c = casesData[id]; if (!c) return;
+  if (!confirm('Approve cancellation ' + id + ' for ' + (c.customer || 'this customer') + '?' + (c.stop && c.stop.stopId ? '\nThe delivery stop will be taken off the board.' : ''))) return;
+  caseRemoveDeliveryStop(c).then(function(result) {
+    if (result === 'delivered') {
+      if (confirm('This order was already delivered, so it can’t be cancelled. Turn this case into a Return (pick the part back up)?'))
+        return caseUpdate(id, { type: 'return', stage: 'requested' }, 'Already delivered — changed from a cancellation to a return').then(function() { showToast(id + ' is now a return — schedule the pickup.', 'green'); });
+      return;
+    }
+    var ch = { stage: 'cancelled', cancelledBy: caseWho(), cancelledAt: Date.now() };
+    if (result === 'removed') ch['stop/removed'] = true;
+    return caseUpdate(id, ch, 'Cancellation approved' + (result === 'removed' ? ' — delivery stop taken off the board' : '') + (c.refund && c.refund.status === 'pending' ? ' • refund still to approve' : ''))
+      .then(function() { showToast(id + ' cancelled' + (result === 'removed' ? ' — removed from the delivery board' : '') + '.', 'green'); });
+  }).catch(function(e) { console.error(e); showToast('Could not update — check your connection.', 'red'); });
+}
+function rejectCase(id) {
+  var why = prompt('Why is ' + id + ' rejected? (the customer keeps the order)');
+  if (why === null) return;
+  caseUpdate(id, { stage: 'rejected' }, 'Rejected' + (why.trim() ? ' — ' + why.trim() : ''));
+}
+function reopenCase(id) {
+  var c = casesData[id]; if (!c || !confirm('Reopen ' + id + '?')) return;
+  var stage = c.type === 'return' ? (c.condition ? 'inspected' : (c.pickup && c.pickup.status === 'completed' ? 'picked_up' : (c.pickup ? 'pickup_scheduled' : 'requested'))) : (c.type === 'refund' && c.refund && c.refund.status === 'approved' ? 'approved' : 'requested');
+  caseUpdate(id, { stage: stage }, 'Reopened');
+}
+function closeCase(id) {
+  var c = casesData[id]; if (!c) return;
+  if (refundWaiting(c) && !confirm('The refund is not paid yet. Close the case anyway? (the refund stays open)')) return;
+  caseUpdate(id, { stage: 'closed' }, 'Case closed');
+}
+function deleteCase(id) {
+  if (!confirm('Delete case ' + id + '? It disappears from the list (the delivery stops are not touched).')) return;
+  caseUpdate(id, { deleted: true }, 'Deleted').then(function() { showToast(id + ' deleted.', ''); });
+}
+var pickupFor = null;
+function openPickup(id) {
+  var c = casesData[id]; if (!c) return;
+  pickupFor = id;
+  document.getElementById('pkSub').textContent = id + ' — ' + (c.customer || '') + (c.address ? ' • ' + c.address : ' • no address yet (add it on the board)');
+  document.getElementById('pkDriver').innerHTML = driverOptionsHtml('');
+  document.getElementById('pkSave').disabled = false;
+  document.getElementById('pickupModal').classList.add('open');
+}
+function confirmPickup() {
+  var c = casesData[pickupFor]; if (!c) return;
+  var btn = document.getElementById('pkSave'); btn.disabled = true;
+  caseSchedulePickup(c, document.getElementById('pkDriver').value, pickupExtras(c)).then(function() {
+    closeModal('pickupModal'); showToast('Pickup added to today’s delivery board.', 'green');
+  }).catch(function(e) { console.error(e); btn.disabled = false; showToast('Could not add the pickup — check your connection.', 'red'); });
+}
+function markPickedUp(id, how) {
+  var c = casesData[id]; if (!c) return;
+  var ch = { stage: 'picked_up' };
+  if (c.pickup && c.pickup.stopId) ch['pickup/status'] = 'completed';
+  var p = c.pickup && c.pickup.stopId ? casePatchStop(c.pickup.day, c.pickup.stopId, { status: 'completed', updatedBy: caseWho(), updatedAt: gcapEt.timeStr(Date.now()), updatedAtMs: Date.now() }).catch(function() {}) : Promise.resolve();
+  p.then(function() { return caseUpdate(id, ch, how === 'dropoff' ? 'Customer dropped the part off at the warehouse' : 'Marked picked up'); });
+}
+
+/* inspection: condition + photo + video (photos only if video upload is down) */
+var insp = null;
+function openInspect(id) {
+  var c = casesData[id]; if (!c) return;
+  insp = { id: id, condition: '', photos: [], videos: [], uploading: 0 };
+  document.getElementById('inSub').textContent = id + ' — ' + (c.customer || '') + (c.items ? ' • ' + c.items : '');
+  document.getElementById('inNotes').value = '';
+  document.getElementById('inspectModal').classList.add('open');
+  renderInspect();
+}
+function closeInspect() { closeModal('inspectModal'); insp = null; }
+function pickCondition(id) { if (insp) { insp.condition = id; renderInspect(); } }
+function inspectMissing() {
+  var m = [];
+  if (!insp.condition) m.push('pick the condition');
+  if (!insp.photos.length) m.push('add a photo');
+  if (!insp.videos.length && !insp.videoFailed) m.push('add a video');
+  if (insp.uploading) m.push('wait for the video to finish');
+  return m;
+}
+function renderInspect() {
+  if (!insp) return;
+  document.getElementById('inConditions').innerHTML = CASE_CONDITIONS.map(function(c) {
+    var on = insp.condition === c.id;
+    return '<button type="button" onclick="pickCondition(\'' + c.id + '\')" style="text-align:left; cursor:pointer; font:inherit; padding:10px 12px; border-radius:10px; color:var(--text); background:' + (on ? c.color + '22' : 'transparent') + '; border:1.5px solid ' + (on ? c.color : 'var(--glass-border)') + ';"><b>' + c.icon + ' ' + c.label + '</b><div style="font-size:11.5px; color:var(--text-soft);">' + c.hint + '</div></button>';
+  }).join('');
+  document.getElementById('inMedia').innerHTML = proofMediaHtml(insp) || '<div class="hist-empty">No photo or video yet.</div>';
+  var miss = inspectMissing();
+  document.getElementById('inMsg').textContent = miss.length ? 'To continue: ' + miss.join(', ') + '.' : (insp.videoFailed && !insp.videos.length ? '⚠ Video uploads aren’t working right now — saving with photos only.' : '');
+  var b = document.getElementById('inSave');
+  b.disabled = miss.length > 0;
+  b.textContent = insp.condition === 'damaged' ? '🗑 Save — dispose of this part' : (insp.condition ? '✓ Save — back on the shelf' : 'Save inspection');
+}
+function inspectFile(input, kind) {
+  var file = input.files && input.files[0]; input.value = '';
+  var d = insp; if (!file || !d) return;
+  addProofMedia(d, file, kind, function() { if (insp === d) renderInspect(); }, 'return_' + d.id);
+}
+function confirmInspect() {
+  var d = insp; if (!d || inspectMissing().length) return;
+  var c = casesData[d.id]; if (!c) return;
+  var info = caseConditionInfo(d.condition), outcome = info.outcome, who = caseWho(), notes = document.getElementById('inNotes').value.trim(), now = Date.now();
+  var btn = document.getElementById('inSave'); btn.disabled = true;
+  var proof = { photos: d.photos, videos: d.videos, condition: d.condition, outcome: outcome, notes: notes || null, by: who, at: now };
+  var jobs = [fbDb.ref('gcap/caseProof/' + d.id).set(proof)];
+  /* if the part came back from a delivery ("Returned Part"), close that out on the delivery board as well */
+  if (c.stop && c.stop.stopId && c.stop.status === 'returned') {
+    var stopChanges = { returnResolved: true, returnResolvedBy: who, returnResolvedAt: gcapEt.timeStr(now), returnCondition: d.condition, returnOutcome: outcome, returnProcessNotes: notes || null, returnPhotoCount: d.photos.length, returnVideoCount: d.videos.length, returnNoVideo: d.videos.length === 0 };
+    jobs.push(casePatchStop(c.stop.day, c.stop.stopId, stopChanges).catch(function(e) { console.error(e); }));
+    jobs.push(fbDb.ref('gcap/records/returnProof/' + c.stop.stopId).set(proof).catch(function() {}));
+    jobs.push(fbDb.ref('gcap/records/returns/' + c.stop.stopId).update({ resolved: true, resolvedBy: who, resolvedAt: gcapEt.timeStr(now), condition: d.condition, outcome: outcome, processNotes: notes || null, noVideo: d.videos.length === 0 }).catch(function() {}));
+  }
+  Promise.all(jobs).then(function() {
+    return caseUpdate(d.id, { stage: 'inspected', condition: d.condition, outcome: outcome, inspectNotes: notes || null, inspectedBy: who, inspectedAt: now, hasProof: true, noVideo: d.videos.length === 0 },
+      'Inspected: ' + info.label + ' — ' + (outcome === 'disposed' ? 'dispose of it' : 'back on the shelf' + (d.condition === 'slight' ? ' at a discount' : '')) + (d.videos.length ? '' : ' (no video)'));
+  }).then(function() {
+    closeInspect(); showToast(outcome === 'disposed' ? 'Saved — dispose of the part.' : 'Saved — put it back on the shelf.', 'green');
+  }).catch(function(e) { console.error(e); btn.disabled = false; showToast('Could not save — check your connection.', 'red'); });
+}
+function viewProof(id) {
+  var c = casesData[id]; if (!c) return;
+  document.getElementById('pvTitle').textContent = '📷 ' + id + ' — inspection';
+  document.getElementById('pvSub').textContent = 'Loading…';
+  document.getElementById('pvMedia').innerHTML = '';
+  document.getElementById('proofView').classList.add('open');
+  var path = c.hasProof ? 'gcap/caseProof/' + id : c.proofPath;
+  fbDb.ref(path).once('value').then(function(snap) {
+    var p = snap.val() || {}, info = caseConditionInfo(p.condition);
+    document.getElementById('pvSub').textContent = (info ? info.label + ' • ' : '') + (p.by ? 'by ' + p.by + ' ' + fmtWhen(p.at) : '') + (p.notes ? ' — ' + p.notes : '');
+    document.getElementById('pvMedia').innerHTML = proofMediaHtml({ photos: p.photos || [], videos: p.videos || [], uploading: 0 }) || '<div class="hist-empty">No photos saved.</div>';
+  });
+}
+
+/* refunds: anyone who edits cases can ask for one; only the owner / admins approve and pay */
+var refundCtx = null;
+function openRefund(id, mode) {
+  var c = casesData[id]; if (!c) return;
+  if (mode !== 'request' && mode !== 'edit' && !caseCanApproveMoney()) { showToast('Only the owner or an admin can do that.', 'red'); return; }
+  refundCtx = { id: id, mode: mode };
+  var r = c.refund || {};
+  document.getElementById('rfTitle').textContent = mode === 'pay' ? '💵 Mark refund as paid' : (mode === 'edit' ? '✎ Edit refund' : '💲 Refund needed');
+  document.getElementById('rfSub').textContent = id + ' — ' + (c.customer || '') + (mode === 'request' ? ' • the owner / an admin approves it next' : '');
+  document.getElementById('rfAmount').value = r.amount != null ? r.amount : (c.amount != null ? c.amount : '');
+  document.getElementById('rfMethod').innerHTML = refundMethodOptions(r.method || (/cash/i.test(c.mop || '') ? 'Cash' : (/check/i.test(c.mop || '') ? 'Check' : '')));
+  document.getElementById('rfRef').value = r.reference || '';
+  document.getElementById('rfNote').value = r.note || '';
+  document.getElementById('rfRef').style.display = document.getElementById('rfRefLabel').style.display = mode === 'pay' ? '' : 'none';
+  document.getElementById('rfSave').textContent = mode === 'pay' ? '✓ Refunded' : 'Save';
+  document.getElementById('rfSave').disabled = false;
+  document.getElementById('refundModal').classList.add('open');
+}
+function confirmRefund() {
+  var ctx = refundCtx, c = ctx && casesData[ctx.id]; if (!c) return;
+  var amt = Number(document.getElementById('rfAmount').value);
+  if (!(amt > 0)) { showToast('Type the refund amount.', 'red'); return; }
+  var method = document.getElementById('rfMethod').value, note = document.getElementById('rfNote').value.trim(), ref = document.getElementById('rfRef').value.trim();
+  var who = caseWho(), now = Date.now(), ch = {}, text;
+  if (ctx.mode === 'request') {
+    ch.refund = { amount: amt, method: method, note: note || null, status: 'pending', requestedBy: who, requestedAt: now };
+    text = 'Refund of ' + caseMoney(amt) + ' requested (' + method + ')';
+  } else if (ctx.mode === 'edit') {
+    ch['refund/amount'] = amt; ch['refund/method'] = method; ch['refund/note'] = note || null;
+    text = 'Refund changed to ' + caseMoney(amt) + ' (' + method + ')';
+  } else {
+    ch['refund/amount'] = amt; ch['refund/method'] = method; ch['refund/note'] = note || null; ch['refund/reference'] = ref || null;
+    ch['refund/status'] = 'refunded'; ch['refund/paidBy'] = who; ch['refund/paidAt'] = now;
+    if (c.type === 'refund') ch.stage = 'refunded';
+    text = 'Refunded ' + caseMoney(amt) + ' by ' + method + (ref ? ' (ref ' + ref + ')' : '');
+  }
+  document.getElementById('rfSave').disabled = true;
+  caseUpdate(c.id, ch, text).then(function() { closeModal('refundModal'); showToast(text + '.', 'green'); })
+    .catch(function(e) { console.error(e); document.getElementById('rfSave').disabled = false; showToast('Could not save — check your connection.', 'red'); });
+}
+function approveRefund(id) {
+  var c = casesData[id]; if (!c || !caseCanApproveMoney()) return;
+  if (!confirm('Approve a ' + caseMoney(c.refund.amount) + ' refund to ' + (c.customer || 'this customer') + '?')) return;
+  var ch = { 'refund/status': 'approved', 'refund/approvedBy': caseWho(), 'refund/approvedAt': Date.now() };
+  if (c.type === 'refund') ch.stage = 'approved';
+  caseUpdate(id, ch, 'Refund of ' + caseMoney(c.refund.amount) + ' approved');
+}
+function denyRefund(id) {
+  var c = casesData[id]; if (!c || !caseCanApproveMoney()) return;
+  var why = prompt('Why is this refund denied?');
+  if (why === null) return;
+  var ch = { 'refund/status': 'denied', 'refund/deniedBy': caseWho(), 'refund/deniedAt': Date.now(), 'refund/note': why.trim() || null };
+  if (c.type === 'refund') ch.stage = 'denied';
+  caseUpdate(id, ch, 'Refund denied' + (why.trim() ? ' — ' + why.trim() : ''));
+}
+
+/* ---------- share / export ---------- */
+function caseText(c) {
+  var t = CASE_TYPES[c.type] || CASE_TYPES['return'];
+  return 'Gold Coast Auto Parts — ' + t.label + ' ' + c.id + '\n' +
+    'Customer: ' + (c.customer || '—') + (c.so ? '\nSO# ' + c.so : '') + (c.items ? '\nPart(s): ' + c.items : '') + (c.amount != null ? '\nAmount: ' + caseMoney(c.amount) : '') +
+    '\nReason: ' + (c.reason || '—') + (c.notes ? ' — ' + c.notes : '') + '\nStatus: ' + (CASE_STAGE_LABEL[c.stage] || c.stage) +
+    (c.condition ? '\nCondition: ' + (caseConditionInfo(c.condition) || {}).label : '') +
+    (c.refund && c.refund.status ? '\nRefund: ' + caseMoney(c.refund.amount) + ' ' + (c.refund.method || '') + ' — ' + REFUND_STATUS_LABEL[c.refund.status] : '') +
+    '\n\nSent from the Gold Coast Auto Parts web app.';
+}
+function shareCase(id) {
+  var c = casesData[id]; if (!c) return;
+  var t = caseText(c);
+  if (navigator.share) navigator.share({ title: c.id, text: t }).catch(function() {});
+  else (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function() { showToast('Copied.', 'green'); }, function() { prompt('Copy this:', t); });
+}
+function downloadCasesCsv() {
+  var cols = ['Case', 'Type', 'Status', 'Opened', 'Opened by', 'Customer', 'SO#', 'Part(s)', 'Amount', 'MOP', 'Reason', 'Notes', 'Condition', 'Outcome', 'Refund amount', 'Refund method', 'Refund status', 'Refund paid', 'Refund reference', 'Pickup driver'];
+  var rows = caseList().sort(function(a, b) { return (a.num || 0) - (b.num || 0); }).map(function(c) {
+    var r = c.refund || {};
+    return [c.id, (CASE_TYPES[c.type] || {}).label, CASE_STAGE_LABEL[c.stage] || c.stage, fmtWhen(c.createdAt), c.createdBy, c.customer, c.so, c.items, c.amount, c.mop, c.reason, c.notes,
+      (caseConditionInfo(c.condition) || {}).label || '', c.outcome || '', r.amount, r.method, r.status ? REFUND_STATUS_LABEL[r.status] : '', fmtWhen(r.paidAt), r.reference, c.pickup && c.pickup.driver];
+  });
+  var csv = [cols].concat(rows).map(function(r) { return r.map(function(x) { var s = x == null ? '' : String(x); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(','); }).join('\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'cancellations-returns-refunds-' + gcapEt.dateKey(Date.now()) + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ---------- Ask AI snapshot ---------- */
+var assistantBoardName = 'returns';
+function assistantBoardContext() {
+  var L = ['Page: Order Cancellations, Returns & Refunds. Today: ' + gcapEt.dateKey(Date.now())];
+  var open = caseList().filter(caseIsOpen);
+  L.push('OPEN CASES (' + open.length + '):');
+  open.forEach(function(c) {
+    L.push('- ' + c.id + ' | ' + (CASE_TYPES[c.type] || {}).label + ' | ' + (CASE_STAGE_LABEL[c.stage] || c.stage) + ' | ' + (c.customer || '?') + (c.so ? ' | SO ' + c.so : '') +
+      (c.items ? ' | ' + c.items : '') + (c.reason ? ' | reason: ' + c.reason : '') + (c.refund && c.refund.status ? ' | refund ' + caseMoney(c.refund.amount) + ' ' + c.refund.status : '') +
+      (c.pickup && c.pickup.driver ? ' | pickup driver ' + c.pickup.driver + ' (' + (c.pickup.status || '') + ')' : ''));
+  });
+  var closed = caseList().filter(function(c) { return !caseIsOpen(c); }).slice(-30);
+  L.push('RECENTLY CLOSED (' + closed.length + '):');
+  closed.forEach(function(c) { L.push('- ' + c.id + ' | ' + (CASE_TYPES[c.type] || {}).label + ' | ' + (CASE_STAGE_LABEL[c.stage] || c.stage) + ' | ' + (c.customer || '?') + (c.refund && c.refund.status ? ' | refund ' + caseMoney(c.refund.amount) + ' ' + c.refund.status : '')); });
+  return L.join('\n');
+}
+</script>
+<script src="training.js"></script>
+<script src="drive-client.js"></script>
+<script src="assistant.js"></script>
+<script src="zoho-orders-ui.js"></script>
+</body>
+</html>

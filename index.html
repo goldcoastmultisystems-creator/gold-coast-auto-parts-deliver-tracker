@@ -456,6 +456,7 @@ footer .footer-copy { color: var(--text-soft); font-size: 11.5px; }
       <button class="hdr-btn" onclick="openPartsList()">Parts to Pull</button>
       <button class="hdr-btn" onclick="openPartsToPurchase()">Parts to Purchase</button>
       <button class="hdr-btn" onclick="openReturnsModal()">🔄 Returns</button>
+      <button class="hdr-btn" onclick="goToCases()">↩ Cancellations, Returns &amp; Refunds →</button>
       <button class="hdr-btn" id="checksBtn" onclick="openChecksModal()">💵 Checks</button>
       <button class="hdr-btn" onclick="openZohoOrders()">🧾 Zoho Orders</button>
       <button class="hdr-btn" onclick="openAssistantModal()">🤖 Ask AI</button>
@@ -778,7 +779,7 @@ function attachFirebaseListeners() {
     var localToday = days && days[key];
     if (localToday) {
       if (!incoming[key]) incoming[key] = { stops: [], activity: [], archived: [] };
-      incoming[key].stops = mergeStopsForSave(incoming[key].stops, localToday.stops, knownStopIds);
+      incoming[key].stops = mergeIncomingStops(incoming[key].stops, localToday.stops);
       incoming[key].activity = localToday.activity && localToday.activity.length > (incoming[key].activity||[]).length ? localToday.activity : incoming[key].activity;
     }
     days = Object.assign({}, olderDays, incoming);
@@ -796,6 +797,8 @@ function attachFirebaseListeners() {
   /* tiny indexes so the app doesn't need every old day loaded */
   fbDb.ref('gcap/zohoImported').on('value', function(snap) { zohoImportedIndex = snap.val() || {}; indexLoadedOnce = true; if (daysLoadedOnce) zohoReconcileIndex(); });
   fbDb.ref('gcap/customerMop').on('value', function(snap) { customerMop = snap.val() || {}; });
+  /* Cancellations, Returns & Refunds: show each stop's case and keep both sides in step */
+  casesListen(function() { if (currentDay && currentDay.stops.some(function(x) { return x.caseId; })) renderAll(); try { renderZohoList(); } catch (e) {} });
   fbDb.ref('gcap/records/checks').on('value', function(snap) {
     var n = 0; snap.forEach(function(x) { var c = x.val() || {}; if (!c.deleted && c.status !== 'deposited') n++; });
     openChecksFromRecords = n; updateChecksBadge();
@@ -1269,6 +1272,40 @@ function mergeStopsForSave(serverStops, localStops, knownIds) {
   return merged;
 }
 
+/* Stops changed or deleted on this device that haven't reached the server yet. While such a change is on its way the board
+   keeps its own copy; every other stop always shows the server's latest (a driver's status, a pickup added from Returns…).
+   Kept in storage too, so a refresh right after a change doesn't lose it. */
+var pendingStopWrites = (function() { try { return JSON.parse(localStorage.getItem('kgps_pending')) || {}; } catch (e) { return {}; } })();
+var pendingStopBatch = Object.keys(pendingStopWrites).reduce(function(m, k) { return Math.max(m, (pendingStopWrites[k] && pendingStopWrites[k].batch) || 0); }, 0);
+function storePendingStopWrites() { try { localStorage.setItem('kgps_pending', JSON.stringify(pendingStopWrites)); } catch (e) {} }
+function markPendingStopWrites(key, localStops) {
+  var srv = lastServerDays[key], batch = ++pendingStopBatch, srvJson = {}, localIds = {};
+  if (srv && srv.exists) srv.stops.forEach(function(st, i) { srvJson[st.id] = srv.stopsJson[i]; });
+  (localStops || []).forEach(function(st) {
+    localIds[st.id] = true;
+    if (!srv || srvJson[st.id] !== stableJson(st)) pendingStopWrites[st.id] = { batch: batch };
+  });
+  Object.keys(srvJson).forEach(function(id) { if (!localIds[id] && knownStopIds[id]) pendingStopWrites[id] = { batch: batch, del: true }; });
+  storePendingStopWrites();
+  return batch;
+}
+function clearPendingStopWrites(batch) {
+  Object.keys(pendingStopWrites).forEach(function(id) { if ((pendingStopWrites[id].batch || 0) <= batch) delete pendingStopWrites[id]; });
+  storePendingStopWrites();
+}
+function mergeIncomingStops(serverStops, localStops) {
+  var localById = {}, seen = {}, out = [];
+  (localStops || []).forEach(function(st) { localById[st.id] = st; });
+  (serverStops || []).forEach(function(st) {
+    seen[st.id] = true;
+    var p = pendingStopWrites[st.id];
+    if (p && p.del) return;
+    out.push(p && localById[st.id] ? localById[st.id] : st);
+  });
+  (localStops || []).forEach(function(st) { if (!seen[st.id] && (!knownStopIds[st.id] || (pendingStopWrites[st.id] && !pendingStopWrites[st.id].del))) out.push(st); });
+  return out;
+}
+
 /* ---------- LIVE WINDOW: keep only recent days loaded; older ones come on demand ---------- */
 var DAYS_WINDOW = 4;                 // today + 3 days back (matches the carry-over look-back)
 var olderDays = {}, olderLoaded = false, olderLoading = null;
@@ -1333,6 +1370,7 @@ function saveDays(d) {
   if (!FIREBASE_ENABLED || !fbDb) return;
   var key = todayKey();
   var fallbackLocalDay = d[key] || { stops: [], activity: [], archived: [] };
+  var batch = markPendingStopWrites(key, fallbackLocalDay.stops);
   saveDaysChain = saveDaysChain.then(function() {
     var have = lastServerDays[key];
     var ready = have ? Promise.resolve(have) : fbDb.ref('gcap/days/' + key).once('value').then(function(snap) { return serverDayState(snap.val()); });
@@ -1346,7 +1384,7 @@ function saveDays(d) {
       var activity = localDay.activity || [], archived = localDay.archived || [];
       var stopsJson = mergedStops.map(stableJson), aJson = stableJson(activity), arJson = stableJson(archived);
       var next = { exists: true, stops: mergedStops, stopsJson: stopsJson, activityJson: aJson, archivedJson: arJson };
-      if (!srv.exists || srv.dirty) { lastServerDays[key] = next; return fbDb.ref(base).set({ stops: mergedStops, activity: activity, archived: archived }); }
+      if (!srv.exists || srv.dirty) { lastServerDays[key] = next; return fbDb.ref(base).set({ stops: mergedStops, activity: activity, archived: archived }); }   // (pending marks clear after this write)
       var updates = {}, changed = 0;
       mergedStops.forEach(function(st, i) { if (stopsJson[i] !== srv.stopsJson[i]) { updates[base + '/stops/' + i] = st; changed++; } });
       for (var i = mergedStops.length; i < srv.stopsJson.length; i++) { updates[base + '/stops/' + i] = null; changed++; }
@@ -1356,7 +1394,7 @@ function saveDays(d) {
       if (!changed) return;
       return fbDb.ref().update(updates);
     });
-  }).catch(function(e) {
+  }).then(function() { clearPendingStopWrites(batch); }).catch(function(e) {
     lastServerDays[todayKey()] = null;   // forget our picture of the server so the next save re-reads it
     console.error('saveDays failed', e);
   });
@@ -1919,6 +1957,7 @@ function renderStopCard(s, i, curId) {
       '<span class="type-badge type-'+s.type+'">'+TYPE_LABELS[s.type]+'</span>' +
       (canAssignRoutes() && s.status !== 'completed' ? '<span class="assigned-badge" style="cursor:pointer;" onclick="openAssignStops([\''+s.id+'\'], \''+escapeHtml(String(s.loc||'This stop').replace(/['\\]/g, ''))+'\')" title="Change who this stop is assigned to">👤 '+(s.assignedTo ? escapeHtml(s.assignedTo) : 'Assign driver')+' ▾</span>' : (s.assignedTo ? '<span class="assigned-badge">👤 '+escapeHtml(s.assignedTo)+'</span>' : '')) +
       (s.carriedFrom ? '<span class="assigned-badge" title="Unfinished, carried over from an earlier day">↪ from '+fmtDateDisplay(s.carriedFrom)+'</span>' : '') +
+      caseStopChipHtml(s) +
       '<button class="stop-share-btn" onclick="whatsappStop(\''+s.id+'\')" title="Send on WhatsApp" style="border-color:rgba(52,211,153,0.55); background:rgba(52,211,153,0.14); color:#34d399;">💬</button>' +
       '<button class="stop-share-btn" onclick="shareStop(\''+s.id+'\')" title="Share (with photos)">↗</button>' +
       '<button class="stop-edit-btn" onclick="editStop(\''+s.id+'\')" title="Edit">✎</button>' +
@@ -1942,6 +1981,7 @@ function renderStopCard(s, i, curId) {
       '</div>' +
       ((s.checks||[]).length ? '<div style="font-size:11.5px; color:var(--text-soft); margin-top:6px;">💵 ' + s.checks.length + ' check' + (s.checks.length>1?'s':'') + ' on this stop — see the Checks tab to review/deposit</div>' : '') +
       '<div class="status-row" style="margin-top:2px;">' + statusBtns + '</div>' +
+      caseStartLinkHtml(s) +
       updatedByHtml +
       '<div class="chat">' +
         '<div class="chat-log">' + chatLog + '</div>' +
@@ -2070,6 +2110,7 @@ function deleteStop(id) {
   currentDay.stops = currentDay.stops.filter(function(x) { return x.id !== id; });
   saveDays(days);
   if (s && s.zohoId) { zohoForgetImport(s.zohoId, s.isReturn); try { renderZohoOrders(); } catch (e) {} }   // the order can be added again
+  if (s && s.caseId) caseOnStopDeleted(s);
   if (s) addActivity('Removed', s.loc + ' was deleted');
   renderAll();
 }
@@ -2118,6 +2159,7 @@ function setStatus(id, status) {
   s.updatedAt = nowTimeStr();
   s.updatedAtMs = Date.now();
   saveDays(days);
+  if (s.caseId) caseOnStopStatus(s, status, todayKey());
   addActivity(STATUS_LABELS[status], s.loc + ' marked ' + STATUS_LABELS[status].toLowerCase() + ' by ' + s.updatedBy);
   showToast(status === 'completed' ? '✅ ' + s.loc + ' completed — saved in End of Day & History' : s.loc + ' → ' + STATUS_LABELS[status], status === 'returned' || status === 'postponed' ? 'red' : 'green');
   renderAll();
@@ -2152,6 +2194,11 @@ function confirmReturn() {
   s.updatedAtMs = Date.now();
   saveDays(days);
   saveReturnRecord(todayKey(), s);
+  /* opens a Return case (or notes it on this stop's case) so it shows on the Cancellations, Returns & Refunds page */
+  caseOnPartReturned(s, todayKey(), function(c) {
+    var st = currentDay.stops.find(function(x) { return x.id === id; });
+    if (st && !st.caseId) { st.caseId = c.id; saveDays(days); renderAll(); }
+  });
   addActivity('Returned Part', s.loc + ' — not accepted (' + reason + ') by ' + s.updatedBy);
   showToast(s.loc + ' → Returned Part', 'red');
   closeReturnModal();
@@ -2296,6 +2343,7 @@ function confirmProcessReturn() {
     Object.keys(changes).forEach(function(k) { s[k] = changes[k]; });
     updateReturnStopRemote(d.dateKey, d.stopId, changes);
     saveReturnRecord(d.dateKey, s);
+    if (s.caseId) caseOnReturnProcessed(s, d.condition, outcome, 'gcap/records/returnProof/' + s.id);
     if (d.dateKey === todayKey()) {
       gcapSaveDaysCache('kgps_days', days);
       addActivity('Return Resolved', (s.loc || 'Stop') + ' — ' + (outcome === 'disposed' ? 'disposed (damaged)' : 'shelved (' + returnConditionLabel(d.condition).toLowerCase() + ')') + ' by ' + who);
@@ -3243,6 +3291,7 @@ function zohoImportOrders(orders, assignedTo, asReturn, mopMap, closeMap, driver
     };
     currentDay.stops.push(stop);
     added.push(stop);
+    if (asReturn) zohoOpenReturnCase(o, stop);
     var ik = zohoIndexKey(o.id, !!asReturn);
     zohoImportedIndex[ik] = todayKey(); zohoRecentImports[ik] = Date.now();
     if (fbDb) fbDb.ref('gcap/zohoImported/' + ik).set(todayKey()).catch(function() {});
@@ -3254,6 +3303,44 @@ function zohoImportOrders(orders, assignedTo, asReturn, mopMap, closeMap, driver
     renderAll();
   }
   return added.length;
+}
+
+/* ---------- CANCELLATIONS, RETURNS & REFUNDS (the page itself is returns-refunds.html; shared logic in cases-lib.js) ---------- */
+function goToCases(qs) {
+  var url = 'returns-refunds.html' + (qs || '');
+  saveDaysChain.then(function() { location.href = url; }, function() { location.href = url; });   // let a save in flight finish first
+}
+function caseStopChipHtml(s) {
+  if (!s.caseId) return '';
+  var c = casesData[s.caseId];
+  if (c && c.deleted) return '';
+  var t = c && CASE_TYPES[c.type];
+  return '<span class="assigned-badge" style="cursor:pointer; color:' + (t ? t.color : 'var(--gold-2)') + '; border-color:' + (t ? t.color : 'var(--glass-border-gold)') + '; background:transparent;" onclick="goToCases(\'#' + escapeHtml(s.caseId) + '\')" title="Open this case on the Cancellations, Returns &amp; Refunds page">' +
+    escapeHtml(c ? caseShortLabel(c) : '📋 ' + s.caseId) + ' →</span>';
+}
+function caseStartLinkHtml(s) {
+  if (s.caseId || !canAssignRoutes()) return '';
+  var done = s.status === 'completed';
+  return '<div style="font-size:12px; margin:-4px 0 8px;"><a href="#" onclick="event.preventDefault(); goToCases(\'?from=stop&day=' + todayKey() + '&stop=' + s.id + '\')" style="color:var(--text-soft); text-decoration:underline;">' +
+    (done ? '↩ Customer wants to return this / 💲 refund →' : '✖ Customer cancelled this order / ↩ return / 💲 refund →') + '</a></div>';
+}
+/* Zoho "Add as return": the pickup stop gets a Return case so it can be inspected and refunded on the Returns page. */
+function zohoOpenReturnCase(o, stop) {
+  if (typeof caseCreate !== 'function' || !fbDb) return;
+  caseCreate({
+    type: 'return', stage: 'pickup_scheduled', customer: o.customer || '', address: o.address || '', so: o.number || '', items: stop.part || '', zohoId: o.id,
+    amount: o.money && o.money.total != null ? Number(o.money.total) : null, mop: stop.mop || '', reason: 'Customer return', source: 'Zoho order (Add as return)',
+    pickup: { day: todayKey(), stopId: stop.id, driver: stop.assignedTo || '', status: 'pending' }
+  }).then(function(c) {
+    var st = currentDay.stops.find(function(x) { return x.id === stop.id; });
+    if (st && !st.caseId) { st.caseId = c.id; saveDays(days); renderAll(); }
+  }).catch(function(e) { console.error('return case for Zoho order failed', e); });
+}
+/* On the board's Zoho list, show which orders already have a case. */
+function zohoExtraOrderActions(o) {
+  return caseList().filter(function(c) { return c.zohoId === o.id; }).map(function(c) {
+    return '<button class="btn btn-ghost btn-sm" onclick="goToCases(\'#' + escapeHtml(c.id) + '\')">' + escapeHtml(caseShortLabel(c)) + ' →</button>';
+  }).join('');
 }
 
 /* ---------- ASK AI board snapshot (chat panel + inventory lookup live in assistant.js) ---------- */
@@ -4127,6 +4214,7 @@ function shareText(title, text) {
 
 init();
 </script>
+<script src="cases-lib.js"></script>
 <script src="training.js"></script>
 <script src="drive-client.js"></script>
 <script src="assistant.js"></script>

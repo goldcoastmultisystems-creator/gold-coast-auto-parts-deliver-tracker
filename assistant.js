@@ -11,6 +11,9 @@ function invLocText(sku) { return inventoryLoc.loc[invLocKey(sku)] || ''; }
 var INV_STOPWORDS = { the:1, a:1, an:1, do:1, we:1, have:1, any:1, in:1, on:1, of:1, for:1, is:1, are:1, there:1, stock:1, much:1, many:1, how:1, what:1, whats:1, price:1, cost:1, qty:1, quantity:1, left:1, got:1, you:1, and:1, or:1, to:1, it:1, our:1, with:1, part:1, parts:1, available:1, inventory:1 };
 
 function assistantSuggestions() {
+  if (typeof assistantBoardName !== 'undefined' && assistantBoardName === 'returns') {
+    return ['Which cases are still open?', 'Which refunds need approval?', 'What returns are waiting for pickup?'];
+  }
   if (typeof assistantBoardName !== 'undefined' && assistantBoardName === 'inventory') {
     return ['What Camry parts are in stock?', 'Which RAV4 parts are sold out?', 'How many bumpers do we have?'];
   }

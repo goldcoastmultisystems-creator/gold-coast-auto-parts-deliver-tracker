@@ -272,9 +272,10 @@ function renderZohoList() {
           '<div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">' + escapeHtml(o.date) + (o.deliveryDate ? ' • deliver ' + escapeHtml(o.deliveryDate) : '') + (chips ? ' • ' + chips : '') + '</div>' +
           (open ? '' : '<div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">' + (o.address ? escapeHtml(o.address) + ' • ' : '') + o.lines.length + ' item' + (o.lines.length === 1 ? '' : 's') + ' — tap for full order ▾</div>') +
         '</div>' +
-        '<div style="display:flex; gap:6px; margin-top:6px;">' +
+        '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">' +
           '<button class="btn btn-sm" style="background:rgba(52,211,153,0.14); border:1px solid rgba(52,211,153,0.55); color:#34d399;" onclick="zohoWhatsApp(\'' + escapeHtml(o.id) + '\')">💬 WhatsApp</button>' +
-          '<button class="btn btn-ghost btn-sm" onclick="zohoShare(\'' + escapeHtml(o.id) + '\')">↗ Share</button></div>' +
+          '<button class="btn btn-ghost btn-sm" onclick="zohoShare(\'' + escapeHtml(o.id) + '\')">↗ Share</button>' +
+          (typeof zohoExtraOrderActions === 'function' ? zohoExtraOrderActions(o) : '') + '</div>' +
         (open ? zohoDetailHtml(o) : '') +
       '</div></div>';
   }).join('');
